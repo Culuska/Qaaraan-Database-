@@ -193,13 +193,17 @@
   .auth-hero .hero-stats .n{font-size:21px;font-weight:700;}
   .auth-hero .hero-stats .l{font-size:11px;color:rgba(255,255,255,.72);margin-top:2px;}
   .auth-side{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg);}
-  .auth-wrap{max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 16px 40px rgba(38,37,31,.08);}
-  .auth-wrap h2{font-size:19px;margin:0 0 6px;}
-  .auth-wrap .sub{font-size:12px;color:var(--ink-2);margin-bottom:20px;}
+  .auth-wrap{position:relative;max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 16px 40px rgba(38,37,31,.08);overflow:hidden;}
+  .auth-wrap::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent);}
+  .auth-wrap h2{font-size:19px;margin:0 0 6px;text-align:center;}
+  .auth-wrap .sub{font-size:12px;color:var(--ink-2);margin-bottom:20px;text-align:center;}
   .auth-wrap .frow{margin-bottom:14px;}
   .auth-wrap label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:4px;}
+  .auth-wrap .input-icon{position:relative;}
+  .auth-wrap .input-icon i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:16px;pointer-events:none;}
+  .auth-wrap .input-icon input{padding-left:38px;border-radius:24px;}
   .auth-wrap .err{color:var(--danger-ink);font-size:12px;margin-bottom:10px;min-height:16px;}
-  .auth-wrap button.primary{width:100%;padding:11px;margin-top:6px;font-size:14px;}
+  .auth-wrap button.primary{width:100%;padding:12px;margin-top:6px;font-size:14px;border-radius:24px;}
   .auth-switch{margin-top:14px;font-size:12px;color:var(--ink-2);text-align:center;}
   .auth-switch a{color:var(--accent-ink);cursor:pointer;text-decoration:underline;}
   @media (max-width:860px){
@@ -2121,8 +2125,8 @@ function authHeroHtml(){
           <circle cx="22" cy="22" r="2.6" fill="#0F6E56"/>
         </svg>
       </div>
-      <h1>Maamul si fudud lacagaha qaaraankaaga</h1>
-      <p>Xubnaha, qoondooyinka bille, kharashaadka bulshada (guur, diya, iwm), iyo xisaabaadka guud — dhammaan hal meel, si sahlan loo maamulo.</p>
+      <h1>Qaaranka-Xalane Cadow</h1>
+      <p>Qaaranka waa Insurance qof walbo oo qaraabadaha anfacaayo.</p>
       <div class="hero-stats">
         <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">Xubno firfircoon</div></div>
         <div><div class="n">July–Dec 2026</div><div class="l">Xilliga qoondooyinka</div></div>
@@ -2141,8 +2145,8 @@ function renderSetupScreen(){
           <h2>Samee account-ka admin-ka ugu horreeya</h2>
           <div class="sub">Weli ma jiraan users. Account-kan wuxuu noqon doonaa <b>admin</b> — wuxuu awood u yeelan doonaa inuu maamulo dhammaan xubnaha, users-ka, iyo codsiyada.</div>
           <div class="err" id="authErr"></div>
-          <div class="frow"><label>Username</label><input type="text" id="setupUser" value="Osman" placeholder="tusaale: Osman"></div>
-          <div class="frow"><label>Password</label><input type="password" id="setupPass" placeholder="ugu yaraan 4 xaraf"></div>
+          <div class="frow"><label>Username</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="setupUser" value="Osman" placeholder="tusaale: Osman"></div></div>
+          <div class="frow"><label>Password</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="setupPass" placeholder="ugu yaraan 4 xaraf"></div></div>
           <button class="primary" id="setupBtn">Samee account-ka admin-ka</button>
         </div>
       </div>
@@ -2172,8 +2176,8 @@ function renderLoginScreen(){
           <h2>Gal — Qaaraan Database</h2>
           <div class="sub">Geli username iyo password-kaaga.</div>
           <div class="err" id="authErr"></div>
-          <div class="frow"><label>Username</label><input type="text" id="loginUser" placeholder="username"></div>
-          <div class="frow"><label>Password</label><input type="password" id="loginPass" placeholder="password"></div>
+          <div class="frow"><label>Username</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
+          <div class="frow"><label>Password</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
           <button class="primary" id="loginBtn">Gal</button>
         </div>
       </div>

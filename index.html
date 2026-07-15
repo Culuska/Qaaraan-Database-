@@ -28,12 +28,34 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;}
   .wrap{max-width:1220px;margin:0 auto;padding:20px 20px 60px;}
-  .topbar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
-  .topbar h1{font-size:19px;font-weight:600;margin:0;}
-  .topbar .sub{color:var(--ink-2);font-size:13px;}
-  .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);}
-  .tabs button{border:none;background:none;padding:9px 4px;margin-right:18px;font-size:14px;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;}
-  .tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--accent);}
+  .app-shell{display:flex;align-items:stretch;min-height:100vh;}
+  .sidebar{width:242px;flex-shrink:0;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .sidebar-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 20px;}
+  .sidebar-brand .mark{width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}
+  .sidebar-brand .word{font-size:15px;font-weight:700;}
+  .sidebar-nav{display:flex;flex-direction:column;gap:2px;}
+  .sidebar-nav button{display:flex;align-items:center;gap:11px;padding:9px 10px;border:none;background:none;border-radius:8px;font-size:13.5px;color:var(--ink-2);text-align:left;cursor:pointer;width:100%;min-height:auto;}
+  .sidebar-nav button i{font-size:17px;width:18px;text-align:center;flex-shrink:0;}
+  .sidebar-nav button:hover{background:#F4F2EC;color:var(--ink);}
+  .sidebar-nav button.on{background:var(--accent-bg);color:var(--accent-ink);font-weight:600;}
+  .sidebar-divider{height:1px;background:var(--line);margin:10px 6px;}
+  .sidebar-footer{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;}
+  .sidebar-user{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px;gap:8px;}
+  .sidebar-user .nm{font-size:13px;font-weight:600;}
+  .sidebar-user .rl{font-size:11px;color:var(--ink-2);}
+  .sidebar-user .gear{border:none;background:none;color:var(--ink-2);cursor:pointer;padding:4px;flex-shrink:0;min-height:auto;}
+  .sidebar-user .gear:hover{color:var(--ink);}
+  .sidebar-footer button.logout{width:100%;}
+  .main-content{flex:1;min-width:0;padding:26px 30px 60px;max-width:1180px;}
+  .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .page-head h1{font-size:21px;font-weight:700;margin:0;}
+  .page-head .page-sub{color:var(--ink-2);font-size:13px;margin:2px 0 0;flex-basis:100%;}
+  .page-head-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  @media (max-width:768px){
+    .sidebar{display:none;}
+    .main-content{padding:14px 12px 20px;max-width:100%;}
+    .page-head h1{font-size:18px;}
+  }
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;}
   .card .lbl{font-size:12px;color:var(--ink-2);margin-bottom:4px;}
@@ -245,38 +267,36 @@
 <body>
 <div id="authRoot"></div>
 <div id="publicRoot" style="display:none;"></div>
-<div class="wrap" id="appWrap" style="display:none;">
-  <div class="topbar">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <svg width="44" height="44" viewBox="0 0 44 44" style="flex-shrink:0;">
-        <circle cx="22" cy="22" r="21" fill="#0F6E56"/>
-        <circle cx="22" cy="22" r="21" fill="none" stroke="#085041" stroke-width="1"/>
-        <circle cx="15" cy="17" r="5.2" fill="#E1F5EE"/>
-        <circle cx="29" cy="17" r="5.2" fill="#E1F5EE" fill-opacity="0.85"/>
-        <circle cx="22" cy="27" r="5.2" fill="#E1F5EE" fill-opacity="0.7"/>
-        <circle cx="22" cy="22" r="2.6" fill="#0F6E56"/>
-      </svg>
-      <div>
-        <h1>Qaaraan — Database Lacagaha</h1>
-        <div class="sub">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
-      </div>
+<div class="app-shell" id="appWrap" style="display:none;">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">Q</div>
+      <div class="word">Qaaraan</div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;">
-      <div class="user-chip"><span class="dot"></span><span id="userChipName"></span></div>
-      <div class="toprow-actions">
-        <button id="btnManageUsers"><i class="ti ti-users"></i> Users</button>
-        <button id="btnAppSettings">Settings</button>
-        <button class="primary" id="btnAddCustomer"><i class="ti ti-plus"></i> Add new customer</button>
-        <button id="btnLogout">Logout</button>
-      </div>
+    <div class="sidebar-nav" id="sidebarNavList"></div>
+    <div class="sidebar-footer" id="sidebarFooter"></div>
+  </div>
+  <div class="main-content">
+
+  <div id="dashboardView">
+    <div class="page-head">
+      <h1>Guddoon</h1>
+      <div class="page-sub">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
+    </div>
+    <div class="cards" id="summaryCards"></div>
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-head"><h2>Dhaqdhaqaaqii ugu dambeeyay</h2></div>
+      <div id="dashRecentActivity"></div>
     </div>
   </div>
 
-  <div class="tabs" id="tabsBar"></div>
-
-  <div class="cards" id="summaryCards"></div>
-
-  <div id="membersView">
+  <div id="membersView" style="display:none;">
+    <div class="page-head">
+      <h1>Xubnaha</h1>
+      <div class="page-head-actions">
+        <button class="primary" id="btnAddCustomer"><i class="ti ti-plus"></i> Xubin cusub</button>
+      </div>
+    </div>
     <div class="layout" id="membersLayout">      <div class="panel">
         <div class="view-toggle">
           <button id="btnFull" class="on">Full report</button>
@@ -311,14 +331,15 @@
   </div>
 
   <div id="disbView" style="display:none;">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Kharashaadka Bulshada (Guur, Diya, iwm)</h2>
-        <div style="display:flex;gap:6px;">
-          <button id="btnDisbExportPdf">Export PDF</button>
-          <button id="btnDisbExportXlsx">Export Excel</button>
-        </div>
+    <div class="page-head">
+      <h1>Kharashaadka Bulshada</h1>
+      <div class="page-sub">Guur, Diya, iwm</div>
+      <div class="page-head-actions">
+        <button id="btnDisbExportPdf">Export PDF</button>
+        <button id="btnDisbExportXlsx">Export Excel</button>
       </div>
+    </div>
+    <div class="panel">
       <div style="padding:16px;">
         <div class="no-perm" id="disbNoPerm" style="display:none;margin-bottom:16px;">Uma haysatid ogolaansho lacag qabasho / kharash diiwaangelin.</div>
         <form class="disb-form" id="disbForm">
@@ -359,16 +380,16 @@
   </div>
 
   <div id="pendingView" style="display:none;">
+    <div class="page-head"><h1>Ogolaansho La Sugayo</h1></div>
     <div class="panel">
-      <div class="panel-head"><h2>Codsiyada sugaya ogolaanshaha (Pending approvals)</h2></div>
       <div id="pendingList"></div>
       <div class="foot-note" id="pendingFoot"></div>
     </div>
   </div>
 
   <div id="activityView" style="display:none;">
+    <div class="page-head"><h1>Diiwaanka Dhaqdhaqaaqa</h1></div>
     <div class="panel">
-      <div class="panel-head"><h2>Dhammaan Activity-ga (Activity log)</h2></div>
       <div class="search"><input type="text" id="activitySearch" placeholder="Search magaca user-ka..."></div>
       <div class="list-scroll" id="activityList"></div>
       <div class="foot-note" id="activityFoot"></div>
@@ -376,18 +397,18 @@
   </div>
 
   <div id="accountsView" style="display:none;">
+    <div class="page-head">
+      <h1>Konoonyada</h1>
+      <div class="page-head-actions"><button id="btnAddAccount">Ku dar account</button></div>
+    </div>
     <div class="panel">
-      <div class="panel-head">
-        <h2>Accounts (Bank / Cash balances)</h2>
-        <button id="btnAddAccount">Ku dar account</button>
-      </div>
       <div id="accountsList" style="padding:16px;"></div>
     </div>
   </div>
 
   <div id="remindersView" style="display:none;">
+    <div class="page-head"><h1>Xasuusin Bille</h1></div>
     <div class="panel">
-      <div class="panel-head"><h2>Xasuusin Bille (Monthly Reminders)</h2></div>
       <div class="search"><input type="text" id="reminderSearch" placeholder="Search magaca..."></div>
       <div class="list-scroll" id="remindersList"></div>
       <div class="foot-note" id="remindersFoot"></div>
@@ -395,6 +416,7 @@
   </div>
 
   <div id="financialView" style="display:none;">
+    <div class="page-head"><h1>Xisaabaadka Guud</h1></div>
     <div class="cards" id="financialCards" style="margin-bottom:16px;"></div>
     <div class="panel">
       <div class="panel-head">
@@ -404,6 +426,8 @@
       <div id="payablesList"></div>
       <div class="foot-note" id="payablesFoot"></div>
     </div>
+  </div>
+
   </div>
 </div>
 <div id="mobileBottomNav"></div>
@@ -706,35 +730,42 @@ function showToast(msg){
 }
 
 function renderSummary(){
-  if(currentTab === "members"){
-    if(!hasPerm("viewReports")){
-      document.getElementById("summaryCards").innerHTML = "";
-      return;
-    }
-    const active = db.members.filter(m=>m.status==="active");
-    const totalBal = db.members.reduce((s,m)=>s+computeBalance(m),0);
-    const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
-    const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
-    document.getElementById("summaryCards").innerHTML = `
-      <div class="card"><div class="lbl">Wadarta balance-ka hadda</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
-      <div class="card"><div class="lbl">Xubnaha (active)</div><div class="val">${active.length} / ${db.members.length}</div></div>
-      <div class="card"><div class="lbl">Xubno lacag laga rabo</div><div class="val">${owingCount}</div></div>
-      <div class="card"><div class="lbl">Lacagta la ururiyay</div><div class="val pos">${money(totalCollected)}</div></div>
-      ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">Codsi sugaya</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
-    `;
-  } else if(currentTab === "disb") {
-    if(!hasPerm("viewReports")){
-      document.getElementById("summaryCards").innerHTML = "";
-      return;
-    }
-    const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
-    const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
-    document.getElementById("summaryCards").innerHTML = `
-      <div class="card"><div class="lbl">Wadarta kharashka</div><div class="val neg">${money(totalDisb)}</div></div>
-      <div class="card"><div class="lbl">Tirada kharashaadka</div><div class="val">${db.disbursements.length}</div></div>
-      <div class="card"><div class="lbl">Lacagta hadda jirta (est.)</div><div class="val ${(totalCollected-totalDisb)>=0?'pos':'neg'}">${money(totalCollected-totalDisb)}</div></div>
-    `;
+  const el = document.getElementById("summaryCards");
+  if(!hasPerm("viewReports")){
+    el.innerHTML = "";
+    return;
   }
+  const active = db.members.filter(m=>m.status==="active");
+  const totalBal = db.members.reduce((s,m)=>s+computeBalance(m),0);
+  const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
+  const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
+  const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
+  el.innerHTML = `
+    <div class="card"><div class="lbl">Wadarta balance-ka hadda</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
+    <div class="card"><div class="lbl">Xubnaha (active)</div><div class="val">${active.length} / ${db.members.length}</div></div>
+    <div class="card"><div class="lbl">Xubno lacag laga rabo</div><div class="val">${owingCount}</div></div>
+    <div class="card"><div class="lbl">Lacagta la ururiyay</div><div class="val pos">${money(totalCollected)}</div></div>
+    <div class="card"><div class="lbl">Wadarta kharashka</div><div class="val neg">${money(totalDisb)}</div></div>
+    ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">Codsi sugaya</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
+  `;
+}
+
+function renderDashboardActivity(){
+  const el = document.getElementById("dashRecentActivity");
+  if(!el) return;
+  if(!isAdmin()){
+    el.innerHTML = '';
+    return;
+  }
+  const recent = db.activityLog.slice(0,5);
+  el.innerHTML = recent.length ? recent.map(a=>`
+    <div class="activity-row">
+      <div>
+        <div>${a.action} <span class="status-tag ${a.status}">${a.status}</span></div>
+        <div class="meta2">${a.actor} &nbsp;•&nbsp; ${new Date(a.ts).toLocaleString()} ${a.details?(' — '+a.details):''}</div>
+      </div>
+    </div>
+  `).join("") : '<div class="empty">Wax activity ah lama helin.</div>';
 }
 
 function memberRowHtml(m, idx){
@@ -1707,26 +1738,47 @@ function renderActivity(){
 }
 
 function renderTabs(){
-  const bar = document.getElementById("tabsBar");
   const tabs = [
+    {id:"dashboard", label:"Guddoon", icon:"ti-layout-grid"},
     {id:"members", label:"Xubnaha", icon:"ti-users"},
     {id:"disb", label:"Kharashaadka Bulshada", icon:"ti-report-money"}
   ];
+  if(hasPerm("viewReports")){
+    tabs.push({id:"accounts", label:"Konoonyada", icon:"ti-building-bank"});
+    tabs.push({id:"financial", label:"Xisaabaadka Guud", icon:"ti-report-analytics"});
+  }
   if(hasPerm("collectPayment")){
     tabs.push({id:"reminders", label:"Xasuusin Bille", icon:"ti-bell"});
   }
-  if(hasPerm("viewReports")){
-    tabs.push({id:"accounts", label:"Accounts", icon:"ti-building-bank"});
-    tabs.push({id:"financial", label:"Xisaabaadka Guud", icon:"ti-report-analytics"});
-  }
+  const adminTabs = [];
   if(isAdmin()){
-    tabs.push({id:"pending", label:"Pending approvals"+(db.pendingActions.filter(p=>p.status==="pending").length ? ` (${db.pendingActions.filter(p=>p.status==="pending").length})` : ""), icon:"ti-clock-check"});
-    tabs.push({id:"activity", label:"Activity log", icon:"ti-history"});
+    adminTabs.push({id:"pending", label:"Ogolaansho La Sugayo"+(db.pendingActions.filter(p=>p.status==="pending").length ? ` (${db.pendingActions.filter(p=>p.status==="pending").length})` : ""), icon:"ti-clock-check"});
+    adminTabs.push({id:"activity", label:"Diiwaanka Dhaqdhaqaaqa", icon:"ti-history"});
   }
-  bar.innerHTML = tabs.map(t=>`<button data-tab="${t.id}" class="${currentTab===t.id?'on':''}">${t.label}</button>`).join("");
-  bar.querySelectorAll("[data-tab]").forEach(btn=>{
+
+  const navBtn = t => `<button data-tab="${t.id}" class="${currentTab===t.id?'on':''}"><i class="ti ${t.icon}"></i><span>${t.label}</span></button>`;
+  const navList = document.getElementById("sidebarNavList");
+  navList.innerHTML = tabs.map(navBtn).join("")
+    + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
+    + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>Isticmaalayaasha</span></button>` : "");
+  navList.querySelectorAll("[data-tab]").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
   });
+  const usersBtn = navList.querySelector("[data-action='users']");
+  if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
+
+  const footer = document.getElementById("sidebarFooter");
+  const roleLabel = currentUserObj.role === "admin" ? "Maamule" : "Shaqaale";
+  footer.innerHTML = `
+    <div class="sidebar-user">
+      <div><div class="nm">${currentUser}</div><div class="rl">${roleLabel}</div></div>
+      ${isAdmin() ? `<button class="gear" id="btnAppSettings" title="Settings"><i class="ti ti-settings"></i></button>` : ""}
+    </div>
+    <button class="logout" id="btnLogout">Ka bax</button>
+  `;
+  document.getElementById("btnLogout").addEventListener("click", doLogout);
+  const settingsBtn = document.getElementById("btnAppSettings");
+  if(settingsBtn) settingsBtn.addEventListener("click", openAppSettingsModal);
 
   const mobileTabs = tabs.slice(0,5);
   const nav = document.getElementById("mobileBottomNav");
@@ -1746,6 +1798,7 @@ function updateMobileLayoutClass(){
 function switchTab(tab){
   currentTab = tab;
   renderTabs();
+  document.getElementById("dashboardView").style.display = tab==="dashboard" ? "" : "none";
   document.getElementById("membersView").style.display = tab==="members" ? "" : "none";
   document.getElementById("disbView").style.display = tab==="disb" ? "" : "none";
   document.getElementById("pendingView").style.display = tab==="pending" ? "" : "none";
@@ -1754,6 +1807,7 @@ function switchTab(tab){
   document.getElementById("remindersView").style.display = tab==="reminders" ? "" : "none";
   document.getElementById("financialView").style.display = tab==="financial" ? "" : "none";
   renderSummary();
+  if(tab==="dashboard") renderDashboardActivity();
   if(tab==="disb") renderDisbursements();
   if(tab==="pending") renderPending();
   if(tab==="activity") renderActivity();
@@ -2143,17 +2197,10 @@ function renderLoginScreen(){
 function showApp(){
   document.getElementById("authRoot").innerHTML = "";
   document.getElementById("appWrap").style.display = "";
-  document.getElementById("userChipName").innerHTML = `${currentUser} <span class="role-badge ${currentUserObj.role}">${currentUserObj.role}</span>`;
-  document.getElementById("btnManageUsers").style.display = isAdmin() ? "" : "none";
   document.getElementById("btnAddCustomer").style.display = hasPerm("addCustomer") ? "" : "none";
   document.getElementById("btnGroups").style.display = hasPerm("viewReports") ? "" : "none";
-  currentTab = "members";
-  renderTabs();
-  document.getElementById("membersView").style.display = "";
-  document.getElementById("disbView").style.display = "none";
-  document.getElementById("pendingView").style.display = "none";
-  document.getElementById("activityView").style.display = "none";
-  renderSummary(); renderList(); renderDetail();
+  switchTab("dashboard");
+  renderList(); renderDetail();
   if(!window.__dragScrollbarInit){ setupDragScrollbar(); window.__dragScrollbarInit = true; }
 }
 
@@ -2220,9 +2267,6 @@ function openManageUsersModal(){
   });
 }
 
-document.getElementById("btnManageUsers").addEventListener("click", openManageUsersModal);
-document.getElementById("btnAppSettings").addEventListener("click", openAppSettingsModal);
-
 function openAppSettingsModal(){
   if(!isAdmin()){
     openModal(`<h3>Settings</h3><p class="muted">Kaliya admin-ku wuu bedeli karaa settings-ka.</p><div class="actions"><button id="mCancel">Xir</button></div>`);
@@ -2251,12 +2295,12 @@ function openAppSettingsModal(){
     closeModal();
   });
 }
-document.getElementById("btnLogout").addEventListener("click", ()=>{
+function doLogout(){
   logActivity("Logout", "", "direct");
   saveDb();
   currentUser = null; currentUserObj = null;
   renderAuthGate();
-});
+}
 
 function renderPublicMemberView(memberId){
   document.getElementById("authRoot").style.display = "none";

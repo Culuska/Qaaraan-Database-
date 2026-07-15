@@ -411,7 +411,10 @@
   </div>
 
   <div id="remindersView" style="display:none;">
-    <div class="page-head"><h1>Xasuusin Bille</h1></div>
+    <div class="page-head">
+      <h1>Xasuusin Bille</h1>
+      <div class="page-head-actions"><button class="primary" id="btnBulkReminders"><i class="ti ti-send"></i> Dir dhammaan (WhatsApp)</button></div>
+    </div>
     <div class="panel">
       <div class="search"><input type="text" id="reminderSearch" placeholder="Search magaca..."></div>
       <div class="list-scroll" id="remindersList"></div>
@@ -1225,10 +1228,10 @@ function formatSomaliPhone(raw){
 function buildBalanceMessage(m){
   const bal = computeBalance(m);
   const paid = totalPaid(m);
-  const recentTx = [...m.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
-  const txLines = recentTx.length ? recentTx.map(t=>
-    `  ${t.date}: ${t.type==='due'?'Qoondo':(t.type==='writeoff'?'Cafinaad':'Payment')} ${t.type==='due'?'+':'-'}${money(t.amount)}`
-  ) : ["  (Wax dhaqdhaqaaq ah lama helin)"];
+  const recentPayments = [...m.transactions].filter(t=>t.type==="payment").sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+  const payLines = recentPayments.length ? recentPayments.map(t=>
+    `  ${t.date}: ${money(t.amount)}${t.note?(' — '+t.note):''}`
+  ) : ["  (Wali lacag lama bixin)"];
   const hasBaseUrl = !!(db.settings && db.settings.baseUrl);
   const baseUrl = hasBaseUrl ? db.settings.baseUrl.replace(/\/?$/, '') : window.location.href.split('?')[0].split('#')[0];
   const link = `${baseUrl}?member=${m.id}`;
@@ -1238,10 +1241,10 @@ function buildBalanceMessage(m){
     `Tan waa xaaladda qaaraankaaga:`,
     `- Qoondada bille: ${money(m.monthlyDue||0)}/bil`,
     `- Wadarta aad bixisay: ${money(paid)}`,
-    `- Balance-ka hadda: ${bal<0 ? money(Math.abs(bal))+" (dheeraad/credit)" : money(bal)}`,
+    `- Balance-ka hadda (waa la rabo): ${bal<0 ? money(Math.abs(bal))+" (dheeraad/credit)" : money(bal)}`,
     ``,
-    `3-da dhaqdhaqaaq ee ugu dambeeyay:`,
-    ...txLines,
+    `3-da lacag ee ugu dambeeyay ee aad bixisay:`,
+    ...payLines,
     ``,
     bal>0 ? `Fadlan qoondadaada dhaqso u soo dir.` : `Mahadsanid, wax lagaa rabo ma jiro hadda.`,
     ``,
@@ -1274,6 +1277,62 @@ function sendBalanceViaWhatsapp(m){
     const text = encodeURIComponent(document.getElementById("waMessage").value);
     window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
     closeModal();
+  });
+}
+
+let bulkReminderQueue = [];
+let bulkReminderIndex = 0;
+
+function openBulkReminderModal(){
+  const owing = db.members
+    .filter(m=>m.status==="active" && computeBalance(m) > 0 && formatSomaliPhone(m.phone))
+    .sort((a,b)=>computeBalance(b)-computeBalance(a));
+  if(!owing.length){
+    showToast("Wax qof ah oo lacag laga rabo oo telefoon leh lama helin.");
+    return;
+  }
+  bulkReminderQueue = owing;
+  bulkReminderIndex = 0;
+  renderBulkReminderStep();
+}
+
+function renderBulkReminderStep(){
+  const total = bulkReminderQueue.length;
+  if(bulkReminderIndex >= total){
+    openModal(`
+      <h3>Dhammaaday</h3>
+      <p class="muted">Waad soo martay dhammaan ${total} qof oo lacag laga rabo.</p>
+      <div class="actions"><button class="primary" id="mDone">Xir</button></div>
+    `);
+    document.getElementById("mDone").addEventListener("click", closeModal);
+    return;
+  }
+  const m = bulkReminderQueue[bulkReminderIndex];
+  const bal = computeBalance(m);
+  const phone = formatSomaliPhone(m.phone);
+  openModal(`
+    <h3>Xasuusin guud — ${bulkReminderIndex+1} / ${total}</h3>
+    <div class="bal-row" style="margin-bottom:14px;">
+      <div class="bal-box"><div class="lbl">Magaca</div><div class="val" style="font-size:14px;">${m.name}</div></div>
+      <div class="bal-box"><div class="lbl">Balance</div><div class="val" style="color:var(--danger-ink)">${money(bal)}</div></div>
+    </div>
+    <div class="frow">
+      <label>Fariinta (waad bedeli kartaa)</label>
+      <textarea id="waMessage" style="min-height:200px;">${buildBalanceMessage(m)}</textarea>
+    </div>
+    <div class="actions">
+      <button id="mStop">Jooji</button>
+      <button id="mSkip">Ka bood</button>
+      <button class="primary" id="mSend">Fur WhatsApp &amp; tag qofka xiga</button>
+    </div>
+  `);
+  document.getElementById("mStop").addEventListener("click", closeModal);
+  document.getElementById("mSkip").addEventListener("click", ()=>{ bulkReminderIndex++; renderBulkReminderStep(); });
+  document.getElementById("mSend").addEventListener("click", ()=>{
+    const text = encodeURIComponent(document.getElementById("waMessage").value);
+    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+    bulkReminderIndex++;
+    renderBulkReminderStep();
   });
 }
 
@@ -1845,6 +1904,7 @@ function renderReminders(){
   });
 }
 document.getElementById("reminderSearch").addEventListener("input", renderReminders);
+document.getElementById("btnBulkReminders").addEventListener("click", openBulkReminderModal);
 
 function accountBalance(acc){
   let bal = acc.openingBalance;

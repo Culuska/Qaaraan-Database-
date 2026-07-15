@@ -305,6 +305,8 @@
     <div class="page-head">
       <h1 data-t-en="Members">Xubnaha</h1>
       <div class="page-head-actions">
+        <button id="btnFullExportPdf">Export PDF</button>
+        <button id="btnFullExportXlsx">Export Excel</button>
         <button class="primary" id="btnAddCustomer"><i class="ti ti-plus"></i> <span data-t-en="New member">Xubin cusub</span></button>
       </div>
     </div>
@@ -875,6 +877,9 @@ function renderList(){
   const rows = document.getElementById("memberRows");
   const membersById = Object.fromEntries(db.members.map(m=>[m.id,m]));
 
+  const fullExportPdfBtn = document.getElementById("btnFullExportPdf");
+  const fullExportXlsxBtn = document.getElementById("btnFullExportXlsx");
+
   if(viewMode === "full"){
     const sorted = [...db.members].sort((a,b)=>a.name.localeCompare(b.name));
     const filtered = sorted.filter(m=>m.name.toLowerCase().includes(q) && statusPasses(m,sf));
@@ -882,8 +887,15 @@ function renderList(){
     document.getElementById("listFoot").textContent = `${filtered.length} / ${db.members.length} ${t("xubnood","members")}`;
     attachRowClicks(rows);
     updateDragThumb();
+    const showExport = hasPerm("viewReports");
+    fullExportPdfBtn.style.display = showExport ? "" : "none";
+    fullExportXlsxBtn.style.display = showExport ? "" : "none";
+    fullExportPdfBtn.onclick = ()=>exportFullListPdf(filtered);
+    fullExportXlsxBtn.onclick = ()=>exportFullListExcel(filtered);
     return;
   }
+  fullExportPdfBtn.style.display = "none";
+  fullExportXlsxBtn.style.display = "none";
 
   let html = "";
   let shownCount = 0;
@@ -1034,6 +1046,50 @@ function exportGroupPdf(g, members){
   doc.setFontSize(10);
   doc.text(t("Wadarta","Total")+": $"+total.toFixed(2), 140, y);
   doc.save(g.group.replace(/[^a-z0-9]+/gi,"_")+".pdf");
+}
+
+function exportFullListExcel(members){
+  const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[],
+    ["#",t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance","Status"]];
+  let total = 0;
+  members.forEach((m,i)=>{
+    const bal = computeBalance(m);
+    total += bal;
+    rows.push([i+1, m.name, m.phone||"-", m.monthlyDue||0, bal, m.status]);
+  });
+  rows.push(["","","",t("Wadarta","Total"), total, ""]);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:32},{wch:16},{wch:12},{wch:14},{wch:10}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, t("xubnaha_oo_dhan","full_member_report")+".xlsx");
+}
+
+function exportFullListPdf(members){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 18;
+  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y+=9;
+  doc.setFontSize(9); doc.setFont(undefined,"bold");
+  doc.text("#", 14, y); doc.text(t("Magaca","Name"), 24, y); doc.text(t("Telefoon","Phone"), 110, y); doc.text(t("Qoondo","Due"), 150, y); doc.text("Balance", 175, y);
+  y += 4; doc.line(14,y,196,y); y += 5;
+  doc.setFont(undefined,"normal");
+  let total = 0;
+  members.forEach((m,i)=>{
+    if(y > 280){ doc.addPage(); y = 18; }
+    const bal = computeBalance(m);
+    total += bal;
+    doc.text(String(i+1), 14, y);
+    doc.text(String(m.name).slice(0,40)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''), 24, y);
+    doc.text(String(m.phone||"-"), 110, y);
+    doc.text(m.monthlyDue?("$"+m.monthlyDue):"-", 150, y);
+    doc.text("$"+bal.toFixed(2), 175, y);
+    y += 6;
+  });
+  y += 2; doc.line(14,y,196,y); y += 6;
+  doc.setFontSize(10);
+  doc.text(t("Wadarta","Total")+`: $${total.toFixed(2)}  (${members.length} ${t('xubnood','members')})`, 14, y);
+  doc.save(t("xubnaha_oo_dhan","full_member_report")+".pdf");
 }
 
 function memberDisbursementBreakdown(m){

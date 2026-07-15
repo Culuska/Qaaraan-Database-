@@ -110,14 +110,32 @@ Tabs shown depend on permissions (`renderTabs`):
 - Disbursement exports: full, or filtered by category.
 - **General Ledger** (`buildJournalEntries()` in `index.html`) — not a real
   ledger table in the database. Computed live from `db.members[].transactions`,
-  `db.disbursements`, and `db.accounts` opening balances into a derived
-  double-entry journal: every due/payment/write-off/expense becomes a
+  `db.disbursements`, `db.payables`, and `db.accounts` opening balances into a
+  derived double-entry journal: every due/payment/write-off/expense becomes a
   debit+credit pair across virtual accounts (`Accounts Receivable — Members`,
-  `Dues Revenue`, `Bad Debt Expense`, `Expense: <category>`) and real bank/cash
-  accounts. Three views share this journal: a chronological **Journal**, a
-  **Ledger by account** (pick one account, see a running balance), and a
-  **Trial Balance** (confirms total debits = total credits). PDF/Excel export
-  matches the existing export patterns.
+  `Dues Revenue`, `Bad Debt Expense`, `Accounts Payable`, `Expense: <category>`)
+  and real bank/cash accounts. Three views share this journal: a chronological
+  **Journal**, a **Ledger by account** (pick one account, see a running
+  balance), and a **Trial Balance** (confirms total debits = total credits).
+  PDF/Excel export matches the existing export patterns.
+  - **Bills go through Accounts Payable as two linked entries**, not one:
+    when a payable is created, `Dr Expense: <category> / Cr Accounts Payable`
+    (dated `createdDate`) — this is what makes unpaid bills show up as a real
+    liability even before they're paid. When `openPayBillModal()` pays it,
+    the resulting disbursement carries a `payableId` back-reference, and the
+    journal posts a second entry `Dr Accounts Payable / Cr <bank account>`
+    (dated `paidDate`) to clear the liability. An unpaid bill's category is
+    unknown until payment, so it posts to a generic `Uncategorized Expense
+    (AP)` bucket until then; disbursements with a `payableId` are skipped in
+    the regular disbursement loop so they aren't double-counted. Regular
+    disbursements (no linked payable — Guno/Diya/Dhiig nool paid directly)
+    keep the simpler single `Dr Expense / Cr Bank` entry, since there's no
+    AP step for those.
+  - **This makes the Ledger accrual-basis for billed expenses**, while
+    `renderFinancialSummary()`'s "Total expenses" card on the Financials tab
+    stays cash-basis (`db.disbursements.reduce(...)`, unpaid payables
+    excluded) — the two numbers can legitimately differ by the total of
+    unpaid bills. Not a bug; flag it if asked to reconcile the two views.
 
 ## Quick payment receipt
 

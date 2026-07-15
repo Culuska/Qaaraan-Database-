@@ -2385,7 +2385,7 @@ function openPayBillModal(payId){
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const account = document.getElementById("apPayAccount").value;
     const category = document.getElementById("apPayCategory").value;
-    db.disbursements.push({id:"d"+Date.now(), category, amount:p.amount, date:todayStr(), recipient:p.vendor, memo:"Bill payment (AP): "+(p.description||p.vendor), account});
+    db.disbursements.push({id:"d"+Date.now(), category, amount:p.amount, date:todayStr(), recipient:p.vendor, memo:"Bill payment (AP): "+(p.description||p.vendor), account, payableId:p.id});
     p.status = "paid";
     p.paidDate = todayStr();
     logActivity("Bixinta bill (AP -> Expense)", `${p.vendor}: ${money(p.amount)}`, "direct");
@@ -2497,6 +2497,8 @@ function buildJournalEntries(){
   const REVENUE = t("Dakhliga Qoondooyinka","Dues Revenue");
   const BADDEBT = t("Kharashka Deynta la Cafiyay","Bad Debt Expense");
   const EQUITY = t("Hantida Bilowga ah","Opening Equity");
+  const AP = t("Xisaabaadka La Bixin (Deymaha)","Accounts Payable");
+  const UNCATEGORIZED_AP_EXPENSE = t("Kharash aan weli la qeybin (AP)","Uncategorized Expense (AP)");
   const acctName = (id)=>{
     const a = db.accounts.find(x=>x.id===id);
     return a ? a.name : t("Account aan la sheegin","Unspecified account");
@@ -2521,7 +2523,21 @@ function buildJournalEntries(){
       }
     }
   }
+  // Bills go through Accounts Payable as two linked entries — received (Dr
+  // Expense / Cr AP), then paid (Dr AP / Cr Bank) — instead of a single
+  // cash-basis "Dr Expense / Cr Bank" entry, so unpaid bills still show up
+  // as a real liability and expenses are recognized when billed, not when
+  // eventually paid.
+  for(const p of db.payables){
+    const linkedDisb = db.disbursements.find(d=>d.payableId===p.id);
+    const category = linkedDisb ? linkedDisb.category : UNCATEGORIZED_AP_EXPENSE;
+    entries.push({date:p.createdDate||todayStr(), desc:`${t("Bill la helay","Bill received")}: ${p.vendor}${p.description?(' — '+p.description):''}`, debit:`${t("Kharashka","Expense")}: ${category}`, credit:AP, amount:p.amount});
+    if(linkedDisb){
+      entries.push({date:p.paidDate||linkedDisb.date, desc:`${t("Bill la bixiyay","Bill paid")}: ${p.vendor}`, debit:AP, credit:acctName(linkedDisb.account), amount:p.amount});
+    }
+  }
   for(const d of db.disbursements){
+    if(d.payableId) continue; // already posted above as a Dr AP / Cr Bank entry
     entries.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${d.recipient?(' — '+d.recipient):''}`, debit:`${t("Kharashka","Expense")}: ${d.category}`, credit:acctName(d.account), amount:d.amount});
   }
   entries.sort((a,b)=>a.date.localeCompare(b.date));

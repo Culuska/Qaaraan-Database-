@@ -67,7 +67,7 @@
   .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
   .panel-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:space-between;}
   .panel-head h2{font-size:14px;font-weight:600;margin:0;}
-  input[type=text],input[type=number],input[type=date],select,textarea{
+  input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
     width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;font-size:13px;font-family:var(--font);background:#fff;color:var(--ink);
   }
   textarea{resize:vertical;min-height:56px;}
@@ -180,33 +180,39 @@
   .auth-split{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr;}
   .auth-hero{
     position:relative;overflow:hidden;color:#fff;
-    background:linear-gradient(160deg,#12896C 0%,#0F6E56 45%,#073A2F 100%);
-    display:flex;flex-direction:column;justify-content:center;padding:64px;
+    background:linear-gradient(155deg,#16244a 0%,#101c3c 45%,#070c1c 100%);
+    display:flex;flex-direction:column;padding:48px 64px;
   }
-  .auth-hero::before,.auth-hero::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.07);}
+  .auth-hero::before,.auth-hero::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.06);}
   .auth-hero::before{width:440px;height:440px;top:-150px;right:-130px;}
-  .auth-hero::after{width:300px;height:300px;bottom:-110px;left:-70px;background:rgba(255,255,255,.05);}
-  .auth-hero .hero-logo{margin-bottom:26px;position:relative;z-index:1;}
-  .auth-hero h1{font-size:32px;font-weight:700;margin:0 0 14px;max-width:440px;line-height:1.28;position:relative;z-index:1;}
-  .auth-hero p{font-size:14px;color:rgba(255,255,255,.82);max-width:400px;line-height:1.6;position:relative;z-index:1;}
-  .auth-hero .hero-stats{display:flex;gap:32px;margin-top:36px;position:relative;z-index:1;}
-  .auth-hero .hero-stats .n{font-size:21px;font-weight:700;}
-  .auth-hero .hero-stats .l{font-size:11px;color:rgba(255,255,255,.72);margin-top:2px;}
+  .auth-hero::after{width:300px;height:300px;bottom:-110px;left:-70px;background:rgba(255,255,255,.04);}
+  .hero-brand{display:flex;align-items:center;gap:10px;position:relative;z-index:1;}
+  .hero-brand .badge{width:40px;height:40px;border-radius:11px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex-shrink:0;}
+  .hero-brand .word{font-size:17px;font-weight:700;}
+  .hero-mid{flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1;}
+  .hero-mid h1{font-size:34px;font-weight:800;margin:0 0 14px;max-width:440px;line-height:1.25;}
+  .hero-mid p{font-size:14px;color:rgba(255,255,255,.78);max-width:400px;line-height:1.6;}
+  .hero-mid .hero-stats{display:flex;gap:32px;margin-top:36px;}
+  .hero-mid .hero-stats .n{font-size:21px;font-weight:700;}
+  .hero-mid .hero-stats .l{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;}
+  .hero-foot{position:relative;z-index:1;font-size:12px;color:rgba(255,255,255,.5);}
   .auth-side{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg);}
-  .auth-wrap{max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 16px 40px rgba(38,37,31,.08);}
-  .auth-wrap h2{font-size:19px;margin:0 0 6px;}
-  .auth-wrap .sub{font-size:12px;color:var(--ink-2);margin-bottom:20px;}
-  .auth-wrap .frow{margin-bottom:14px;}
-  .auth-wrap label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:4px;}
+  .auth-wrap{max-width:400px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 32px;box-shadow:0 20px 50px rgba(20,20,30,.12);}
+  .auth-wrap h2{font-size:26px;font-weight:800;margin:0 0 6px;}
+  .auth-wrap .sub{font-size:13px;color:var(--ink-2);margin-bottom:26px;}
+  .auth-wrap .frow{margin-bottom:16px;}
+  .auth-wrap label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+  .auth-wrap input[type=text],.auth-wrap input[type=password]{padding:12px 14px;border-radius:10px;border:1.5px solid var(--line-strong);font-size:14px;}
   .auth-wrap .err{color:var(--danger-ink);font-size:12px;margin-bottom:10px;min-height:16px;}
-  .auth-wrap button.primary{width:100%;padding:11px;margin-top:6px;font-size:14px;}
-  .auth-switch{margin-top:14px;font-size:12px;color:var(--ink-2);text-align:center;}
+  .auth-wrap button.primary{width:100%;padding:13px;margin-top:6px;font-size:15px;font-weight:700;border-radius:10px;}
+  .auth-switch{margin-top:18px;font-size:12px;color:var(--ink-2);text-align:center;}
   .auth-switch a{color:var(--accent-ink);cursor:pointer;text-decoration:underline;}
   @media (max-width:860px){
     .auth-split{grid-template-columns:1fr;min-height:0;}
-    .auth-hero{padding:40px 24px;}
-    .auth-hero h1{font-size:23px;}
-    .auth-hero .hero-stats{margin-top:24px;}
+    .auth-hero{padding:32px 24px;}
+    .hero-mid{padding:24px 0;}
+    .hero-mid h1{font-size:23px;}
+    .hero-mid .hero-stats{margin-top:24px;}
     .auth-side{padding:28px 18px 40px;}
   }
   .user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);}
@@ -2109,24 +2115,22 @@ document.getElementById("disbForm").addEventListener("submit", async (e)=>{
 });
 
 function authHeroHtml(){
+  const year = new Date().getFullYear();
   return `
     <div class="auth-hero">
-      <div class="hero-logo">
-        <svg width="48" height="48" viewBox="0 0 44 44">
-          <circle cx="22" cy="22" r="21" fill="#fff" fill-opacity="0.14"/>
-          <circle cx="22" cy="22" r="21" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="1"/>
-          <circle cx="15" cy="17" r="5.2" fill="#fff"/>
-          <circle cx="29" cy="17" r="5.2" fill="#fff" fill-opacity="0.85"/>
-          <circle cx="22" cy="27" r="5.2" fill="#fff" fill-opacity="0.7"/>
-          <circle cx="22" cy="22" r="2.6" fill="#0F6E56"/>
-        </svg>
+      <div class="hero-brand">
+        <div class="badge">Q</div>
+        <span class="word">Qaaraan Database</span>
       </div>
-      <h1>Maamul si fudud lacagaha qaaraankaaga</h1>
-      <p>Xubnaha, qoondooyinka bille, kharashaadka bulshada (guur, diya, iwm), iyo xisaabaadka guud — dhammaan hal meel, si sahlan loo maamulo.</p>
-      <div class="hero-stats">
-        <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">Xubno firfircoon</div></div>
-        <div><div class="n">July–Dec 2026</div><div class="l">Xilliga qoondooyinka</div></div>
+      <div class="hero-mid">
+        <h1>Ku soo dhawoow database-ka qaaraankeenna</h1>
+        <p>Xubnaha, qoondooyinka bille, kharashaadka bulshada (guur, diya, iwm), iyo xisaabaadka guud — dhammaan hal meel, si sahlan loo maamulo.</p>
+        <div class="hero-stats">
+          <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">Xubno firfircoon</div></div>
+          <div><div class="n">July–Dec 2026</div><div class="l">Xilliga qoondooyinka</div></div>
+        </div>
       </div>
+      <div class="hero-foot">© ${year} Qaaraan Database</div>
     </div>
   `;
 }
@@ -2169,11 +2173,11 @@ function renderLoginScreen(){
       ${authHeroHtml()}
       <div class="auth-side">
         <div class="auth-wrap">
-          <h2>Gal — Qaaraan Database</h2>
-          <div class="sub">Geli username iyo password-kaaga.</div>
+          <h2>Ku soo dhawoow</h2>
+          <div class="sub">Geli xogtaada si aad u sii wadato.</div>
           <div class="err" id="authErr"></div>
-          <div class="frow"><label>Username</label><input type="text" id="loginUser" placeholder="username"></div>
-          <div class="frow"><label>Password</label><input type="password" id="loginPass" placeholder="password"></div>
+          <div class="frow"><label>Username</label><input type="text" id="loginUser" placeholder="username-kaaga"></div>
+          <div class="frow"><label>Password</label><input type="password" id="loginPass" placeholder="password-kaaga"></div>
           <button class="primary" id="loginBtn">Gal</button>
         </div>
       </div>

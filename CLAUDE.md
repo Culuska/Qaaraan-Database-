@@ -6,8 +6,9 @@ Guidance for Claude Code (or any future session) working in this repo.
 
 Qaaraan is a Somali-language web app for managing a community savings fund
 (monthly dues, member balances, community disbursements like weddings/funerals,
-accounts payable, bank/cash accounts, and staff permissions). All UI text is
-in Somali — **keep any new UI text in Somali.**
+accounts payable, bank/cash accounts, and staff permissions). Somali is the
+default language, with an EN/SO toggle (see "Internationalization" below) —
+**keep any new UI text in both languages, using the `t()` helper.**
 
 ## Files
 
@@ -81,6 +82,37 @@ in Somali — **keep any new UI text in Somali.**
   `MONTH_LABEL`. Reuse these rather than reformatting inline.
 - **No build step.** Don't introduce a bundler, package manager for the
   frontend, or framework — this is deliberately a single static HTML file.
+
+## Internationalization
+
+The app defaults to Somali with an EN/SO toggle. Preference is stored in
+`localStorage` (`qaaraan-lang`), per-browser — switching calls `setLang()`,
+which does a full `location.reload()` rather than live-patching the DOM.
+- **Dynamic content** (anything rendered by JS template literals) uses the
+  `t(somaliText, englishText)` helper, e.g. `` `<h1>${t("Xubnaha","Members")}</h1>` ``.
+  Watch out for local variables/loop params named `t` shadowing this global
+  function (several places rename the loop var, e.g. `for (const tx of
+  m.transactions)` instead of `t`, or call `window.t(...)` explicitly where
+  renaming isn't practical).
+- **Static HTML** (markup that exists in the page from load, not rebuilt by a
+  render function) uses `data-t-en="English text"` (or `data-t-en-ph=` for
+  placeholders); the Somali text is the element's literal content, used
+  as-is when `currentLang === "so"`. `applyStaticTranslations()` runs once
+  in `init()` and swaps in the English text when needed.
+- **What's intentionally left Somali-only, regardless of toggle:**
+  - `logActivity()` action/details strings — persisted audit-log data, not
+    live UI. Historical entries can't retroactively change language anyway.
+  - The outbound WhatsApp message body built by `buildBalanceMessage()` —
+    it's addressed to the *member*, not the admin using the toggle, so it
+    stays Somali even when the admin's own UI is in English. Only the modal
+    chrome around it (labels, buttons) respects the toggle.
+  - Disbursement category names (`Xalane / Diya`, `Dhiig nool`, `Diya
+    wadaag`, `Guno`) — these are specific community-fund terms without a
+    clean one-word English equivalent; mistranslating them risks changing
+    their meaning. Generic labels around them (buttons, filters) do
+    translate.
+- New user-facing strings should follow the same pattern rather than being
+  added Somali-only.
 
 ## Deploy chain
 

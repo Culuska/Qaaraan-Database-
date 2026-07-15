@@ -46,6 +46,13 @@
   .sidebar-user .gear{border:none;background:none;color:var(--ink-2);cursor:pointer;padding:4px;flex-shrink:0;min-height:auto;}
   .sidebar-user .gear:hover{color:var(--ink);}
   .sidebar-footer button.logout{width:100%;}
+  .lang-toggle{display:flex;gap:2px;background:#F4F2EC;border-radius:20px;padding:2px;}
+  .lang-toggle button{border:none;background:none;padding:4px 10px;font-size:11px;font-weight:600;border-radius:16px;min-height:auto;color:var(--ink-2);}
+  .lang-toggle button.on{background:var(--accent);color:#fff;}
+  .auth-hero .lang-toggle{position:absolute;top:20px;right:20px;z-index:2;background:rgba(255,255,255,.14);}
+  .auth-hero .lang-toggle button{color:rgba(255,255,255,.75);}
+  .auth-hero .lang-toggle button.on{background:#fff;color:var(--accent-ink);}
+  .auth-wrap > .lang-toggle{position:absolute;top:14px;right:14px;}
   .main-content{flex:1;min-width:0;padding:26px 30px 60px;max-width:1180px;}
   .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
   .page-head h1{font-size:21px;font-weight:700;margin:0;}
@@ -284,21 +291,21 @@
 
   <div id="dashboardView">
     <div class="page-head">
-      <h1>Guddoon</h1>
-      <div class="page-sub">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
+      <h1 data-t-en="Dashboard">Guddoon</h1>
+      <div class="page-sub" data-t-en="Opening balance: 30 June 2026 • Dues period: July–December 2026">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
     </div>
     <div class="cards" id="summaryCards"></div>
     <div class="panel" style="margin-top:18px;">
-      <div class="panel-head"><h2>Dhaqdhaqaaqii ugu dambeeyay</h2></div>
+      <div class="panel-head"><h2 data-t-en="Recent Activity">Dhaqdhaqaaqii ugu dambeeyay</h2></div>
       <div id="dashRecentActivity"></div>
     </div>
   </div>
 
   <div id="membersView" style="display:none;">
     <div class="page-head">
-      <h1>Xubnaha</h1>
+      <h1 data-t-en="Members">Xubnaha</h1>
       <div class="page-head-actions">
-        <button class="primary" id="btnAddCustomer"><i class="ti ti-plus"></i> Xubin cusub</button>
+        <button class="primary" id="btnAddCustomer"><i class="ti ti-plus"></i> <span data-t-en="New member">Xubin cusub</span></button>
       </div>
     </div>
     <div class="layout" id="membersLayout">      <div class="panel">
@@ -307,9 +314,9 @@
           <button id="btnGroups">Groups report</button>
         </div>
         <div class="search" style="display:flex;gap:8px;align-items:center;">
-          <input type="text" id="searchBox" placeholder="Search magaca...">
+          <input type="text" id="searchBox" placeholder="Search magaca..." data-t-en-ph="Search name...">
           <select id="statusFilter" style="max-width:150px;">
-            <option value="all">Dhammaan</option>
+            <option value="all" data-t-en="All">Dhammaan</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
@@ -317,7 +324,7 @@
         <div style="display:flex;">
           <div class="list-scroll" id="listScroll" style="flex:1;">
             <table id="memberTable">
-              <thead><tr><th style="width:34px;">#</th><th>Magaca</th><th>Qoondo/bil</th><th style="text-align:right">Balance</th></tr></thead>
+              <thead><tr><th style="width:34px;">#</th><th data-t-en="Name">Magaca</th><th data-t-en="Due/month">Qoondo/bil</th><th style="text-align:right">Balance</th></tr></thead>
               <tbody id="memberRows"></tbody>
             </table>
           </div>
@@ -329,15 +336,15 @@
       </div>
 
       <div class="panel" id="detailPanel">
-        <div class="empty">Dooro qof liiska ku jira si aad u aragto faahfaahinta iyo si aad payment ugu darto.</div>
+        <div class="empty" data-t-en="Select a person from the list to see details and add a payment.">Dooro qof liiska ku jira si aad u aragto faahfaahinta iyo si aad payment ugu darto.</div>
       </div>
     </div>
   </div>
 
   <div id="disbView" style="display:none;">
     <div class="page-head">
-      <h1>Kharashaadka Bulshada</h1>
-      <div class="page-sub">Guur, Diya, iwm</div>
+      <h1 data-t-en="Community Expenses">Kharashaadka Bulshada</h1>
+      <div class="page-sub" data-t-en="Weddings, Diya, etc.">Guur, Diya, iwm</div>
       <div class="page-head-actions">
         <button id="btnDisbExportPdf">Export PDF</button>
         <button id="btnDisbExportXlsx">Export Excel</button>
@@ -345,10 +352,10 @@
     </div>
     <div class="panel">
       <div style="padding:16px;">
-        <div class="no-perm" id="disbNoPerm" style="display:none;margin-bottom:16px;">Uma haysatid ogolaansho lacag qabasho / kharash diiwaangelin.</div>
+        <div class="no-perm" id="disbNoPerm" style="display:none;margin-bottom:16px;" data-t-en="You don't have permission to collect payments / record expenses.">Uma haysatid ogolaansho lacag qabasho / kharash diiwaangelin.</div>
         <form class="disb-form" id="disbForm">
           <div class="f">
-            <label>Nooca</label>
+            <label data-t-en="Type">Nooca</label>
             <select id="disbCategory">
               <option>Xalane / Diya</option>
               <option>Dhiig nool</option>
@@ -356,24 +363,24 @@
               <option>Guno</option>
             </select>
           </div>
-          <div class="f"><label>Lacagta</label><input required type="number" step="0.01" min="0.01" id="disbAmount" placeholder="0.00"></div>
-          <div class="f"><label>Taariikhda</label><input required type="date" id="disbDate"></div>
+          <div class="f"><label data-t-en="Amount">Lacagta</label><input required type="number" step="0.01" min="0.01" id="disbAmount" placeholder="0.00"></div>
+          <div class="f"><label data-t-en="Date">Taariikhda</label><input required type="date" id="disbDate"></div>
           <div class="f"><label>Account</label><select id="disbAccount"></select></div>
-          <div class="f" style="flex:2"><label>Cida loo bixiyay (ikhtiyaari)</label><input type="text" id="disbRecipient" placeholder="magaca / qoyska"></div>
-          <div class="f" style="flex:2;display:none;" id="disbSharedWithWrap"><label>Cida lala wadaagaa</label><input type="text" id="disbSharedWith" placeholder="magaca kooxda/qofka lala wadaago"></div>
-          <div class="f" style="flex:3"><label>MEMO (sababta)</label><input required type="text" id="disbMemo" placeholder="Faahfaahin sababta lacagta loo bixiyay"></div>
-          <button type="submit" class="primary">Diiwaangeli</button>
+          <div class="f" style="flex:2"><label data-t-en="Recipient (optional)">Cida loo bixiyay (ikhtiyaari)</label><input type="text" id="disbRecipient" placeholder="magaca / qoyska" data-t-en-ph="name / family"></div>
+          <div class="f" style="flex:2;display:none;" id="disbSharedWithWrap"><label data-t-en="Shared with">Cida lala wadaagaa</label><input type="text" id="disbSharedWith" placeholder="magaca kooxda/qofka lala wadaago" data-t-en-ph="name of group/person sharing"></div>
+          <div class="f" style="flex:3"><label data-t-en="MEMO (reason)">MEMO (sababta)</label><input required type="text" id="disbMemo" placeholder="Faahfaahin sababta lacagta loo bixiyay" data-t-en-ph="Explain why this amount was paid"></div>
+          <button type="submit" class="primary" data-t-en="Record">Diiwaangeli</button>
         </form>
         <div class="cards" id="disbSummary" style="margin-bottom:8px;"></div>
         <div class="view-toggle" id="disbCatFilters" style="padding:0 0 12px;">
-          <button data-catfilter="all" class="on">Dhammaan</button>
-          <button data-catfilter="baddebt">Deyn la cafiyay</button>
+          <button data-catfilter="all" class="on" data-t-en="All">Dhammaan</button>
+          <button data-catfilter="baddebt" data-t-en="Written-off debt">Deyn la cafiyay</button>
           <button data-catfilter="guno">Guno</button>
           <button data-catfilter="diya">Diya</button>
           <button data-catfilter="dhiignool">Dhiig nool</button>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:8px;" id="disbCatPdfWrap">
-          <button id="btnDisbCatPdf">PDF-ga category-gan</button>
+          <button id="btnDisbCatPdf" data-t-en="PDF for this category">PDF-ga category-gan</button>
         </div>
         <div id="disbMonthly" style="margin-bottom:14px;"></div>
         <div id="disbByPerson" style="margin-bottom:14px;"></div>
@@ -384,7 +391,7 @@
   </div>
 
   <div id="pendingView" style="display:none;">
-    <div class="page-head"><h1>Ogolaansho La Sugayo</h1></div>
+    <div class="page-head"><h1 data-t-en="Pending Approvals">Ogolaansho La Sugayo</h1></div>
     <div class="panel">
       <div id="pendingList"></div>
       <div class="foot-note" id="pendingFoot"></div>
@@ -392,9 +399,9 @@
   </div>
 
   <div id="activityView" style="display:none;">
-    <div class="page-head"><h1>Diiwaanka Dhaqdhaqaaqa</h1></div>
+    <div class="page-head"><h1 data-t-en="Activity Log">Diiwaanka Dhaqdhaqaaqa</h1></div>
     <div class="panel">
-      <div class="search"><input type="text" id="activitySearch" placeholder="Search magaca user-ka..."></div>
+      <div class="search"><input type="text" id="activitySearch" placeholder="Search magaca user-ka..." data-t-en-ph="Search username..."></div>
       <div class="list-scroll" id="activityList"></div>
       <div class="foot-note" id="activityFoot"></div>
     </div>
@@ -402,8 +409,8 @@
 
   <div id="accountsView" style="display:none;">
     <div class="page-head">
-      <h1>Konoonyada</h1>
-      <div class="page-head-actions"><button id="btnAddAccount">Ku dar account</button></div>
+      <h1 data-t-en="Accounts">Konoonyada</h1>
+      <div class="page-head-actions"><button id="btnAddAccount" data-t-en="Add account">Ku dar account</button></div>
     </div>
     <div class="panel">
       <div id="accountsList" style="padding:16px;"></div>
@@ -412,23 +419,23 @@
 
   <div id="remindersView" style="display:none;">
     <div class="page-head">
-      <h1>Xasuusin Bille</h1>
-      <div class="page-head-actions"><button class="primary" id="btnBulkReminders"><i class="ti ti-send"></i> Dir dhammaan (WhatsApp)</button></div>
+      <h1 data-t-en="Reminders">Xasuusin Bille</h1>
+      <div class="page-head-actions"><button class="primary" id="btnBulkReminders"><i class="ti ti-send"></i> <span data-t-en="Send to all (WhatsApp)">Dir dhammaan (WhatsApp)</span></button></div>
     </div>
     <div class="panel">
-      <div class="search"><input type="text" id="reminderSearch" placeholder="Search magaca..."></div>
+      <div class="search"><input type="text" id="reminderSearch" placeholder="Search magaca..." data-t-en-ph="Search name..."></div>
       <div class="list-scroll" id="remindersList"></div>
       <div class="foot-note" id="remindersFoot"></div>
     </div>
   </div>
 
   <div id="financialView" style="display:none;">
-    <div class="page-head"><h1>Xisaabaadka Guud</h1></div>
+    <div class="page-head"><h1 data-t-en="Financials">Xisaabaadka Guud</h1></div>
     <div class="cards" id="financialCards" style="margin-bottom:16px;"></div>
     <div class="panel">
       <div class="panel-head">
-        <h2>Accounts Payable (Deymaha aan la bixin)</h2>
-        <button id="btnAddPayable">Ku dar bill</button>
+        <h2 data-t-en="Accounts Payable (unpaid bills)">Accounts Payable (Deymaha aan la bixin)</h2>
+        <button id="btnAddPayable" data-t-en="Add bill">Ku dar bill</button>
       </div>
       <div id="payablesList"></div>
       <div class="foot-note" id="payablesFoot"></div>
@@ -454,13 +461,16 @@ let currentTab = "members";
 let disbCatFilter = "all";
 let disbRecipientFilter = null;
 const PERM_KEYS = ["addCustomer","collectPayment","delete","deactivate","viewReports"];
-const PERM_LABELS = {
-  addCustomer: "Ku darid xubin cusub",
-  collectPayment: "Lacag qabasho (payments, kharashaad, cafinaad)",
-  delete: "Tirtirid xubin",
-  deactivate: "De-activate / Activate xubin",
-  viewReports: "Arkid reports (summary, groups, exports)"
-};
+function permLabel(key){
+  const labels = {
+    addCustomer: t("Ku darid xubin cusub","Add new member"),
+    collectPayment: t("Lacag qabasho (payments, kharashaad, cafinaad)","Collect payments (payments, expenses, write-offs)"),
+    delete: t("Tirtirid xubin","Delete member"),
+    deactivate: t("De-activate / Activate xubin","Deactivate / activate member"),
+    viewReports: t("Arkid reports (summary, groups, exports)","View reports (summary, groups, exports)")
+  };
+  return labels[key];
+}
 const MONTHS_2026 = ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12"];
 const MONTH_LABEL = {"2026-07":"July 2026","2026-08":"August 2026","2026-09":"September 2026","2026-10":"October 2026","2026-11":"November 2026","2026-12":"December 2026"};
 
@@ -468,6 +478,33 @@ let db = null;
 let selectedId = null;
 let idCounter = 1000;
 let txCounter = 1;
+
+let currentLang = localStorage.getItem("qaaraan-lang") || "so";
+function t(so, en){ return currentLang === "en" ? en : so; }
+function setLang(l){
+  if(l === currentLang) return;
+  localStorage.setItem("qaaraan-lang", l);
+  location.reload();
+}
+function applyStaticTranslations(){
+  document.querySelectorAll("[data-t-en]").forEach(el=>{
+    if(currentLang === "en") el.textContent = el.dataset.tEn;
+  });
+  document.querySelectorAll("[data-t-en-ph]").forEach(el=>{
+    if(currentLang === "en") el.placeholder = el.dataset.tEnPh;
+  });
+}
+function langToggleHtml(){
+  return `<div class="lang-toggle">
+    <button data-lang="so" class="${currentLang==='so'?'on':''}">SO</button>
+    <button data-lang="en" class="${currentLang==='en'?'on':''}">EN</button>
+  </div>`;
+}
+function wireLangToggle(root){
+  root.querySelectorAll("[data-lang]").forEach(btn=>{
+    btn.addEventListener("click", ()=>setLang(btn.dataset.lang));
+  });
+}
 
 function money(n){
   n = Math.round(n*100)/100;
@@ -556,7 +593,7 @@ function applyAction(type, payload){
 
 async function attemptAction(type, payload, permKey, label){
   if(!hasPerm(permKey)){
-    showToast("Uma haysatid ogolaansho (permission) falkan.");
+    showToast(t("Uma haysatid ogolaansho (permission) falkan.","You don't have permission for this action."));
     return {status:"denied"};
   }
   if(isAdmin()){
@@ -568,7 +605,7 @@ async function attemptAction(type, payload, permKey, label){
   db.pendingActions.push({id:"p"+Date.now()+"_"+Math.random().toString(36).slice(2,7), type, payload, label, requestedBy:currentUser, requestedAt:new Date().toISOString(), status:"pending"});
   logActivity(label, "Wuxuu sugayaa ogolaanshaha admin-ka", "pending");
   await saveDb();
-  showToast("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka (Osman)");
+  showToast(t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka (Osman)","Your request is awaiting admin approval (Osman)"));
   return {status:"pending"};
 }
 
@@ -715,7 +752,7 @@ async function saveDb(){
       body: JSON.stringify({value: JSON.stringify(db)})
     });
     if(!res.ok) throw new Error('save failed');
-  }catch(e){ showToast("Khalad: lama kaydin karo (storage error)"); }
+  }catch(e){ showToast(t("Khalad: lama kaydin karo (storage error)","Error: could not save (storage error)")); }
 }
 function syncAccruals(){
   const due = monthsDueSoFar();
@@ -748,12 +785,12 @@ function renderSummary(){
   const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
   const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
   el.innerHTML = `
-    <div class="card"><div class="lbl">Wadarta balance-ka hadda</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
-    <div class="card"><div class="lbl">Xubnaha (active)</div><div class="val">${active.length} / ${db.members.length}</div></div>
-    <div class="card"><div class="lbl">Xubno lacag laga rabo</div><div class="val">${owingCount}</div></div>
-    <div class="card"><div class="lbl">Lacagta la ururiyay</div><div class="val pos">${money(totalCollected)}</div></div>
-    <div class="card"><div class="lbl">Wadarta kharashka</div><div class="val neg">${money(totalDisb)}</div></div>
-    ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">Codsi sugaya</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
+    <div class="card"><div class="lbl">${t("Wadarta balance-ka hadda","Total current balance")}</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
+    <div class="card"><div class="lbl">${t("Xubnaha (active)","Members (active)")}</div><div class="val">${active.length} / ${db.members.length}</div></div>
+    <div class="card"><div class="lbl">${t("Xubno lacag laga rabo","Members owing")}</div><div class="val">${owingCount}</div></div>
+    <div class="card"><div class="lbl">${t("Lacagta la ururiyay","Total collected")}</div><div class="val pos">${money(totalCollected)}</div></div>
+    <div class="card"><div class="lbl">${t("Wadarta kharashka","Total expenses")}</div><div class="val neg">${money(totalDisb)}</div></div>
+    ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">${t("Codsi sugaya","Pending requests")}</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
   `;
 }
 
@@ -772,7 +809,7 @@ function renderDashboardActivity(){
         <div class="meta2">${a.actor} &nbsp;•&nbsp; ${new Date(a.ts).toLocaleString()} ${a.details?(' — '+a.details):''}</div>
       </div>
     </div>
-  `).join("") : '<div class="empty">Wax activity ah lama helin.</div>';
+  `).join("") : `<div class="empty">${t("Wax activity ah lama helin.","No activity found.")}</div>`;
 }
 
 function memberRowHtml(m, idx){
@@ -805,8 +842,8 @@ function renderList(){
   if(viewMode === "full"){
     const sorted = [...db.members].sort((a,b)=>a.name.localeCompare(b.name));
     const filtered = sorted.filter(m=>m.name.toLowerCase().includes(q) && statusPasses(m,sf));
-    rows.innerHTML = filtered.map((m,i)=>memberRowHtml(m,i+1)).join("") || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">Wax natiijo ah lama helin.</td></tr>`;
-    document.getElementById("listFoot").textContent = `${filtered.length} / ${db.members.length} xubnood`;
+    rows.innerHTML = filtered.map((m,i)=>memberRowHtml(m,i+1)).join("") || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">${t("Wax natiijo ah lama helin.","No results found.")}</td></tr>`;
+    document.getElementById("listFoot").textContent = `${filtered.length} / ${db.members.length} ${t("xubnood","members")}`;
     attachRowClicks(rows);
     updateDragThumb();
     return;
@@ -823,7 +860,7 @@ function renderList(){
     const groupTotal = members.reduce((s,m)=>s+computeBalance(m),0);
     html += `<tr><td colspan="4" style="padding:0;border:none;">
       <div class="grp-head">
-        <div>${g.group}<div class="wk">Wakiil: ${g.wakiil}</div></div>
+        <div>${g.group}<div class="wk">${t("Wakiil","Rep")}: ${g.wakiil}</div></div>
         ${hasPerm("viewReports") ? `<div class="exp">
           <button type="button" data-exp="pdf" data-group="${g.group}">PDF</button>
           <button type="button" data-exp="xlsx" data-group="${g.group}">Excel</button>
@@ -832,11 +869,11 @@ function renderList(){
     </td></tr>`;
     html += members.map((m,i)=>memberRowHtml(m,i+1)).join("");
     html += `<tr><td colspan="4" style="padding:0;border:none;">
-      <div class="grp-sub"><span>Wadarta ${g.group} (${members.length})</span><span>${money(groupTotal)}</span></div>
+      <div class="grp-sub"><span>${t("Wadarta","Total")} ${g.group} (${members.length})</span><span>${money(groupTotal)}</span></div>
     </td></tr>`;
   }
-  rows.innerHTML = html || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">Wax natiijo ah lama helin.</td></tr>`;
-  document.getElementById("listFoot").textContent = `${shownCount} xubnood oo koox ku jira`;
+  rows.innerHTML = html || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">${t("Wax natiijo ah lama helin.","No results found.")}</td></tr>`;
+  document.getElementById("listFoot").textContent = `${shownCount} ${t("xubnood oo koox ku jira","members in groups")}`;
   attachRowClicks(rows);
   rows.querySelectorAll("[data-exp]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
@@ -921,15 +958,15 @@ function updateDragThumb(){
 }
 
 function exportGroupExcel(g, members){
-  const rows = [["Reer", g.group],["Wakiil", g.wakiil],[],
-    ["Magaca","Telefoon","Qoondo/bil","Balance"]];
+  const rows = [[t("Reer","Group"), g.group],[t("Wakiil","Rep"), g.wakiil],[],
+    [t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance"]];
   let total = 0;
   for(const m of members){
     const bal = computeBalance(m);
     total += bal;
     rows.push([m.name, m.phone||"-", m.monthlyDue||0, bal]);
   }
-  rows.push(["","","Wadarta", total]);
+  rows.push(["","",t("Wadarta","Total"), total]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:32},{wch:16},{wch:12},{wch:14}];
   const wb = XLSX.utils.book_new();
@@ -942,9 +979,9 @@ function exportGroupPdf(g, members){
   const doc = new jsPDF();
   let y = 18;
   doc.setFontSize(14); doc.text(g.group, 14, y); y+=7;
-  doc.setFontSize(10); doc.text("Wakiil: "+g.wakiil, 14, y); y+=9;
+  doc.setFontSize(10); doc.text(t("Wakiil","Rep")+": "+g.wakiil, 14, y); y+=9;
   doc.setFontSize(9);
-  doc.text("Magaca", 14, y); doc.text("Telefoon", 100, y); doc.text("Qoondo", 140, y); doc.text("Balance", 170, y);
+  doc.text(t("Magaca","Name"), 14, y); doc.text(t("Telefoon","Phone"), 100, y); doc.text(t("Qoondo","Due"), 140, y); doc.text("Balance", 170, y);
   y += 4; doc.line(14,y,196,y); y += 5;
   let total = 0;
   for(const m of members){
@@ -959,7 +996,7 @@ function exportGroupPdf(g, members){
   }
   y += 2; doc.line(14,y,196,y); y += 6;
   doc.setFontSize(10);
-  doc.text("Wadarta: $"+total.toFixed(2), 140, y);
+  doc.text(t("Wadarta","Total")+": $"+total.toFixed(2), 140, y);
   doc.save(g.group.replace(/[^a-z0-9]+/gi,"_")+".pdf");
 }
 
@@ -981,7 +1018,7 @@ function renderDetail(){
   const m = db.members.find(x=>x.id===selectedId);
   updateMobileLayoutClass();
   if(!m){
-    panel.innerHTML = `<div class="empty">Dooro qof liiska ku jira si aad u aragto faahfaahinta iyo si aad payment ugu darto.</div>`;
+    panel.innerHTML = `<div class="empty">${t("Dooro qof liiska ku jira si aad u aragto faahfaahinta iyo si aad payment ugu darto.","Select a person from the list to see details and add a payment.")}</div>`;
     return;
   }
   const bal = computeBalance(m);
@@ -996,24 +1033,24 @@ function renderDetail(){
         <button id="mobileBackBtn" style="padding:6px 10px;flex-shrink:0;"><i class="ti ti-arrow-left"></i></button>
         <div>
           <div class="name">${m.name} ${inactive?'<span class="badge inactive">Inactive</span>':'<span class="badge">Active</span>'}</div>
-          <div class="meta">${m.phone || 'Telefoon lama helin'} ${m.monthlyDue?`<span class="badge">${money(m.monthlyDue)}/bil</span>`:''}</div>
+          <div class="meta">${m.phone || t('Telefoon lama helin','No phone on file')} ${m.monthlyDue?`<span class="badge">${money(m.monthlyDue)}/${t('bil','mo')}</span>`:''}</div>
         </div>
       </div>
       <div class="detail-actions">
-        <button id="btnBalanceSummary">Balance summary</button>
-        <button id="btnSendWhatsapp">Dir WhatsApp</button>
-        ${canDeact ? `<button id="btnToggleStatus">${inactive?'Dib u activate':'De-activate'}</button>` : ''}
-        ${canPay ? `<button class="ghost-warn" id="btnWriteoff">Cafi deynta</button>` : ''}
-        ${canDel ? `<button class="ghost-danger" id="btnDeleteMember">Tirtir</button>` : ''}
+        <button id="btnBalanceSummary">${t("Balance summary","Balance summary")}</button>
+        <button id="btnSendWhatsapp">${t("Dir WhatsApp","Send WhatsApp")}</button>
+        ${canDeact ? `<button id="btnToggleStatus">${inactive?t('Dib u activate','Reactivate'):t('De-activate','Deactivate')}</button>` : ''}
+        ${canPay ? `<button class="ghost-warn" id="btnWriteoff">${t("Cafi deynta","Write off debt")}</button>` : ''}
+        ${canDel ? `<button class="ghost-danger" id="btnDeleteMember">${t("Tirtir","Delete")}</button>` : ''}
       </div>
     </div>
     <div class="detail-body">
       <div class="bal-row">
-        <div class="bal-box"><div class="lbl">Balance 30 June</div><div class="val">${money(m.openingBalance)}</div></div>
-        <div class="bal-box"><div class="lbl">Wadarta la bixiyay</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-        <div class="bal-box"><div class="lbl">Deyn la cafiyay</div><div class="val" style="color:var(--danger-ink)">${money(totalWrittenOff(m))}</div></div>
-        <div class="bal-box"><div class="lbl">Balance hadda</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-        ${(m.monthlyDue>0) ? `<div class="bal-box"><div class="lbl">Bilo ku taagan</div><div class="val" style="color:${bal>0?'var(--danger-ink)':'var(--accent-ink)'}">${(bal/m.monthlyDue).toFixed(1)} bil</div></div>` : ''}
+        <div class="bal-box"><div class="lbl">${t("Balance 30 June","Balance 30 June")}</div><div class="val">${money(m.openingBalance)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Deyn la cafiyay","Debt written off")}</div><div class="val" style="color:var(--danger-ink)">${money(totalWrittenOff(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        ${(m.monthlyDue>0) ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan","Months owed")}</div><div class="val" style="color:${bal>0?'var(--danger-ink)':'var(--accent-ink)'}">${(bal/m.monthlyDue).toFixed(1)} ${t("bil","mo")}</div></div>` : ''}
       </div>
 
       ${(()=>{
@@ -1021,12 +1058,12 @@ function renderDetail(){
         const mc = monthsComparison(m);
         if(!mc) return '';
         return `<div class="months-compare">
-          <div class="top"><span>Bilo la bixiyay</span><span>Wadarta bilaha (qoondo)</span></div>
+          <div class="top"><span>${t("Bilo la bixiyay","Months paid")}</span><span>${t("Wadarta bilaha (qoondo)","Total months (dues)")}</span></div>
           <div class="bar"><div class="fill" style="width:${mc.pct.toFixed(1)}%"></div></div>
           <div class="nums">
-            <span style="color:var(--accent-ink);font-weight:600;">${mc.monthsPaid.toFixed(1)} bil la bixiyay</span>
-            <span style="color:var(--ink-2);">/ ${mc.monthsTotal.toFixed(1)} bil oo dhan</span>
-            <span style="color:${mc.monthsRemaining>0?'var(--danger-ink)':'var(--accent-ink)'};font-weight:600;">${mc.monthsRemaining.toFixed(1)} bil ku hartay</span>
+            <span style="color:var(--accent-ink);font-weight:600;">${mc.monthsPaid.toFixed(1)} ${t("bil la bixiyay","months paid")}</span>
+            <span style="color:var(--ink-2);">/ ${mc.monthsTotal.toFixed(1)} ${t("bil oo dhan","months total")}</span>
+            <span style="color:${mc.monthsRemaining>0?'var(--danger-ink)':'var(--accent-ink)'};font-weight:600;">${mc.monthsRemaining.toFixed(1)} ${t("bil ku hartay","months left")}</span>
           </div>
         </div>`;
       })()}
@@ -1036,36 +1073,36 @@ function renderDetail(){
         const dbk = memberDisbursementBreakdown(m);
         if(dbk.total <= 0) return '';
         return `<div class="months-compare" style="cursor:pointer;" id="disbBreakdownBox">
-          <div class="top"><span>Kharashaadka Bulshada loo bixiyay ${m.name}</span><span>Wadarta: ${money(dbk.total)}</span></div>
+          <div class="top"><span>${t("Kharashaadka Bulshada loo bixiyay","Community expenses paid to")} ${m.name}</span><span>${t("Wadarta","Total")}: ${money(dbk.total)}</span></div>
           <div class="nums" style="flex-wrap:wrap;gap:10px;">
             ${Object.entries(dbk.byCat).map(([cat,amt])=>`<span><span class="disb-cat">${cat}</span> ${money(amt)}</span>`).join("")}
           </div>
-          <div class="muted" style="margin-top:6px;">Riix si aad u aragto faahfaahinta Kharashaadka Bulshada</div>
+          <div class="muted" style="margin-top:6px;">${t("Riix si aad u aragto faahfaahinta Kharashaadka Bulshada","Click to see community expense details")}</div>
         </div>`;
       })()}
 
       ${canPay ? `<form class="pay" id="payForm">
-        <div class="f"><label>Lacagta</label><input required type="number" step="0.01" min="0.01" id="payAmount" placeholder="0.00"></div>
-        <div class="f"><label>Taariikhda</label><input required type="date" id="payDate" value="${todayStr()}"></div>
+        <div class="f"><label>${t("Lacagta","Amount")}</label><input required type="number" step="0.01" min="0.01" id="payAmount" placeholder="0.00"></div>
+        <div class="f"><label>${t("Taariikhda","Date")}</label><input required type="date" id="payDate" value="${todayStr()}"></div>
         <div class="f"><label>Account</label><select id="payAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
-        <div class="f" style="flex:2"><label>Faahfaahin (ikhtiyaari)</label><input type="text" id="payNote" placeholder="tusaale: cash, EVC, iwm"></div>
-        <button type="submit" class="primary">Diiwaangeli payment</button>
-      </form>` : `<div class="no-perm" style="margin-bottom:14px;">Uma haysatid ogolaansho lacag qabasho.</div>`}
+        <div class="f" style="flex:2"><label>${t("Faahfaahin (ikhtiyaari)","Note (optional)")}</label><input type="text" id="payNote" placeholder="${t('tusaale: cash, EVC, iwm','e.g. cash, EVC, etc.')}"></div>
+        <button type="submit" class="primary">${t("Diiwaangeli payment","Record payment")}</button>
+      </form>` : `<div class="no-perm" style="margin-bottom:14px;">${t("Uma haysatid ogolaansho lacag qabasho.","You don't have permission to collect payments.")}</div>`}
 
-      <div class="muted" style="margin-bottom:8px;">Taariikhda dhaqdhaqaaqyada (transactions)</div>
+      <div class="muted" style="margin-bottom:8px;">${t("Taariikhda dhaqdhaqaaqyada (transactions)","Transaction history")}</div>
       <div class="tx-list">
         ${txSorted.length ? txSorted.map(tx=>`
           <div class="tx ${tx.type}">
             <div class="l">
-              <span>${tx.type==='due' ? (tx.note && tx.note.startsWith('Invoice') ? 'Invoice (taariikhi)' : 'Qoondo bille') : (tx.type==='writeoff' ? 'Bad debt — Cafinaad' : (tx.note==='Payment (imported)' ? 'Payment (taariikhi)' : 'Payment'))} — ${tx.date}</span>
+              <span>${tx.type==='due' ? (tx.note && tx.note.startsWith('Invoice') ? t('Invoice (taariikhi)','Invoice (historical)') : t('Qoondo bille','Monthly due')) : (tx.type==='writeoff' ? t('Bad debt — Cafinaad','Bad debt — written off') : (tx.note==='Payment (imported)' ? t('Payment (taariikhi)','Payment (historical)') : 'Payment'))} — ${tx.date}</span>
               <span class="muted">${tx.note||''}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <span class="amt">${tx.type==='due'?'+':'-'}${money(tx.amount)}</span>
-              ${canDel ? `<button class="del" data-txid="${tx.id}" title="Tirtir">✕</button>` : ''}
+              ${canDel ? `<button class="del" data-txid="${tx.id}" title="${t('Tirtir','Delete')}">✕</button>` : ''}
             </div>
           </div>
-        `).join("") : '<div class="muted">Wali ma jiraan dhaqdhaqaaq.</div>'}
+        `).join("") : `<div class="muted">${t("Wali ma jiraan dhaqdhaqaaq.","No transactions yet.")}</div>`}
       </div>
     </div>
   `;
@@ -1092,16 +1129,16 @@ function renderDetail(){
         const tx = m.transactions.find(t=>t.id===txid);
         if(!tx) return;
         const serial = getMemberSerial(m);
-        const txLabel = tx.type==='due'?'Qoondo bille':(tx.type==='writeoff'?'Bad debt':'Payment');
+        const txLabel = tx.type==='due'?t('Qoondo bille','Monthly due'):(tx.type==='writeoff'?'Bad debt':'Payment');
 
         const showStep1 = ()=>{
           openModal(`
-            <h3>Ma hubtaa inaad tirtirto transaction-kan?</h3>
+            <h3>${t("Ma hubtaa inaad tirtirto transaction-kan?","Are you sure you want to delete this transaction?")}</h3>
             <p class="muted">${txLabel} — ${tx.date} — ${money(tx.amount)} — ${m.name}</p>
-            <p class="muted" style="color:var(--danger-ink);">Falkan lama soo celin karo.</p>
+            <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo.","This action cannot be undone.")}</p>
             <div class="actions">
-              <button id="mNo">Maya</button>
-              <button class="ghost-danger" id="mYes">Haa, tirtir</button>
+              <button id="mNo">${t("Maya","No")}</button>
+              <button class="ghost-danger" id="mYes">${t("Haa, tirtir","Yes, delete")}</button>
             </div>
           `);
           document.getElementById("mNo").addEventListener("click", closeModal);
@@ -1110,19 +1147,19 @@ function renderDetail(){
 
         const showStep2 = ()=>{
           openModal(`
-            <h3>Xaqiijinta u dambeysa</h3>
-            <p class="muted">Si aad u xaqiijiso, geli serial number-ka ${m.name} — <b>serial ${serial}</b></p>
-            <div class="frow"><input type="number" id="delSerialInput" placeholder="Geli lambarka #"></div>
+            <h3>${t("Xaqiijinta u dambeysa","Final confirmation")}</h3>
+            <p class="muted">${t("Si aad u xaqiijiso, geli serial number-ka","To confirm, enter")} ${m.name} — <b>${t("serial","serial")} ${serial}</b></p>
+            <div class="frow"><input type="number" id="delSerialInput" placeholder="${t('Geli lambarka #','Enter the # number')}"></div>
             <div class="actions">
-              <button id="mCancel">Maya</button>
-              <button class="ghost-danger" id="mConfirm">Xaqiiji tirtirka</button>
+              <button id="mCancel">${t("Maya","No")}</button>
+              <button class="ghost-danger" id="mConfirm">${t("Xaqiiji tirtirka","Confirm delete")}</button>
             </div>
           `);
           document.getElementById("mCancel").addEventListener("click", closeModal);
           document.getElementById("mConfirm").addEventListener("click", async ()=>{
             const entered = parseInt(document.getElementById("delSerialInput").value, 10);
             if(entered !== serial){
-              showToast(`Khalad: geli sax ahaan serial ${serial}`);
+              showToast(t(`Khalad: geli sax ahaan serial ${serial}`,`Error: enter serial ${serial} exactly`));
               return;
             }
             m.transactions = m.transactions.filter(t=>t.id!==txid);
@@ -1133,7 +1170,7 @@ function renderDetail(){
             logActivity("Tirtirid transaction", `${m.name} (serial ${serial}): ${tx.type} $${tx.amount}`, "direct");
             await saveDb();
             closeModal();
-            showToast("Waa la tirtiray");
+            showToast(t("Waa la tirtiray","Deleted"));
             renderSummary(); renderList(); renderDetail();
           });
         };
@@ -1156,11 +1193,11 @@ function renderDetail(){
   if(canDel){
     document.getElementById("btnDeleteMember").addEventListener("click", ()=>{
       openModal(`
-        <h3>Ma hubtaa inaad tirtirto ${m.name}?</h3>
-        <p class="muted">Falkan lama soo celin karo. Dhammaan taariikhda dhaqdhaqaaqyadiisa way la tirtiri doontaa.</p>
+        <h3>${t("Ma hubtaa inaad tirtirto","Are you sure you want to delete")} ${m.name}?</h3>
+        <p class="muted">${t("Falkan lama soo celin karo. Dhammaan taariikhda dhaqdhaqaaqyadiisa way la tirtiri doontaa.","This action cannot be undone. All of their transaction history will be deleted too.")}</p>
         <div class="actions">
-          <button id="mCancel">Maya</button>
-          <button class="ghost-danger" id="mConfirm">Haa, tirtir</button>
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
         </div>
       `);
       document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -1178,20 +1215,20 @@ function renderDetail(){
   if(canPay){
     document.getElementById("btnWriteoff").addEventListener("click", ()=>{
       openModal(`
-        <h3>Cafi deynta — Bad debt</h3>
-        <div class="frow"><label>Lacagta la cafinayo</label><input type="number" step="0.01" id="woAmount" value="${bal>0?bal.toFixed(2):''}"></div>
-        <div class="frow"><label>MEMO (sababta) — waajib</label><textarea id="woMemo" placeholder="Sida: deyn aan la soo celin karin, qof maqan iwm"></textarea></div>
+        <h3>${t("Cafi deynta — Bad debt","Write off debt — Bad debt")}</h3>
+        <div class="frow"><label>${t("Lacagta la cafinayo","Amount to write off")}</label><input type="number" step="0.01" id="woAmount" value="${bal>0?bal.toFixed(2):''}"></div>
+        <div class="frow"><label>${t("MEMO (sababta) — waajib","MEMO (reason) — required")}</label><textarea id="woMemo" placeholder="${t('Sida: deyn aan la soo celin karin, qof maqan iwm','e.g. debt that cannot be recovered, missing person, etc.')}"></textarea></div>
         <div class="actions">
-          <button id="mCancel">Maya</button>
-          <button class="ghost-warn" id="mConfirm">Xaqiiji cafinaadka</button>
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-warn" id="mConfirm">${t("Xaqiiji cafinaadka","Confirm write-off")}</button>
         </div>
       `);
       document.getElementById("mCancel").addEventListener("click", closeModal);
       document.getElementById("mConfirm").addEventListener("click", async ()=>{
         const amount = parseFloat(document.getElementById("woAmount").value);
         const memo = document.getElementById("woMemo").value.trim();
-        if(!amount || amount<=0){ showToast("Geli lacag sax ah"); return; }
-        if(!memo){ showToast("MEMO waa waajib"); return; }
+        if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+        if(!memo){ showToast(t("MEMO waa waajib","MEMO is required")); return; }
         const r = await attemptAction("writeoff", {memberId:m.id, amount, memo}, "collectPayment", `Bad debt cafinaad: ${m.name}`);
         closeModal();
         if(r.status !== "denied"){
@@ -1255,21 +1292,21 @@ function buildBalanceMessage(m){
 function sendBalanceViaWhatsapp(m){
   const phone = formatSomaliPhone(m.phone);
   if(!phone){
-    showToast("Qofkan telefoon lama helin — WhatsApp lama diri karo.");
+    showToast(t("Qofkan telefoon lama helin — WhatsApp lama diri karo.","This person has no phone on file — can't send WhatsApp."));
     return;
   }
   const defaultLines = buildBalanceMessage(m);
 
   openModal(`
-    <h3>Dir fariin WhatsApp — ${m.name}</h3>
-    <div class="frow"><label>Telefoon: +${phone}</label></div>
+    <h3>${t("Dir fariin WhatsApp","Send WhatsApp message")} — ${m.name}</h3>
+    <div class="frow"><label>${t("Telefoon","Phone")}: +${phone}</label></div>
     <div class="frow">
-      <label>Fariinta (waad bedeli kartaa)</label>
+      <label>${t("Fariinta (waad bedeli kartaa)","Message (you can edit it)")}</label>
       <textarea id="waMessage" style="min-height:220px;">${defaultLines}</textarea>
     </div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mSend">Fur WhatsApp</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mSend">${t("Fur WhatsApp","Open WhatsApp")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -1288,7 +1325,7 @@ function openBulkReminderModal(){
     .filter(m=>m.status==="active" && computeBalance(m) > 0 && formatSomaliPhone(m.phone))
     .sort((a,b)=>computeBalance(b)-computeBalance(a));
   if(!owing.length){
-    showToast("Wax qof ah oo lacag laga rabo oo telefoon leh lama helin.");
+    showToast(t("Wax qof ah oo lacag laga rabo oo telefoon leh lama helin.","No one with an open balance and a phone on file was found."));
     return;
   }
   bulkReminderQueue = owing;
@@ -1300,9 +1337,9 @@ function renderBulkReminderStep(){
   const total = bulkReminderQueue.length;
   if(bulkReminderIndex >= total){
     openModal(`
-      <h3>Dhammaaday</h3>
-      <p class="muted">Waad soo martay dhammaan ${total} qof oo lacag laga rabo.</p>
-      <div class="actions"><button class="primary" id="mDone">Xir</button></div>
+      <h3>${t("Dhammaaday","Done")}</h3>
+      <p class="muted">${t("Waad soo martay dhammaan","You've gone through all")} ${total} ${t("qof oo lacag laga rabo.","people with an open balance.")}</p>
+      <div class="actions"><button class="primary" id="mDone">${t("Xir","Close")}</button></div>
     `);
     document.getElementById("mDone").addEventListener("click", closeModal);
     return;
@@ -1311,19 +1348,19 @@ function renderBulkReminderStep(){
   const bal = computeBalance(m);
   const phone = formatSomaliPhone(m.phone);
   openModal(`
-    <h3>Xasuusin guud — ${bulkReminderIndex+1} / ${total}</h3>
+    <h3>${t("Xasuusin guud","Bulk reminder")} — ${bulkReminderIndex+1} / ${total}</h3>
     <div class="bal-row" style="margin-bottom:14px;">
-      <div class="bal-box"><div class="lbl">Magaca</div><div class="val" style="font-size:14px;">${m.name}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Magaca","Name")}</div><div class="val" style="font-size:14px;">${m.name}</div></div>
       <div class="bal-box"><div class="lbl">Balance</div><div class="val" style="color:var(--danger-ink)">${money(bal)}</div></div>
     </div>
     <div class="frow">
-      <label>Fariinta (waad bedeli kartaa)</label>
+      <label>${t("Fariinta (waad bedeli kartaa)","Message (you can edit it)")}</label>
       <textarea id="waMessage" style="min-height:200px;">${buildBalanceMessage(m)}</textarea>
     </div>
     <div class="actions">
-      <button id="mStop">Jooji</button>
-      <button id="mSkip">Ka bood</button>
-      <button class="primary" id="mSend">Fur WhatsApp &amp; tag qofka xiga</button>
+      <button id="mStop">${t("Jooji","Stop")}</button>
+      <button id="mSkip">${t("Ka bood","Skip")}</button>
+      <button class="primary" id="mSend">${t("Fur WhatsApp & tag qofka xiga","Open WhatsApp & go to next")}</button>
     </div>
   `);
   document.getElementById("mStop").addEventListener("click", closeModal);
@@ -1343,7 +1380,7 @@ function computeMonthlyAging(m){
   // opening balance acts as an extra "pre-existing" due bucket dated before all months
   const rows = [];
   if(m.openingBalance > 0){
-    rows.push({label:"Balance hore (kahor)", amount:m.openingBalance, date:"0000-00"});
+    rows.push({label:t("Balance hore (kahor)","Prior balance (before)"), amount:m.openingBalance, date:"0000-00"});
   }
   for(const d of dues){
     rows.push({label:MONTH_LABEL[d.date.slice(0,7)] || d.date.slice(0,7), amount:d.amount, date:d.date});
@@ -1361,15 +1398,15 @@ function computeMonthlyAging(m){
 
 function renderMonthAgingTab(m){
   const aging = computeMonthlyAging(m);
-  if(!aging.length) return '<div class="empty">Wax qoondo bille ah lama helin.</div>';
+  if(!aging.length) return `<div class="empty">${t("Wax qoondo bille ah lama helin.","No monthly dues found.")}</div>`;
   return `<div class="tx-list">
     ${aging.map(a=>`
       <div class="tx ${a.status==='Paid'?'payment':(a.status==='Unpaid'?'due':'writeoff')}">
         <div class="l">
           <span>${a.label}</span>
-          <span class="muted">${a.status==='Partial' ? `Qayb ahaan la bixiyay: ${money(a.covered)} / ${money(a.amount)}` : (a.status==='Paid' ? 'La bixiyay oo dhan' : 'Weli lama bixin')}</span>
+          <span class="muted">${a.status==='Partial' ? `${t('Qayb ahaan la bixiyay','Partially paid')}: ${money(a.covered)} / ${money(a.amount)}` : (a.status==='Paid' ? t('La bixiyay oo dhan','Fully paid') : t('Weli lama bixin','Not paid yet'))}</span>
         </div>
-        <span class="amt" style="color:${a.status==='Paid'?'var(--accent-ink)':(a.status==='Partial'?'var(--warn)':'var(--danger-ink)')}">${a.status==='Paid'?'✓ La bixiyay':(a.status==='Partial'?money(a.remaining)+' hadhay':money(a.amount))}</span>
+        <span class="amt" style="color:${a.status==='Paid'?'var(--accent-ink)':(a.status==='Partial'?'var(--warn)':'var(--danger-ink)')}">${a.status==='Paid'?'✓ '+t('La bixiyay','Paid'):(a.status==='Partial'?money(a.remaining)+' '+t('hadhay','left'):money(a.amount))}</span>
       </div>
     `).join("")}
   </div>`;
@@ -1385,10 +1422,10 @@ function openBalanceSummaryModal(m){
     const monthsOwed = (m.monthlyDue && m.monthlyDue > 0) ? (bal / m.monthlyDue) : null;
     return `
     <div class="bal-row" style="margin-bottom:0;">
-      <div class="bal-box"><div class="lbl">Balance (balance summary file)</div><div class="val">${money(m.openingBalance)}</div></div>
-      <div class="bal-box"><div class="lbl">Wadarta la bixiyay (app)</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-      <div class="bal-box"><div class="lbl">Balance hadda</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-      ${monthsOwed !== null ? `<div class="bal-box"><div class="lbl">Bilo ku taagan (balance ÷ qoondo)</div><div class="val" style="color:${monthsOwed>0?'var(--danger-ink)':'var(--accent-ink)'}">${monthsOwed>=0?monthsOwed.toFixed(1):'0'} bil</div></div>` : ''}
+      <div class="bal-box"><div class="lbl">${t("Balance (balance summary file)","Balance (balance summary file)")}</div><div class="val">${money(m.openingBalance)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay (app)","Total paid (app)")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+      ${monthsOwed !== null ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan (balance ÷ qoondo)","Months owed (balance ÷ due)")}</div><div class="val" style="color:${monthsOwed>0?'var(--danger-ink)':'var(--accent-ink)'}">${monthsOwed>=0?monthsOwed.toFixed(1):'0'} ${t("bil","mo")}</div></div>` : ''}
     </div>
   `;
   };
@@ -1402,9 +1439,9 @@ function openBalanceSummaryModal(m){
   const renderHistoryTab = ()=>{
     return `
     <div class="frow" style="display:flex;gap:10px;align-items:flex-end;">
-      <div style="flex:1"><label>Laga bilaabo</label><input type="date" id="bsFrom" value="${minDate}" min="${minDate}" max="${maxDate}"></div>
-      <div style="flex:1"><label>Ilaa</label><input type="date" id="bsTo" value="${maxDate}" min="${minDate}" max="${maxDate}"></div>
-      <button id="bsApplyRange">Shaandhee</button>
+      <div style="flex:1"><label>${t("Laga bilaabo","From")}</label><input type="date" id="bsFrom" value="${minDate}" min="${minDate}" max="${maxDate}"></div>
+      <div style="flex:1"><label>${t("Ilaa","To")}</label><input type="date" id="bsTo" value="${maxDate}" min="${minDate}" max="${maxDate}"></div>
+      <button id="bsApplyRange">${t("Shaandhee","Filter")}</button>
     </div>
     <div id="bsHistoryList"></div>
     `;
@@ -1414,7 +1451,7 @@ function openBalanceSummaryModal(m){
     const list = document.getElementById("bsHistoryList");
     if(!list) return;
     if(!filtered.length){
-      list.innerHTML = '<div class="empty">Wax taariikh ah kuma jiro xilligan la doortay.</div>';
+      list.innerHTML = `<div class="empty">${t("Wax taariikh ah kuma jiro xilligan la doortay.","No history in the selected date range.")}</div>`;
       return;
     }
     list.innerHTML = `<div style="display:flex;justify-content:flex-end;gap:6px;margin:10px 0 8px;">
@@ -1426,7 +1463,7 @@ function openBalanceSummaryModal(m){
           <div class="tx ${t.type}">
             <div class="l">
               <span>${t.type==='due'?'Invoice':(t.type==='writeoff'?'Credit memo':'Payment')}${t.num?(' #'+t.num):''} — ${t.date}</span>
-              <span class="muted">${t.runbal!=null ? 'Balance ka dib: '+money(t.runbal) : ''}</span>
+              <span class="muted">${t.runbal!=null ? window.t('Balance ka dib','Balance after')+': '+money(t.runbal) : ''}</span>
             </div>
             <span class="amt">${t.type==='due'?'+':'-'}${money(t.amount)}</span>
           </div>
@@ -1440,17 +1477,17 @@ function openBalanceSummaryModal(m){
     document.getElementById("bsApplyRange").addEventListener("click", renderHistoryList);
   };
   openModal(`
-    <h3>Balance summary — ${m.name}</h3>
+    <h3>${t("Balance summary","Balance summary")} — ${m.name}</h3>
     <div class="frow">
-      <label>Muuji</label>
+      <label>${t("Muuji","Show")}</label>
       <select id="bsView">
-        <option value="summary">Balance summary (hadda)</option>
-        ${isAdmin() ? `<option value="aging">Xaalada bilaha (bil kasta — la bixiyay/lama bixin)</option>` : ''}
-        <option value="history">Taariikhda buuxda (calendar range)</option>
+        <option value="summary">${t("Balance summary (hadda)","Balance summary (current)")}</option>
+        ${isAdmin() ? `<option value="aging">${t("Xaalada bilaha (bil kasta — la bixiyay/lama bixin)","Monthly status (each month — paid/unpaid)")}</option>` : ''}
+        <option value="history">${t("Taariikhda buuxda (calendar range)","Full history (date range)")}</option>
       </select>
     </div>
     <div id="bsContent">${renderSummaryTab()}</div>
-    <div class="actions"><button id="mCancel">Xir</button></div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("bsView").addEventListener("change", (e)=>{
@@ -1467,8 +1504,8 @@ function openBalanceSummaryModal(m){
 
 function exportMemberHistoryExcel(m, report){
   const sorted = [...report].sort((a,b)=>a.date.localeCompare(b.date));
-  const rows = [["Magaca", m.name],["Telefoon", m.phone||"-"],["Qoondo/bil", m.monthlyDue||0],[],
-    ["Taariikhda","Nooca","Number","Lacagta","Balance ka dib"]];
+  const rows = [[t("Magaca","Name"), m.name],[t("Telefoon","Phone"), m.phone||"-"],[t("Qoondo/bil","Due/month"), m.monthlyDue||0],[],
+    [t("Taariikhda","Date"),t("Nooca","Type"),"Number",t("Lacagta","Amount"),t("Balance ka dib","Balance after")]];
   for(const t of sorted){
     rows.push([t.date, t.type==='due'?'Invoice':(t.type==='writeoff'?'Credit memo':'Payment'), t.num||"", t.type==='due'?t.amount:-t.amount, t.runbal!=null?t.runbal:""]);
   }
@@ -1485,9 +1522,9 @@ function exportMemberHistoryPdf(m, report){
   const sorted = [...report].sort((a,b)=>a.date.localeCompare(b.date));
   let y = 18;
   doc.setFontSize(14); doc.text(m.name, 14, y); y+=7;
-  doc.setFontSize(10); doc.text(`Telefoon: ${m.phone||'-'}  |  Qoondo/bil: $${m.monthlyDue||0}`, 14, y); y+=9;
+  doc.setFontSize(10); doc.text(`${t('Telefoon','Phone')}: ${m.phone||'-'}  |  ${t('Qoondo/bil','Due/month')}: $${m.monthlyDue||0}`, 14, y); y+=9;
   doc.setFontSize(9);
-  doc.text("Taariikhda", 14, y); doc.text("Nooca", 60, y); doc.text("Lacagta", 110, y); doc.text("Balance ka dib", 145, y);
+  doc.text(t("Taariikhda","Date"), 14, y); doc.text(t("Nooca","Type"), 60, y); doc.text(t("Lacagta","Amount"), 110, y); doc.text(t("Balance ka dib","Balance after"), 145, y);
   y += 4; doc.line(14,y,196,y); y += 5;
   for(const t of sorted){
     if(y > 280){ doc.addPage(); y = 18; }
@@ -1508,14 +1545,14 @@ function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
 
 function openAddCustomerModal(){
   openModal(`
-    <h3>Add new customer</h3>
-    <div class="frow"><label>Magaca</label><input type="text" id="ncName" placeholder="Magaca oo dhan"></div>
-    <div class="frow"><label>Telefoon (ikhtiyaari)</label><input type="text" id="ncPhone" placeholder="61xxxxxxx"></div>
-    <div class="frow"><label>Qoondada bille ($)</label><input type="number" step="0.01" id="ncDue" placeholder="5"></div>
-    <div class="frow"><label>Balance bilowga ah ($)</label><input type="number" step="0.01" id="ncOpening" value="0"></div>
+    <h3>${t("Ku dar xubin cusub","Add new member")}</h3>
+    <div class="frow"><label>${t("Magaca","Name")}</label><input type="text" id="ncName" placeholder="${t('Magaca oo dhan','Full name')}"></div>
+    <div class="frow"><label>${t("Telefoon (ikhtiyaari)","Phone (optional)")}</label><input type="text" id="ncPhone" placeholder="61xxxxxxx"></div>
+    <div class="frow"><label>${t("Qoondada bille ($)","Monthly due ($)")}</label><input type="number" step="0.01" id="ncDue" placeholder="5"></div>
+    <div class="frow"><label>${t("Balance bilowga ah ($)","Opening balance ($)")}</label><input type="number" step="0.01" id="ncOpening" value="0"></div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mConfirm">Ku dar</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Ku dar","Add")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -1524,7 +1561,7 @@ function openAddCustomerModal(){
     const phone = document.getElementById("ncPhone").value.trim();
     const due = parseFloat(document.getElementById("ncDue").value) || 0;
     const opening = parseFloat(document.getElementById("ncOpening").value) || 0;
-    if(!name){ showToast("Geli magaca qofka"); return; }
+    if(!name){ showToast(t("Geli magaca qofka","Enter the person's name")); return; }
     const r = await attemptAction("addCustomer", {name, phone, monthlyDue:due, openingBalance:opening}, "addCustomer", `Ku darid xubin cusub: ${name}`);
     closeModal();
     if(r.status === "applied") selectedId = r.resultId;
@@ -1548,7 +1585,7 @@ function exportDisbursementsExcel(){
     if(!byCat[d.category]) byCat[d.category] = [];
     byCat[d.category].push(d);
   }
-  const rows = [["Kharashaadka Bulshada — Report"],[],["Nooca","Taariikhda","Lacagta","Cida loo bixiyay","Cida lala wadaagaa","Memo"]];
+  const rows = [[t("Kharashaadka Bulshada — Report","Community Expenses — Report")],[],[t("Nooca","Type"),t("Taariikhda","Date"),t("Lacagta","Amount"),t("Cida loo bixiyay","Recipient"),t("Cida lala wadaagaa","Shared with"),"Memo"]];
   let grand = 0;
   for(const cat of Object.keys(byCat).sort()){
     const items = byCat[cat].sort((a,b)=>a.date.localeCompare(b.date));
@@ -1557,11 +1594,11 @@ function exportDisbursementsExcel(){
       rows.push([cat, d.date, d.amount, d.recipient||"-", d.sharedWith||"-", d.memo]);
       subtotal += d.amount;
     }
-    rows.push(["", "Wadarta "+cat, subtotal, "", "", ""]);
+    rows.push(["", t("Wadarta","Total")+" "+cat, subtotal, "", "", ""]);
     rows.push([]);
     grand += subtotal;
   }
-  rows.push(["", "WADARTA GUUD", grand, "", "", ""]);
+  rows.push(["", t("WADARTA GUUD","GRAND TOTAL"), grand, "", "", ""]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:16},{wch:12},{wch:12},{wch:20},{wch:20},{wch:34}];
   const wb = XLSX.utils.book_new();
@@ -1578,7 +1615,7 @@ function exportDisbursementsPdf(){
     byCat[d.category].push(d);
   }
   let y = 18;
-  doc.setFontSize(14); doc.text("Kharashaadka Bulshada — Report", 14, y); y += 10;
+  doc.setFontSize(14); doc.text(t("Kharashaadka Bulshada — Report","Community Expenses — Report"), 14, y); y += 10;
   let grand = 0;
   for(const cat of Object.keys(byCat).sort()){
     if(y > 265){ doc.addPage(); y = 18; }
@@ -1597,14 +1634,14 @@ function exportDisbursementsPdf(){
       subtotal += d.amount;
     }
     doc.setFont(undefined, "bold");
-    doc.text("Wadarta "+cat+": $"+subtotal.toFixed(2), 16, y);
+    doc.text(t("Wadarta","Total")+" "+cat+": $"+subtotal.toFixed(2), 16, y);
     doc.setFont(undefined, "normal");
     y += 9;
     grand += subtotal;
   }
   if(y > 270){ doc.addPage(); y = 18; }
   doc.setFontSize(12); doc.setFont(undefined, "bold");
-  doc.text("WADARTA GUUD: $"+grand.toFixed(2), 14, y);
+  doc.text(t("WADARTA GUUD","GRAND TOTAL")+": $"+grand.toFixed(2), 14, y);
   doc.save("kharashaadka_bulshada.pdf");
 }
 
@@ -1617,16 +1654,16 @@ function categoryMatchesFilter(cat, filter){
   return true;
 }
 
-const FILTER_LABELS = {all:"Dhammaan", baddebt:"Deyn la cafiyay", guno:"Guno", diya:"Diya", dhiignool:"Dhiig nool"};
+const FILTER_LABELS = {all:t("Dhammaan","All"), baddebt:t("Deyn la cafiyay","Written-off debt"), guno:"Guno", diya:"Diya", dhiignool:"Dhiig nool"};
 
 function exportCategoryPdf(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const filtered = db.disbursements.filter(d=>categoryMatchesFilter(d.category, disbCatFilter)).sort((a,b)=>a.date.localeCompare(b.date));
   let y = 18;
-  doc.setFontSize(14); doc.text(`Kharashaadka — ${FILTER_LABELS[disbCatFilter]}`, 14, y); y += 8;
+  doc.setFontSize(14); doc.text(`${t('Kharashaadka','Expenses')} — ${FILTER_LABELS[disbCatFilter]}`, 14, y); y += 8;
   doc.setFontSize(9); doc.setFont(undefined,"bold");
-  doc.text("Taariikhda", 14, y); doc.text("Lacagta", 45, y); doc.text("Cida loo bixiyay", 70, y); doc.text("Memo", 130, y);
+  doc.text(t("Taariikhda","Date"), 14, y); doc.text(t("Lacagta","Amount"), 45, y); doc.text(t("Cida loo bixiyay","Recipient"), 70, y); doc.text("Memo", 130, y);
   y += 4; doc.line(14,y,196,y); y += 5;
   doc.setFont(undefined,"normal");
   let total = 0;
@@ -1641,7 +1678,7 @@ function exportCategoryPdf(){
   }
   y += 2; doc.line(14,y,196,y); y += 7;
   doc.setFontSize(11); doc.setFont(undefined,"bold");
-  doc.text("Wadarta: $"+total.toFixed(2)+"  ("+filtered.length+" diiwaan)", 14, y);
+  doc.text(t("Wadarta","Total")+": $"+total.toFixed(2)+"  ("+filtered.length+" "+t("diiwaan","records")+")", 14, y);
   doc.save(`kharash_${disbCatFilter}.pdf`);
 }
 
@@ -1662,7 +1699,7 @@ function renderDisbursements(){
   if(hasPerm("viewReports")){
     document.getElementById("disbSummary").innerHTML = Object.entries(totalsByCat).map(([cat,amt])=>`
       <div class="card"><div class="lbl">${cat}</div><div class="val neg">${money(amt)}</div></div>
-    `).join("") + `<div class="card"><div class="lbl">Wadarta guud</div><div class="val neg">${money(total)}</div></div>`;
+    `).join("") + `<div class="card"><div class="lbl">${t("Wadarta guud","Grand total")}</div><div class="val neg">${money(total)}</div></div>`;
   } else {
     document.getElementById("disbSummary").innerHTML = "";
   }
@@ -1684,30 +1721,30 @@ function renderDisbursements(){
     }
     const months = Object.keys(byMonth).sort().reverse();
     monthlyEl.innerHTML = `
-      <div class="muted" style="margin-bottom:6px;">Xisaabta bille ahaan — ${filtered.length} diiwaan, wadarta ${money(filtered.reduce((s,d)=>s+d.amount,0))}</div>
+      <div class="muted" style="margin-bottom:6px;">${t("Xisaabta bille ahaan","Monthly breakdown")} — ${filtered.length} ${t("diiwaan","records")}, ${t("wadarta","total")} ${money(filtered.reduce((s,d)=>s+d.amount,0))}</div>
       <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;">
         ${months.length ? months.map(mk=>`
           <div class="month-row"><span class="lbl2">${MONTH_LABEL[mk] || mk}</span><span class="amt2">${money(byMonth[mk])}</span></div>
-        `).join("") : '<div class="empty">Wax xog ah lama helin.</div>'}
+        `).join("") : `<div class="empty">${t("Wax xog ah lama helin.","No data found.")}</div>`}
       </div>
     `;
 
     const byPerson = {};
     for(const d of filtered){
-      const name = (d.recipient||"").trim() || "(Aan la sheegin)";
+      const name = (d.recipient||"").trim() || t("(Aan la sheegin)","(Not specified)");
       byPerson[name] = (byPerson[name]||0) + d.amount;
     }
     const people = Object.keys(byPerson).sort((a,b)=>byPerson[b]-byPerson[a]);
     personEl.innerHTML = `
-      <div class="muted" style="margin-bottom:6px;">Xisaabta qof kasta — riix qof si aad u aragto wadartiisa/diiwaannadiisa kaliya</div>
+      <div class="muted" style="margin-bottom:6px;">${t("Xisaabta qof kasta — riix qof si aad u aragto wadartiisa/diiwaannadiisa kaliya","Breakdown by person — click a person to see just their total/records")}</div>
       <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;">
         ${people.length ? people.map(name=>`
           <div class="person-row ${disbRecipientFilter===name?'pr-active':''}" data-person="${name.replace(/"/g,'&quot;')}">
             <span class="lbl2">${name}</span><span class="amt2">${money(byPerson[name])}</span>
           </div>
-        `).join("") : '<div class="empty">Wax xog ah lama helin.</div>'}
+        `).join("") : `<div class="empty">${t("Wax xog ah lama helin.","No data found.")}</div>`}
       </div>
-      ${disbRecipientFilter ? `<button id="btnClearPersonFilter" style="margin-top:8px;">Iska daa shaandhada qofka</button>` : ''}
+      ${disbRecipientFilter ? `<button id="btnClearPersonFilter" style="margin-top:8px;">${t("Iska daa shaandhada qofka","Clear person filter")}</button>` : ''}
     `;
     document.querySelectorAll("#disbByPerson [data-person]").forEach(row=>{
       row.addEventListener("click", ()=>{
@@ -1720,21 +1757,21 @@ function renderDisbursements(){
   }
 
   const canDel = hasPerm("delete");
-  const listSource = disbRecipientFilter ? filtered.filter(d=>((d.recipient||"").trim()||"(Aan la sheegin)")===disbRecipientFilter) : filtered;
+  const listSource = disbRecipientFilter ? filtered.filter(d=>((d.recipient||"").trim()||t("(Aan la sheegin)","(Not specified)"))===disbRecipientFilter) : filtered;
   const sorted = [...listSource].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById("disbList").innerHTML = sorted.length ? sorted.map(d=>`
     <div class="disb-row">
       <div class="l">
-        <span><span class="disb-cat">${d.category}</span> &nbsp;${d.date} ${d.recipient?(' — '+d.recipient):''}${d.sharedWith?(' · Lala wadaagay: '+d.sharedWith):''}</span>
+        <span><span class="disb-cat">${d.category}</span> &nbsp;${d.date} ${d.recipient?(' — '+d.recipient):''}${d.sharedWith?(' · '+t('Lala wadaagay','Shared with')+': '+d.sharedWith):''}</span>
         <span class="muted">${d.memo}</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="amt">-${money(d.amount)}</span>
-        ${canDel ? `<button class="del" data-id="${d.id}" title="Tirtir">✕</button>` : ''}
+        ${canDel ? `<button class="del" data-id="${d.id}" title="${t('Tirtir','Delete')}">✕</button>` : ''}
       </div>
     </div>
-  `).join("") : '<div class="empty">Wali lama diiwaangelin kharash.</div>';
-  document.getElementById("disbFoot").textContent = `${sorted.length} / ${db.disbursements.length} kharash oo la muujinayo`;
+  `).join("") : `<div class="empty">${t("Wali lama diiwaangelin kharash.","No expenses recorded yet.")}</div>`;
+  document.getElementById("disbFoot").textContent = `${sorted.length} / ${db.disbursements.length} ${t("kharash oo la muujinayo","expenses shown")}`;
 
   document.querySelectorAll("#disbList .del").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -1742,7 +1779,7 @@ function renderDisbursements(){
       db.disbursements = db.disbursements.filter(x=>x.id!==btn.dataset.id);
       logActivity("Tirtirid kharash", d?`${d.category} $${d.amount}`:'', "direct");
       await saveDb();
-      showToast("Waa la tirtiray");
+      showToast(t("Waa la tirtiray","Deleted"));
       renderSummary(); renderDisbursements();
     });
   });
@@ -1756,15 +1793,15 @@ function renderPending(){
     <div class="pending-row">
       <div class="l">
         <span class="lbl2">${p.label}</span>
-        <span class="meta2">Codsaday: ${p.requestedBy} &nbsp;•&nbsp; ${new Date(p.requestedAt).toLocaleString()}</span>
+        <span class="meta2">${t("Codsaday","Requested by")}: ${p.requestedBy} &nbsp;•&nbsp; ${new Date(p.requestedAt).toLocaleString()}</span>
       </div>
       <div class="acts">
-        <button class="primary" data-act="approve" data-id="${p.id}">Ogolow</button>
-        <button class="ghost-danger" data-act="reject" data-id="${p.id}">Diid</button>
+        <button class="primary" data-act="approve" data-id="${p.id}">${t("Ogolow","Approve")}</button>
+        <button class="ghost-danger" data-act="reject" data-id="${p.id}">${t("Diid","Reject")}</button>
       </div>
     </div>
-  `).join("") : '<div class="empty">Wax codsi ah lama sugayo hadda.</div>';
-  document.getElementById("pendingFoot").textContent = `${pending.length} codsi oo sugaya`;
+  `).join("") : `<div class="empty">${t("Wax codsi ah lama sugayo hadda.","No requests pending right now.")}</div>`;
+  document.getElementById("pendingFoot").textContent = `${pending.length} ${t("codsi oo sugaya","requests pending")}`;
 
   list.querySelectorAll("[data-act]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -1774,11 +1811,11 @@ function renderPending(){
         const {desc} = applyAction(p.type, p.payload);
         p.status = "approved";
         logActivity(p.label, `${desc} (codsaday: ${p.requestedBy}, ogolaaday: ${currentUser})`, "approved");
-        showToast("Codsigaas waa la ogolaaday");
+        showToast(t("Codsigaas waa la ogolaaday","That request was approved"));
       } else {
         p.status = "rejected";
         logActivity(p.label, `Codsigan waa la diiday (codsaday: ${p.requestedBy}, diiday: ${currentUser})`, "rejected");
-        showToast("Codsigaas waa la diiday");
+        showToast(t("Codsigaas waa la diiday","That request was rejected"));
       }
       await saveDb();
       renderSummary(); renderList(); renderDetail(); renderPending();
@@ -1796,34 +1833,34 @@ function renderActivity(){
         <div class="meta2">${a.actor} &nbsp;•&nbsp; ${new Date(a.ts).toLocaleString()} ${a.details?(' — '+a.details):''}</div>
       </div>
     </div>
-  `).join("") : '<div class="empty">Wax activity ah lama helin.</div>';
-  document.getElementById("activityFoot").textContent = `${filtered.length} / ${db.activityLog.length} diiwaan`;
+  `).join("") : `<div class="empty">${t("Wax activity ah lama helin.","No activity found.")}</div>`;
+  document.getElementById("activityFoot").textContent = `${filtered.length} / ${db.activityLog.length} ${t("diiwaan","records")}`;
 }
 
 function renderTabs(){
   const tabs = [
-    {id:"dashboard", label:"Guddoon", icon:"ti-layout-grid"},
-    {id:"members", label:"Xubnaha", icon:"ti-users"},
-    {id:"disb", label:"Kharashaadka Bulshada", icon:"ti-report-money"}
+    {id:"dashboard", label:t("Guddoon","Dashboard"), icon:"ti-layout-grid"},
+    {id:"members", label:t("Xubnaha","Members"), icon:"ti-users"},
+    {id:"disb", label:t("Kharashaadka Bulshada","Community Expenses"), icon:"ti-report-money"}
   ];
   if(hasPerm("viewReports")){
-    tabs.push({id:"accounts", label:"Konoonyada", icon:"ti-building-bank"});
-    tabs.push({id:"financial", label:"Xisaabaadka Guud", icon:"ti-report-analytics"});
+    tabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
+    tabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-analytics"});
   }
   if(hasPerm("collectPayment")){
-    tabs.push({id:"reminders", label:"Xasuusin Bille", icon:"ti-bell"});
+    tabs.push({id:"reminders", label:t("Xasuusin Bille","Reminders"), icon:"ti-bell"});
   }
   const adminTabs = [];
   if(isAdmin()){
-    adminTabs.push({id:"pending", label:"Ogolaansho La Sugayo"+(db.pendingActions.filter(p=>p.status==="pending").length ? ` (${db.pendingActions.filter(p=>p.status==="pending").length})` : ""), icon:"ti-clock-check"});
-    adminTabs.push({id:"activity", label:"Diiwaanka Dhaqdhaqaaqa", icon:"ti-history"});
+    adminTabs.push({id:"pending", label:t("Ogolaansho La Sugayo","Pending Approvals")+(db.pendingActions.filter(p=>p.status==="pending").length ? ` (${db.pendingActions.filter(p=>p.status==="pending").length})` : ""), icon:"ti-clock-check"});
+    adminTabs.push({id:"activity", label:t("Diiwaanka Dhaqdhaqaaqa","Activity Log"), icon:"ti-history"});
   }
 
-  const navBtn = t => `<button data-tab="${t.id}" class="${currentTab===t.id?'on':''}"><i class="ti ${t.icon}"></i><span>${t.label}</span></button>`;
+  const navBtn = tab => `<button data-tab="${tab.id}" class="${currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
   const navList = document.getElementById("sidebarNavList");
   navList.innerHTML = tabs.map(navBtn).join("")
     + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
-    + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>Isticmaalayaasha</span></button>` : "");
+    + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : "");
   navList.querySelectorAll("[data-tab]").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
   });
@@ -1831,15 +1868,17 @@ function renderTabs(){
   if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
 
   const footer = document.getElementById("sidebarFooter");
-  const roleLabel = currentUserObj.role === "admin" ? "Maamule" : "Shaqaale";
+  const roleLabel = currentUserObj.role === "admin" ? t("Maamule","Admin") : t("Shaqaale","Staff");
   footer.innerHTML = `
     <div class="sidebar-user">
       <div><div class="nm">${currentUser}</div><div class="rl">${roleLabel}</div></div>
       ${isAdmin() ? `<button class="gear" id="btnAppSettings" title="Settings"><i class="ti ti-settings"></i></button>` : ""}
     </div>
-    <button class="logout" id="btnLogout">Ka bax</button>
+    <div style="margin:10px 0;">${langToggleHtml()}</div>
+    <button class="logout" id="btnLogout">${t("Ka bax","Log out")}</button>
   `;
   document.getElementById("btnLogout").addEventListener("click", doLogout);
+  wireLangToggle(footer);
   const settingsBtn = document.getElementById("btnAppSettings");
   if(settingsBtn) settingsBtn.addEventListener("click", openAppSettingsModal);
 
@@ -1890,12 +1929,12 @@ function renderReminders(){
     return `<div class="rem-row">
       <div class="l">
         <span class="nm">${m.name}</span>
-        <span class="meta3">Balance: ${money(computeBalance(m))} ${phone?'':'· telefoon lama helin'}</span>
+        <span class="meta3">Balance: ${money(computeBalance(m))} ${phone?'':'· '+t('telefoon lama helin','no phone on file')}</span>
       </div>
-      <button class="primary" data-remid="${m.id}" ${phone?'':'disabled'}>Dir WhatsApp</button>
+      <button class="primary" data-remid="${m.id}" ${phone?'':'disabled'}>${t("Dir WhatsApp","Send WhatsApp")}</button>
     </div>`;
-  }).join("") : '<div class="empty">Wax qof ah oo lacag laga rabo lama helin.</div>';
-  document.getElementById("remindersFoot").textContent = `${owing.length} qof oo lacag laga rabo`;
+  }).join("") : `<div class="empty">${t("Wax qof ah oo lacag laga rabo lama helin.","No one with an open balance found.")}</div>`;
+  document.getElementById("remindersFoot").textContent = `${owing.length} ${t("qof oo lacag laga rabo","people who owe money")}`;
   list.querySelectorAll("[data-remid]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const m = db.members.find(x=>x.id===btn.dataset.remid);
@@ -1930,27 +1969,27 @@ function renderFinancialSummary(){
     <div class="fin-card">
       <div class="lbl">Accounts Receivable (AR)</div>
       <div class="val" style="color:var(--warn)">${money(totalAR)}</div>
-      <div class="sub">Lacagta xubnaha laga rabo</div>
+      <div class="sub">${t("Lacagta xubnaha laga rabo","Money owed by members")}</div>
     </div>
     <div class="fin-card">
       <div class="lbl">Accounts Payable (AP)</div>
       <div class="val" style="color:var(--danger-ink)">${money(totalAP)}</div>
-      <div class="sub">Bills aan weli la bixin</div>
+      <div class="sub">${t("Bills aan weli la bixin","Bills not yet paid")}</div>
     </div>
     <div class="fin-card">
-      <div class="lbl">Expenses (Kharashaadka)</div>
+      <div class="lbl">${t("Expenses (Kharashaadka)","Expenses")}</div>
       <div class="val" style="color:var(--ink)">${money(totalExpenses)}</div>
-      <div class="sub">Wadarta guud ee la bixiyay</div>
+      <div class="sub">${t("Wadarta guud ee la bixiyay","Total amount paid out")}</div>
     </div>
     <div class="fin-card">
       <div class="lbl">Bad Debt</div>
       <div class="val" style="color:var(--danger-ink)">${money(totalBadDebt)}</div>
-      <div class="sub">Deyn la cafiyay oo dhan</div>
+      <div class="sub">${t("Deyn la cafiyay oo dhan","All debt written off")}</div>
     </div>
     <div class="fin-card">
       <div class="lbl">Net Position (AR − AP)</div>
       <div class="val" style="color:${netPosition>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(netPosition)}</div>
-      <div class="sub">Xaaladda guud ee maaliyadda</div>
+      <div class="sub">${t("Xaaladda guud ee maaliyadda","Overall financial position")}</div>
     </div>
   `;
   renderPayables();
@@ -1975,17 +2014,17 @@ function renderPayables(){
   list.innerHTML = sorted.length ? sorted.map(p=>`
     <div class="pay-row ${p.status}">
       <div class="l">
-        <span class="nm">${p.vendor}${p.status==="paid"?' <span class="badge">La bixiyay</span>':''}</span>
-        <span class="meta4">${p.description||''} ${p.dueDate?('· Waa la bixin bilaha: '+p.dueDate):''}</span>
+        <span class="nm">${p.vendor}${p.status==="paid"?` <span class="badge">${t('La bixiyay','Paid')}</span>`:''}</span>
+        <span class="meta4">${p.description||''} ${p.dueDate?('· '+t('Waa la bixin bilaha','Due')+': '+p.dueDate):''}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="amt">${money(p.amount)}</span>
-        ${(p.status==="unpaid" && canManage) ? `<button data-payid="${p.id}" data-act="pay">Bixi</button>` : ''}
-        ${canManage ? `<button class="del" data-payid="${p.id}" data-act="del" title="Tirtir">✕</button>` : ''}
+        ${(p.status==="unpaid" && canManage) ? `<button data-payid="${p.id}" data-act="pay">${t('Bixi','Pay')}</button>` : ''}
+        ${canManage ? `<button class="del" data-payid="${p.id}" data-act="del" title="${t('Tirtir','Delete')}">✕</button>` : ''}
       </div>
     </div>
-  `).join("") : '<div class="empty">Wax bill ah lama diiwaangelin.</div>';
-  document.getElementById("payablesFoot").textContent = `${db.payables.filter(p=>p.status==='unpaid').length} bill oo aan la bixin, ${db.payables.filter(p=>p.status==='paid').length} oo la bixiyay`;
+  `).join("") : `<div class="empty">${t("Wax bill ah lama diiwaangelin.","No bills recorded yet.")}</div>`;
+  document.getElementById("payablesFoot").textContent = `${db.payables.filter(p=>p.status==='unpaid').length} ${t("bill oo aan la bixin","unpaid bills")}, ${db.payables.filter(p=>p.status==='paid').length} ${t("oo la bixiyay","paid")}`;
 
   list.querySelectorAll("[data-act='pay']").forEach(btn=>{
     btn.addEventListener("click", ()=>openPayBillModal(btn.dataset.payid));
@@ -2002,14 +2041,14 @@ function renderPayables(){
 
 function openAddPayableModal(){
   openModal(`
-    <h3>Ku dar bill (Accounts Payable)</h3>
-    <div class="frow"><label>Vendor / cida la leeyahay</label><input type="text" id="apVendor" placeholder="tusaale: Dahir Cawale"></div>
-    <div class="frow"><label>Lacagta</label><input type="number" step="0.01" id="apAmount" placeholder="0.00"></div>
-    <div class="frow"><label>Waa la bixin bilaha (ikhtiyaari)</label><input type="date" id="apDueDate"></div>
-    <div class="frow"><label>Faahfaahin</label><input type="text" id="apDesc" placeholder="sababta bill-ka"></div>
+    <h3>${t("Ku dar bill (Accounts Payable)","Add bill (Accounts Payable)")}</h3>
+    <div class="frow"><label>${t("Vendor / cida la leeyahay","Vendor / who is owed")}</label><input type="text" id="apVendor" placeholder="${t('tusaale: Dahir Cawale','e.g. Dahir Cawale')}"></div>
+    <div class="frow"><label>${t("Lacagta","Amount")}</label><input type="number" step="0.01" id="apAmount" placeholder="0.00"></div>
+    <div class="frow"><label>${t("Waa la bixin bilaha (ikhtiyaari)","Due date (optional)")}</label><input type="date" id="apDueDate"></div>
+    <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="apDesc" placeholder="${t('sababta bill-ka','reason for the bill')}"></div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mConfirm">Ku dar</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Ku dar","Add")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -2018,8 +2057,8 @@ function openAddPayableModal(){
     const amount = parseFloat(document.getElementById("apAmount").value);
     const dueDate = document.getElementById("apDueDate").value;
     const description = document.getElementById("apDesc").value.trim();
-    if(!vendor){ showToast("Geli vendor-ka"); return; }
-    if(!amount || amount<=0){ showToast("Geli lacag sax ah"); return; }
+    if(!vendor){ showToast(t("Geli vendor-ka","Enter the vendor")); return; }
+    if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
     db.payables.push({id:"ap"+Date.now(), vendor, amount, dueDate, description, status:"unpaid", createdDate:todayStr()});
     logActivity("Ku darid bill (AP)", `${vendor}: ${money(amount)}`, "direct");
     await saveDb();
@@ -2032,10 +2071,10 @@ function openPayBillModal(payId){
   const p = db.payables.find(x=>x.id===payId);
   if(!p) return;
   openModal(`
-    <h3>Bixi bill — ${p.vendor}</h3>
-    <div class="frow"><label>Lacagta: ${money(p.amount)}</label></div>
-    <div class="frow"><label>Account laga bixiyo</label><select id="apPayAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
-    <div class="frow"><label>Category (Kharashaadka)</label>
+    <h3>${t("Bixi bill","Pay bill")} — ${p.vendor}</h3>
+    <div class="frow"><label>${t("Lacagta","Amount")}: ${money(p.amount)}</label></div>
+    <div class="frow"><label>${t("Account laga bixiyo","Account to pay from")}</label><select id="apPayAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+    <div class="frow"><label>${t("Category (Kharashaadka)","Category (Expenses)")}</label>
       <select id="apPayCategory">
         <option>Xalane / Diya</option>
         <option>Dhiig nool</option>
@@ -2044,8 +2083,8 @@ function openPayBillModal(payId){
       </select>
     </div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mConfirm">Xaqiiji bixinta</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Xaqiiji bixinta","Confirm payment")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -2058,7 +2097,7 @@ function openPayBillModal(payId){
     logActivity("Bixinta bill (AP -> Expense)", `${p.vendor}: ${money(p.amount)}`, "direct");
     await saveDb();
     closeModal();
-    showToast("Bill-ka waa la bixiyay, wuxuuna hadda ku jiraa Expenses");
+    showToast(t("Bill-ka waa la bixiyay, wuxuuna hadda ku jiraa Expenses","The bill was paid, and it's now listed under Expenses"));
     renderFinancialSummary();
   });
 }
@@ -2070,15 +2109,15 @@ function renderAccounts(){
   list.innerHTML = db.accounts.map(acc=>{
     const bal = accountBalance(acc);
     let deposited = 0, withdrawn = 0;
-    for(const m of db.members) for(const t of m.transactions) if(t.type==="payment" && t.account===acc.id) deposited += t.amount;
+    for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
     return `<div class="acct-card">
-      <div class="name">${acc.name} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">Tirtir</button>` : ''}</div>
+      <div class="name">${acc.name} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
       <div class="rows">
-        <div><div class="lbl">Balance bilowga ah</div><div class="val">${money(acc.openingBalance)}</div></div>
-        <div><div class="lbl">La saaray (deposits)</div><div class="val" style="color:var(--accent-ink)">${money(deposited)}</div></div>
-        <div><div class="lbl">Laga bixiyay (withdrawals)</div><div class="val" style="color:var(--danger-ink)">${money(withdrawn)}</div></div>
-        <div><div class="lbl">Balance hadda</div><div class="val" style="color:${bal>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        <div><div class="lbl">${t("Balance bilowga ah","Opening balance")}</div><div class="val">${money(acc.openingBalance)}</div></div>
+        <div><div class="lbl">${t("La saaray (deposits)","Deposited")}</div><div class="val" style="color:var(--accent-ink)">${money(deposited)}</div></div>
+        <div><div class="lbl">${t("Laga bixiyay (withdrawals)","Withdrawn")}</div><div class="val" style="color:var(--danger-ink)">${money(withdrawn)}</div></div>
+        <div><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
       </div>
     </div>`;
   }).join("");
@@ -2109,19 +2148,19 @@ document.getElementById("btnAddPayable").addEventListener("click", openAddPayabl
 
 document.getElementById("btnAddAccount").addEventListener("click", ()=>{
   openModal(`
-    <h3>Ku dar account cusub</h3>
-    <div class="frow"><label>Magaca account-ka (tusaale: Salaam Bank, Cash, EVC)</label><input type="text" id="acName" placeholder="Magaca"></div>
-    <div class="frow"><label>Balance bilowga ah ($)</label><input type="number" step="0.01" id="acOpening" value="0"></div>
+    <h3>${t("Ku dar account cusub","Add new account")}</h3>
+    <div class="frow"><label>${t("Magaca account-ka (tusaale: Salaam Bank, Cash, EVC)","Account name (e.g. Salaam Bank, Cash, EVC)")}</label><input type="text" id="acName" placeholder="${t('Magaca','Name')}"></div>
+    <div class="frow"><label>${t("Balance bilowga ah ($)","Opening balance ($)")}</label><input type="number" step="0.01" id="acOpening" value="0"></div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mConfirm">Ku dar</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Ku dar","Add")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const name = document.getElementById("acName").value.trim();
     const opening = parseFloat(document.getElementById("acOpening").value) || 0;
-    if(!name){ showToast("Geli magaca account-ka"); return; }
+    if(!name){ showToast(t("Geli magaca account-ka","Enter the account name")); return; }
     db.accounts.push({id:"acc_"+Date.now(), name, openingBalance:opening});
     logActivity("Ku darid account cusub", name, "direct");
     await saveDb();
@@ -2161,8 +2200,8 @@ document.getElementById("disbForm").addEventListener("submit", async (e)=>{
   const sharedWith = document.getElementById("disbSharedWith").value.trim();
   const memo = document.getElementById("disbMemo").value.trim();
   const account = document.getElementById("disbAccount").value;
-  if(!amount || amount<=0){ showToast("Geli lacag sax ah"); return; }
-  if(!memo){ showToast("MEMO waa waajib"); return; }
+  if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+  if(!memo){ showToast(t("MEMO waa waajib","MEMO is required")); return; }
   const r = await attemptAction("disbursement", {category, amount, date, recipient, sharedWith, memo, account}, "collectPayment", `Kharash: ${category} $${amount}`);
   if(r.status !== "denied"){
     e.target.reset();
@@ -2175,6 +2214,7 @@ document.getElementById("disbForm").addEventListener("submit", async (e)=>{
 function authHeroHtml(){
   return `
     <div class="auth-hero">
+      ${langToggleHtml()}
       <div class="hero-logo">
         <svg width="48" height="48" viewBox="0 0 44 44">
           <circle cx="22" cy="22" r="21" fill="#fff" fill-opacity="0.14"/>
@@ -2186,10 +2226,10 @@ function authHeroHtml(){
         </svg>
       </div>
       <h1>Qaaranka-Xalane Cadow</h1>
-      <p>Qaaranka waa Insurance qof walbo oo qaraabadaha anfacaayo.</p>
+      <p>${t("Qaaranka waa Insurance qof walbo oo qaraabadaha anfacaayo.","Qaaraan is a community insurance fund that benefits everyone's relatives.")}</p>
       <div class="hero-stats">
-        <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">Xubno firfircoon</div></div>
-        <div><div class="n">July–Dec 2026</div><div class="l">Xilliga qoondooyinka</div></div>
+        <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">${t("Xubno firfircoon","Active members")}</div></div>
+        <div><div class="n">July–Dec 2026</div><div class="l">${t("Xilliga qoondooyinka","Dues period")}</div></div>
       </div>
     </div>
   `;
@@ -2197,26 +2237,28 @@ function authHeroHtml(){
 
 function renderSetupScreen(){
   document.getElementById("appWrap").style.display = "none";
-  document.getElementById("authRoot").innerHTML = `
+  const root = document.getElementById("authRoot");
+  root.innerHTML = `
     <div class="auth-split">
       ${authHeroHtml()}
       <div class="auth-side">
         <div class="auth-wrap">
-          <h2>Samee account-ka admin-ka ugu horreeya</h2>
-          <div class="sub">Weli ma jiraan users. Account-kan wuxuu noqon doonaa <b>admin</b> — wuxuu awood u yeelan doonaa inuu maamulo dhammaan xubnaha, users-ka, iyo codsiyada.</div>
+          <h2>${t("Samee account-ka admin-ka ugu horreeya","Create the first admin account")}</h2>
+          <div class="sub">${t('Weli ma jiraan users. Account-kan wuxuu noqon doonaa <b>admin</b> — wuxuu awood u yeelan doonaa inuu maamulo dhammaan xubnaha, users-ka, iyo codsiyada.','No users exist yet. This account will be an <b>admin</b> — able to manage all members, users, and requests.')}</div>
           <div class="err" id="authErr"></div>
-          <div class="frow"><label>Username</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="setupUser" value="Osman" placeholder="tusaale: Osman"></div></div>
-          <div class="frow"><label>Password</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="setupPass" placeholder="ugu yaraan 4 xaraf"></div></div>
-          <button class="primary" id="setupBtn">Samee account-ka admin-ka</button>
+          <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="setupUser" value="Osman" placeholder="${t('tusaale: Osman','e.g. Osman')}"></div></div>
+          <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="setupPass" placeholder="${t('ugu yaraan 4 xaraf','at least 4 characters')}"></div></div>
+          <button class="primary" id="setupBtn">${t("Samee account-ka admin-ka","Create admin account")}</button>
         </div>
       </div>
     </div>
   `;
+  wireLangToggle(root);
   document.getElementById("setupBtn").addEventListener("click", async ()=>{
     const u = document.getElementById("setupUser").value.trim();
     const p = document.getElementById("setupPass").value;
     const err = document.getElementById("authErr");
-    if(!u || !p || p.length<4){ err.textContent = "Geli username iyo password (ugu yaraan 4 xaraf)"; return; }
+    if(!u || !p || p.length<4){ err.textContent = t("Geli username iyo password (ugu yaraan 4 xaraf)","Enter a username and password (at least 4 characters)"); return; }
     const user = {id:"u"+Date.now(), username:u, password:p, role:"admin", permissions:{addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true}};
     db.users.push(user);
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:"Account-ka admin-ka ugu horreeya waa la sameeyay", details:"", status:"direct"});
@@ -2228,27 +2270,29 @@ function renderSetupScreen(){
 
 function renderLoginScreen(){
   document.getElementById("appWrap").style.display = "none";
-  document.getElementById("authRoot").innerHTML = `
+  const root = document.getElementById("authRoot");
+  root.innerHTML = `
     <div class="auth-split">
       ${authHeroHtml()}
       <div class="auth-side">
         <div class="auth-wrap">
-          <h2>Gal — Qaaraan Database</h2>
-          <div class="sub">Geli username iyo password-kaaga.</div>
+          <h2>${t("Gal — Qaaraan Database","Log in — Qaaraan Database")}</h2>
+          <div class="sub">${t("Geli username iyo password-kaaga.","Enter your username and password.")}</div>
           <div class="err" id="authErr"></div>
-          <div class="frow"><label>Username</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
-          <div class="frow"><label>Password</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
-          <button class="primary" id="loginBtn">Gal</button>
+          <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
+          <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
+          <button class="primary" id="loginBtn">${t("Gal","Log in")}</button>
         </div>
       </div>
     </div>
   `;
+  wireLangToggle(root);
   const doLogin = ()=>{
     const u = document.getElementById("loginUser").value.trim();
     const p = document.getElementById("loginPass").value;
     const err = document.getElementById("authErr");
     const user = db.users.find(x=>x.username===u && x.password===p);
-    if(!user){ err.textContent = "Username ama password waa khalad."; return; }
+    if(!user){ err.textContent = t("Username ama password waa khalad.","Username or password is incorrect."); return; }
     currentUser = user.username; currentUserObj = user;
     logActivity("Login", "", "direct");
     saveDb();
@@ -2277,28 +2321,28 @@ function renderAuthGate(){
 function openManageUsersModal(){
   const rows = db.users.map(u=>`
     <div class="userlist-row">
-      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?' <span class="muted">(adiga)</span>':''}</span>
-      <button class="ghost-danger" data-uid="${u.id}" ${db.users.length<=1?'disabled':''}>Tirtir</button>
+      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?` <span class="muted">(${t('adiga','you')})</span>`:''}</span>
+      <button class="ghost-danger" data-uid="${u.id}" ${db.users.length<=1?'disabled':''}>${t("Tirtir","Delete")}</button>
     </div>
   `).join("");
   openModal(`
-    <h3>Users</h3>
+    <h3>${t("Users","Users")}</h3>
     <div style="margin-bottom:16px;">${rows}</div>
-    <h3>Ku dar user cusub</h3>
+    <h3>${t("Ku dar user cusub","Add new user")}</h3>
     <div class="frow"><label>Username</label><input type="text" id="nuUser"></div>
     <div class="frow"><label>Password</label><input type="password" id="nuPass"></div>
     <div class="frow"><label>Role</label>
       <select id="nuRole">
-        <option value="staff">Staff (permissions gaar ah)</option>
-        <option value="admin">Admin (awood buuxda)</option>
+        <option value="staff">${t("Staff (permissions gaar ah)","Staff (specific permissions)")}</option>
+        <option value="admin">${t("Admin (awood buuxda)","Admin (full access)")}</option>
       </select>
     </div>
     <div class="perm-grid" id="permGrid">
-      ${PERM_KEYS.map(k=>`<label><input type="checkbox" data-perm="${k}"> ${PERM_LABELS[k]}</label>`).join("")}
+      ${PERM_KEYS.map(k=>`<label><input type="checkbox" data-perm="${k}"> ${permLabel(k)}</label>`).join("")}
     </div>
     <div class="actions">
-      <button id="mCancel">Xir</button>
-      <button class="primary" id="mConfirm">Ku dar user</button>
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button class="primary" id="mConfirm">${t("Ku dar user","Add user")}</button>
     </div>
   `);
   document.getElementById("nuRole").addEventListener("change", (e)=>{
@@ -2309,14 +2353,14 @@ function openManageUsersModal(){
     const u = document.getElementById("nuUser").value.trim();
     const p = document.getElementById("nuPass").value;
     const role = document.getElementById("nuRole").value;
-    if(!u || !p || p.length<4){ showToast("Username/password waa khalad (ugu yaraan 4 xaraf)"); return; }
-    if(db.users.some(x=>x.username===u)){ showToast("Username-kan horeba wuu jiraa"); return; }
+    if(!u || !p || p.length<4){ showToast(t("Username/password waa khalad (ugu yaraan 4 xaraf)","Username/password invalid (at least 4 characters)")); return; }
+    if(db.users.some(x=>x.username===u)){ showToast(t("Username-kan horeba wuu jiraa","This username already exists")); return; }
     const permissions = {};
     PERM_KEYS.forEach(k=>{ permissions[k] = role==="admin" ? true : document.querySelector(`[data-perm="${k}"]`).checked; });
     db.users.push({id:"u"+Date.now(), username:u, password:p, role, permissions});
     logActivity("Ku darid user cusub", `${u} (${role})`, "direct");
     await saveDb();
-    showToast("User cusub waa la daray");
+    showToast(t("User cusub waa la daray","New user was added"));
     openManageUsersModal();
   });
   document.querySelectorAll("[data-uid]").forEach(btn=>{
@@ -2325,7 +2369,7 @@ function openManageUsersModal(){
       db.users = db.users.filter(x=>x.id!==btn.dataset.uid);
       logActivity("Tirtirid user", u?u.username:'', "direct");
       await saveDb();
-      showToast("User waa la tirtiray");
+      showToast(t("User waa la tirtiray","User was deleted"));
       openManageUsersModal();
     });
   });
@@ -2333,20 +2377,20 @@ function openManageUsersModal(){
 
 function openAppSettingsModal(){
   if(!isAdmin()){
-    openModal(`<h3>Settings</h3><p class="muted">Kaliya admin-ku wuu bedeli karaa settings-ka.</p><div class="actions"><button id="mCancel">Xir</button></div>`);
+    openModal(`<h3>Settings</h3><p class="muted">${t("Kaliya admin-ku wuu bedeli karaa settings-ka.","Only an admin can change settings.")}</p><div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>`);
     document.getElementById("mCancel").addEventListener("click", closeModal);
     return;
   }
   openModal(`
     <h3>App Settings</h3>
     <div class="frow">
-      <label>URL-ka la "publish" gareeyay (Claude.ai)</label>
+      <label>${t('URL-ka la "publish" gareeyay (Claude.ai)','Published URL (Claude.ai)')}</label>
       <input type="text" id="stBaseUrl" placeholder="https://claude.ai/public/artifacts/..." value="${db.settings.baseUrl||''}">
-      <div class="muted" style="margin-top:6px;">Kani waa URL-ka aad hesho marka aad riixdo "Publish & copy link" ee artifact-ka. Waxaa loo isticmaalaa si loo dhiso link-yada WhatsApp ee qof kasta.</div>
+      <div class="muted" style="margin-top:6px;">${t('Kani waa URL-ka aad hesho marka aad riixdo "Publish & copy link" ee artifact-ka. Waxaa loo isticmaalaa si loo dhiso link-yada WhatsApp ee qof kasta.','This is the URL you get when you click "Publish & copy link" on the artifact. It is used to build each member\'s WhatsApp link.')}</div>
     </div>
     <div class="actions">
-      <button id="mCancel">Maya</button>
-      <button class="primary" id="mConfirm">Kaydi</button>
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
@@ -2355,7 +2399,7 @@ function openAppSettingsModal(){
     db.settings.baseUrl = url;
     logActivity("Cusboonaysiinta Settings", "baseUrl updated", "direct");
     await saveDb();
-    showToast("Settings waa la kaydiyay");
+    showToast(t("Settings waa la kaydiyay","Settings saved"));
     closeModal();
   });
 }
@@ -2372,42 +2416,46 @@ function renderPublicMemberView(memberId){
   const m = db.members.find(x=>x.id===memberId);
   const root = document.getElementById("publicRoot");
   if(!m){
-    root.innerHTML = `<div class="auth-wrap"><h2>Lama helin</h2><div class="sub">Xubintan lama helin.</div></div>`;
+    root.innerHTML = `<div class="auth-wrap" style="position:relative;">${langToggleHtml()}<h2>${t("Lama helin","Not found")}</h2><div class="sub">${t("Xubintan lama helin.","This member was not found.")}</div></div>`;
     root.style.display = "";
+    wireLangToggle(root);
     return;
   }
   const bal = computeBalance(m);
   const report = HISTORY_REPORTS[m.id] || [];
   const recentTx = [...m.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
   root.innerHTML = `
-    <div class="auth-wrap" style="max-width:480px;">
+    <div class="auth-wrap" style="max-width:480px;position:relative;">
+      ${langToggleHtml()}
       <h2>${m.name}</h2>
-      <div class="sub">Xaaladda qaaraankaaga</div>
+      <div class="sub">${t("Xaaladda qaaraankaaga","Your fund status")}</div>
       <div class="bal-row" style="margin:16px 0;">
-        <div class="bal-box"><div class="lbl">Qoondo/bil</div><div class="val">${money(m.monthlyDue||0)}</div></div>
-        <div class="bal-box"><div class="lbl">La bixiyay</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-        <div class="bal-box"><div class="lbl">Balance hadda</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Qoondo/bil","Due/month")}</div><div class="val">${money(m.monthlyDue||0)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("La bixiyay","Paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
       </div>
-      <div class="muted" style="margin-bottom:8px;">Dhaqdhaqaaqyadii ugu dambeeyay</div>
+      <div class="muted" style="margin-bottom:8px;">${t("Dhaqdhaqaaqyadii ugu dambeeyay","Recent transactions")}</div>
       <div class="tx-list" style="margin-bottom:16px;">
-        ${recentTx.length ? recentTx.map(t=>`
-          <div class="tx ${t.type}">
-            <div class="l"><span>${t.type==='due'?'Qoondo':(t.type==='writeoff'?'Cafinaad':'Payment')} — ${t.date}</span></div>
-            <span class="amt">${t.type==='due'?'+':'-'}${money(t.amount)}</span>
+        ${recentTx.length ? recentTx.map(tx=>`
+          <div class="tx ${tx.type}">
+            <div class="l"><span>${tx.type==='due'?t('Qoondo','Due'):(tx.type==='writeoff'?t('Cafinaad','Written off'):'Payment')} — ${tx.date}</span></div>
+            <span class="amt">${tx.type==='due'?'+':'-'}${money(tx.amount)}</span>
           </div>
-        `).join("") : '<div class="muted">Wax dhaqdhaqaaq ah lama helin.</div>'}
+        `).join("") : `<div class="muted">${t("Wax dhaqdhaqaaq ah lama helin.","No transactions found.")}</div>`}
       </div>
-      ${report.length ? `<button class="primary" id="pubPdf" style="width:100%;margin-bottom:8px;">Soo deji taariikhda buuxda (PDF)</button>` : ''}
-      <div class="sub" style="text-align:center;margin-top:10px;">Su'aal haddii aad qabto, la xiriir maamulaha qaaraanka.</div>
+      ${report.length ? `<button class="primary" id="pubPdf" style="width:100%;margin-bottom:8px;">${t("Soo deji taariikhda buuxda (PDF)","Download full history (PDF)")}</button>` : ''}
+      <div class="sub" style="text-align:center;margin-top:10px;">${t("Su'aal haddii aad qabto, la xiriir maamulaha qaaraanka.","If you have questions, contact the fund administrator.")}</div>
     </div>
   `;
   root.style.display = "";
+  wireLangToggle(root);
   if(report.length){
     document.getElementById("pubPdf").addEventListener("click", ()=>exportMemberHistoryPdf(m, report));
   }
 }
 
 (async function init(){
+  applyStaticTranslations();
   document.getElementById("disbDate").value = todayStr();
   await loadDb();
   const params = new URLSearchParams(window.location.search);

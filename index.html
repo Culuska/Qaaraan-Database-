@@ -1048,16 +1048,41 @@ function exportGroupPdf(g, members){
   doc.save(g.group.replace(/[^a-z0-9]+/gi,"_")+".pdf");
 }
 
+function groupMembersForExport(members){
+  const memberIds = new Set(members.map(m=>m.id));
+  const byId = Object.fromEntries(members.map(m=>[m.id,m]));
+  const used = new Set();
+  const sections = [];
+  for(const g of GROUPS){
+    const groupMembers = g.memberIds.filter(id=>memberIds.has(id)).map(id=>byId[id]).sort((a,b)=>a.name.localeCompare(b.name));
+    if(groupMembers.length){
+      sections.push({group:g.group, wakiil:g.wakiil, members:groupMembers});
+      groupMembers.forEach(m=>used.add(m.id));
+    }
+  }
+  const ungrouped = members.filter(m=>!used.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name));
+  if(ungrouped.length) sections.push({group:t("Aan koox lahayn","Ungrouped"), wakiil:"", members:ungrouped});
+  return sections;
+}
+
 function exportFullListExcel(members){
-  const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[],
-    ["#",t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance","Status"]];
-  let total = 0;
-  members.forEach((m,i)=>{
-    const bal = computeBalance(m);
-    total += bal;
-    rows.push([i+1, m.name, m.phone||"-", m.monthlyDue||0, bal, m.status]);
-  });
-  rows.push(["","","",t("Wadarta","Total"), total, ""]);
+  const sections = groupMembersForExport(members);
+  const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[]];
+  let grand = 0;
+  for(const s of sections){
+    rows.push([s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : "")]);
+    rows.push(["#",t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance","Status"]);
+    let subtotal = 0;
+    s.members.forEach((m,i)=>{
+      const bal = computeBalance(m);
+      subtotal += bal;
+      rows.push([i+1, m.name, m.phone||"-", m.monthlyDue||0, bal, m.status]);
+    });
+    rows.push(["","","",t("Wadarta","Total")+" "+s.group, subtotal, ""]);
+    rows.push([]);
+    grand += subtotal;
+  }
+  rows.push(["","","",t("WADARTA GUUD","GRAND TOTAL"), grand, ""]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:5},{wch:32},{wch:16},{wch:12},{wch:14},{wch:10}];
   const wb = XLSX.utils.book_new();
@@ -1068,27 +1093,38 @@ function exportFullListExcel(members){
 function exportFullListPdf(members){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const sections = groupMembersForExport(members);
   let y = 18;
-  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y+=9;
-  doc.setFontSize(9); doc.setFont(undefined,"bold");
-  doc.text("#", 14, y); doc.text(t("Magaca","Name"), 24, y); doc.text(t("Telefoon","Phone"), 110, y); doc.text(t("Qoondo","Due"), 150, y); doc.text("Balance", 175, y);
-  y += 4; doc.line(14,y,196,y); y += 5;
-  doc.setFont(undefined,"normal");
-  let total = 0;
-  members.forEach((m,i)=>{
-    if(y > 280){ doc.addPage(); y = 18; }
-    const bal = computeBalance(m);
-    total += bal;
-    doc.text(String(i+1), 14, y);
-    doc.text(String(m.name).slice(0,40)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''), 24, y);
-    doc.text(String(m.phone||"-"), 110, y);
-    doc.text(m.monthlyDue?("$"+m.monthlyDue):"-", 150, y);
-    doc.text("$"+bal.toFixed(2), 175, y);
-    y += 6;
-  });
-  y += 2; doc.line(14,y,196,y); y += 6;
-  doc.setFontSize(10);
-  doc.text(t("Wadarta","Total")+`: $${total.toFixed(2)}  (${members.length} ${t('xubnood','members')})`, 14, y);
+  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y += 10;
+  let grand = 0;
+  for(const s of sections){
+    if(y > 260){ doc.addPage(); y = 18; }
+    doc.setFontSize(11); doc.setFont(undefined,"bold");
+    doc.text(s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : ""), 14, y); y += 6;
+    doc.setFont(undefined,"normal"); doc.setFontSize(8);
+    doc.text("#", 14, y); doc.text(t("Magaca","Name"), 22, y); doc.text(t("Telefoon","Phone"), 108, y); doc.text(t("Qoondo","Due"), 148, y); doc.text("Balance", 172, y);
+    y += 4; doc.line(14,y,196,y); y += 4.5;
+    let subtotal = 0;
+    s.members.forEach((m,i)=>{
+      if(y > 280){ doc.addPage(); y = 18; }
+      const bal = computeBalance(m);
+      subtotal += bal;
+      doc.text(String(i+1), 14, y);
+      doc.text(String(m.name).slice(0,38)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''), 22, y);
+      doc.text(String(m.phone||"-"), 108, y);
+      doc.text(m.monthlyDue?("$"+m.monthlyDue):"-", 148, y);
+      doc.text("$"+bal.toFixed(2), 172, y);
+      y += 5;
+    });
+    doc.setFont(undefined,"bold");
+    doc.text(`${t('Wadarta','Total')} ${s.group}: $${subtotal.toFixed(2)} (${s.members.length})`, 14, y);
+    doc.setFont(undefined,"normal");
+    y += 9;
+    grand += subtotal;
+  }
+  if(y > 270){ doc.addPage(); y = 18; }
+  doc.setFontSize(12); doc.setFont(undefined,"bold");
+  doc.text(`${t('WADARTA GUUD','GRAND TOTAL')}: $${grand.toFixed(2)} (${members.length} ${t('xubnood','members')})`, 14, y);
   doc.save(t("xubnaha_oo_dhan","full_member_report")+".pdf");
 }
 

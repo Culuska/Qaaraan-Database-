@@ -1310,12 +1310,28 @@ function renderDetail(){
   }
 
   if(canDeact){
-    document.getElementById("btnToggleStatus").addEventListener("click", async ()=>{
+    document.getElementById("btnToggleStatus").addEventListener("click", ()=>{
       const newStatus = inactive ? "active" : "inactive";
-      const r = await attemptAction("statusChange", {memberId:m.id, newStatus}, "deactivate", `${newStatus==="active"?"Activate":"De-activate"}: ${m.name}`);
-      if(r.status !== "denied"){
-        renderSummary(); renderList(); renderDetail();
-      }
+      const question = newStatus==="active"
+        ? t(`Ma hubtaa inaad dib u activate gareynayso ${m.name}?`,`Are you sure you want to reactivate ${m.name}?`)
+        : t(`Ma hubtaa inaad de-activate gareynayso ${m.name}?`,`Are you sure you want to deactivate ${m.name}?`);
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${question}</p>
+        ${newStatus==="inactive" ? `<p class="muted">${t("Xubintan wali wuu jiri doonaa xogta, laakiin qoondo bille cusub looma abuurayo ilaa dib loo activate gareeyo.","This member's data stays intact, but no new monthly dues will accrue for them until reactivated.")}</p>` : ''}
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="${newStatus==='inactive'?'ghost-warn':'primary'}" id="mConfirm">${t("Haa","Yes")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        closeModal();
+        const r = await attemptAction("statusChange", {memberId:m.id, newStatus}, "deactivate", `${newStatus==="active"?"Activate":"De-activate"}: ${m.name}`);
+        if(r.status !== "denied"){
+          renderSummary(); renderList(); renderDetail();
+        }
+      });
     });
   }
 
@@ -2000,13 +2016,27 @@ function renderDisbursements(){
   document.getElementById("disbFoot").textContent = `${sorted.length} / ${db.disbursements.length} ${t("kharash oo la muujinayo","expenses shown")}`;
 
   document.querySelectorAll("#disbList .del").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
+    btn.addEventListener("click", ()=>{
       const d = db.disbursements.find(x=>x.id===btn.dataset.id);
-      db.disbursements = db.disbursements.filter(x=>x.id!==btn.dataset.id);
-      logActivity("Tirtirid kharash", d?`${d.category} $${d.amount}`:'', "direct");
-      await saveDb();
-      showToast(t("Waa la tirtiray","Deleted"));
-      renderSummary(); renderDisbursements();
+      if(!d) return;
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${t("Ma hubtaa inaad tirtirto kharashkan","Are you sure you want to delete this expense")}: ${d.category} — ${money(d.amount)}${d.recipient?(' — '+d.recipient):''}?</p>
+        <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo.","This action cannot be undone.")}</p>
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        db.disbursements = db.disbursements.filter(x=>x.id!==d.id);
+        logActivity("Tirtirid kharash", `${d.category} $${d.amount}`, "direct");
+        await saveDb();
+        closeModal();
+        showToast(t("Waa la tirtiray","Deleted"));
+        renderSummary(); renderDisbursements();
+      });
     });
   });
   updateDisbFormVisibility();
@@ -2194,6 +2224,20 @@ function accountBalance(acc){
   return bal;
 }
 
+function computeAccountImpact(acc){
+  let paymentCount = 0, paymentTotal = 0;
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment" && tx.account===acc.id){ paymentCount++; paymentTotal += tx.amount; }
+    }
+  }
+  let disbCount = 0, disbTotal = 0;
+  for(const d of db.disbursements){
+    if(d.account===acc.id){ disbCount++; disbTotal += d.amount; }
+  }
+  return {paymentCount, paymentTotal, disbCount, disbTotal, balance: accountBalance(acc)};
+}
+
 function renderFinancialSummary(){
   const totalAR = db.members.reduce((s,m)=>{ const b = computeBalance(m); return b>0 ? s+b : s; }, 0);
   const totalAP = db.payables.filter(p=>p.status==="unpaid").reduce((s,p)=>s+p.amount,0);
@@ -2266,11 +2310,25 @@ function renderPayables(){
     btn.addEventListener("click", ()=>openPayBillModal(btn.dataset.payid));
   });
   list.querySelectorAll("[data-act='del']").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      db.payables = db.payables.filter(p=>p.id!==btn.dataset.payid);
-      logActivity("Tirtirid bill (AP)", "", "direct");
-      await saveDb();
-      renderFinancialSummary();
+    btn.addEventListener("click", ()=>{
+      const p = db.payables.find(x=>x.id===btn.dataset.payid);
+      if(!p) return;
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${t("Ma hubtaa inaad tirtirto bill-kan","Are you sure you want to delete this bill")}: ${p.vendor} — ${money(p.amount)}?</p>
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        db.payables = db.payables.filter(x=>x.id!==p.id);
+        logActivity("Tirtirid bill (AP)", "", "direct");
+        await saveDb();
+        closeModal();
+        renderFinancialSummary();
+      });
     });
   });
 }
@@ -2358,11 +2416,74 @@ function renderAccounts(){
     </div>`;
   }).join("");
   list.querySelectorAll(".del[data-acctid]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      db.accounts = db.accounts.filter(a=>a.id!==btn.dataset.acctid);
-      logActivity("Tirtirid account", btn.dataset.acctid, "direct");
-      await saveDb();
-      renderAccounts();
+    btn.addEventListener("click", ()=>{
+      const acc = db.accounts.find(a=>a.id===btn.dataset.acctid);
+      if(!acc) return;
+      const impact = computeAccountImpact(acc);
+      const hasImpact = impact.paymentCount>0 || impact.disbCount>0;
+
+      const doDelete = async ()=>{
+        db.accounts = db.accounts.filter(a=>a.id!==acc.id);
+        logActivity("Tirtirid account", acc.name, "direct");
+        await saveDb();
+        closeModal();
+        showToast(t("Account-ka waa la tirtiray","Account deleted"));
+        renderAccounts();
+      };
+
+      if(!hasImpact){
+        openModal(`
+          <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+          <p class="muted">${t("Ma hubtaa inaad tirtirto account-ka","Are you sure you want to delete the account")} "${acc.name}"?</p>
+          <div class="actions">
+            <button id="mCancel">${t("Maya","No")}</button>
+            <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
+          </div>
+        `);
+        document.getElementById("mCancel").addEventListener("click", closeModal);
+        document.getElementById("mConfirm").addEventListener("click", doDelete);
+        return;
+      }
+
+      const showStep1 = ()=>{
+        openModal(`
+          <h3>${t("Digniin","Warning")}: "${acc.name}"</h3>
+          <p class="muted">${t("Account-kan wuxuu leeyahay","This account has")}:</p>
+          <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--ink-2);">
+            ${impact.paymentCount ? `<li>${impact.paymentCount} ${t("lacag-bixin oo xubno ah","member payment(s)")} — ${money(impact.paymentTotal)}</li>` : ''}
+            ${impact.disbCount ? `<li>${impact.disbCount} ${t("kharash oo bulsho ah","community expense(s)")} — ${money(impact.disbTotal)}</li>` : ''}
+            <li>${t("Balance hadda","Current balance")}: ${money(impact.balance)}</li>
+          </ul>
+          <p class="muted" style="color:var(--danger-ink);">${t("Haddii aad tirtirto account-kan, dhaqdhaqaaqyadaas kuma tirtirmi doonaan — laakiin mar dambe kuma tirsanaan doonaan wax account ah, xisaabaadka guud (Financials, General Ledger, Accounts) way saameyn doonaan.","Deleting this account won't delete those transactions — but they'll no longer belong to any account, and your Financials, General Ledger, and Accounts totals will be affected.")}</p>
+          <div class="actions">
+            <button id="mNo">${t("Maya","No")}</button>
+            <button class="ghost-danger" id="mYes">${t("Waan fahmay, sii wad","I understand, continue")}</button>
+          </div>
+        `);
+        document.getElementById("mNo").addEventListener("click", closeModal);
+        document.getElementById("mYes").addEventListener("click", showStep2);
+      };
+      const showStep2 = ()=>{
+        openModal(`
+          <h3>${t("Xaqiijinta u dambeysa","Final confirmation")}</h3>
+          <p class="muted">${t("Si aad u xaqiijiso, qor magaca account-ka","To confirm, type the account name")}: <b>${acc.name}</b></p>
+          <div class="frow"><input type="text" id="delAcctInput" placeholder="${acc.name}"></div>
+          <div class="actions">
+            <button id="mCancel">${t("Maya","No")}</button>
+            <button class="ghost-danger" id="mConfirm">${t("Xaqiiji tirtirka","Confirm delete")}</button>
+          </div>
+        `);
+        document.getElementById("mCancel").addEventListener("click", closeModal);
+        document.getElementById("mConfirm").addEventListener("click", ()=>{
+          const entered = document.getElementById("delAcctInput").value.trim();
+          if(entered !== acc.name){
+            showToast(t("Khalad: magaca account-ka si sax ah u qor","Error: type the account name exactly"));
+            return;
+          }
+          doDelete();
+        });
+      };
+      showStep1();
     });
   });
 }
@@ -2771,13 +2892,26 @@ function openManageUsersModal(){
     openManageUsersModal();
   });
   document.querySelectorAll("[data-uid]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
+    btn.addEventListener("click", ()=>{
       const u = db.users.find(x=>x.id===btn.dataset.uid);
-      db.users = db.users.filter(x=>x.id!==btn.dataset.uid);
-      logActivity("Tirtirid user", u?u.username:'', "direct");
-      await saveDb();
-      showToast(t("User waa la tirtiray","User was deleted"));
-      openManageUsersModal();
+      if(!u) return;
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${t("Ma hubtaa inaad tirtirto user-ka","Are you sure you want to delete the user")} ${u.username}?</p>
+        <p class="muted" style="color:var(--danger-ink);">${t("Isagu mar dambe kuma soo gali doono nidaamka.","They will no longer be able to log in.")}</p>
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        db.users = db.users.filter(x=>x.id!==u.id);
+        logActivity("Tirtirid user", u.username, "direct");
+        await saveDb();
+        showToast(t("User waa la tirtiray","User was deleted"));
+        openManageUsersModal();
+      });
     });
   });
 }

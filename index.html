@@ -442,6 +442,25 @@
     </div>
   </div>
 
+  <div id="ledgerView" style="display:none;">
+    <div class="page-head">
+      <h1 data-t-en="General Ledger">Diiwaanka Xisaabaadka</h1>
+      <div class="page-sub" data-t-en="Every transaction shown as a debit/credit pair across two accounts, like QuickBooks.">Dhaqdhaqaaq kasta wuxuu saameeyaa laba account (debit/credit), sida QuickBooks.</div>
+      <div class="page-head-actions">
+        <button id="btnLedgerExportPdf">Export PDF</button>
+        <button id="btnLedgerExportXlsx">Export Excel</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="view-toggle" id="ledgerViewToggle" style="padding:10px 14px 0;">
+        <button data-ledgerview="journal" class="on" data-t-en="Journal">Diiwaanka Dhaqdhaqaaqyada</button>
+        <button data-ledgerview="ledger" data-t-en="Ledger by account">Xisaabta Account kasta</button>
+        <button data-ledgerview="trial" data-t-en="Trial Balance">Trial Balance</button>
+      </div>
+      <div id="ledgerContent" style="padding:16px;"></div>
+    </div>
+  </div>
+
   </div>
 </div>
 <div id="mobileBottomNav"></div>
@@ -771,6 +790,23 @@ function showToast(msg){
   const t = document.getElementById("toast");
   t.textContent = msg; t.classList.add("show");
   setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+function playPip(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.16);
+    osc.onended = ()=>ctx.close();
+  }catch(e){}
 }
 
 function renderSummary(){
@@ -1117,6 +1153,7 @@ function renderDetail(){
       if(!amount || amount<=0) return;
       const r = await attemptAction("payment", {memberId:m.id, amount, date, note, account}, "collectPayment", `Payment: ${m.name}`);
       if(r.status !== "denied"){
+        playPip();
         renderSummary(); renderList(); renderDetail();
       }
     });
@@ -1571,6 +1608,103 @@ function openAddCustomerModal(){
   });
 }
 
+// ---- Quick payment receipt: fast search-a-member -> record -> repeat flow ----
+let receiptSessionCount = 0;
+let receiptSessionTotal = 0;
+
+function receiptSessionTallyHtml(){
+  if(!receiptSessionCount) return '';
+  return `<div class="muted" style="margin-top:12px;text-align:center;">${receiptSessionCount} ${t("lacag oo la diiwaangeliyay","payments recorded")} — ${t("wadarta","total")} ${money(receiptSessionTotal)}</div>`;
+}
+
+function openQuickReceiptModal(){
+  if(!hasPerm("collectPayment")){
+    showToast(t("Uma haysatid ogolaansho lacag qabasho.","You don't have permission to collect payments."));
+    return;
+  }
+  receiptSessionCount = 0;
+  receiptSessionTotal = 0;
+  renderReceiptSearchStep();
+}
+
+function renderReceiptSearchStep(){
+  openModal(`
+    <h3>${t("Rasiidka Lacag-bixinta","Payment Receipt")}</h3>
+    <div class="frow">
+      <label>${t("Raadi xubin (magaca)","Search member (name)")}</label>
+      <input type="text" id="rcptSearch" placeholder="${t('Qor magaca...','Type a name...')}">
+    </div>
+    <div id="rcptResults" class="tx-list" style="max-height:320px;"></div>
+    ${receiptSessionTallyHtml()}
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  const searchEl = document.getElementById("rcptSearch");
+  const renderResults = ()=>{
+    const q = searchEl.value.trim().toLowerCase();
+    const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const results = document.getElementById("rcptResults");
+    results.innerHTML = matches.length ? matches.map(m=>`
+      <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+        <div class="l">
+          <span>${m.name}</span>
+          <span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span>
+        </div>
+        <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+      </div>
+    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.querySelectorAll("[data-mid]").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        const m = db.members.find(x=>x.id===row.dataset.mid);
+        if(m) renderReceiptConfirmStep(m);
+      });
+    });
+  };
+  searchEl.addEventListener("input", renderResults);
+  searchEl.focus();
+}
+
+function renderReceiptConfirmStep(m){
+  const bal = computeBalance(m);
+  openModal(`
+    <h3>${t("Rasiidka Lacag-bixinta","Payment Receipt")}</h3>
+    <div class="bal-row" style="margin-bottom:14px;">
+      <div class="bal-box"><div class="lbl">${t("Magaca","Full name")}</div><div class="val" style="font-size:14px;">${m.name}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Telefoon","Phone")}</div><div class="val" style="font-size:14px;">${m.phone || '—'}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Qoondo bille","Monthly due")}</div><div class="val" style="font-size:14px;">${money(m.monthlyDue||0)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+    </div>
+    <form id="rcptForm">
+      <div class="frow"><label>${t("Lacagta la bixiyay","Amount paid")}</label><input required type="number" step="0.01" min="0.01" id="rcptAmount" value="${m.monthlyDue||''}"></div>
+      <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="rcptDate" value="${todayStr()}"></div>
+      <div class="frow"><label>Account</label><select id="rcptAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+      <div class="frow"><label>${t("Faahfaahin (ikhtiyaari)","Note (optional)")}</label><input type="text" id="rcptNote" placeholder="${t('tusaale: cash, EVC, iwm','e.g. cash, EVC, etc.')}"></div>
+      <div class="actions">
+        <button type="button" id="rcptBack">${t("Dib u noqo","Back")}</button>
+        <button type="submit" class="primary" id="rcptSubmit">${t("Diiwaangeli","Record")}</button>
+      </div>
+    </form>
+    ${receiptSessionTallyHtml()}
+  `);
+  document.getElementById("rcptBack").addEventListener("click", renderReceiptSearchStep);
+  document.getElementById("rcptForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById("rcptAmount").value);
+    const date = document.getElementById("rcptDate").value;
+    const account = document.getElementById("rcptAccount").value;
+    const note = document.getElementById("rcptNote").value.trim();
+    if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+    const r = await attemptAction("payment", {memberId:m.id, amount, date, note, account}, "collectPayment", `Payment: ${m.name}`);
+    if(r.status === "denied") return;
+    playPip();
+    receiptSessionCount++;
+    receiptSessionTotal += amount;
+    renderSummary(); renderList(); renderDetail();
+    showToast(t("Lacagta waa la diiwaangeliyay","Payment recorded"));
+    renderReceiptSearchStep();
+  });
+}
+
 function updateDisbFormVisibility(){
   const canPay = hasPerm("collectPayment");
   const form = document.getElementById("disbForm");
@@ -1843,9 +1977,13 @@ function renderTabs(){
     {id:"members", label:t("Xubnaha","Members"), icon:"ti-users"},
     {id:"disb", label:t("Kharashaadka Bulshada","Community Expenses"), icon:"ti-report-money"}
   ];
+  if(hasPerm("collectPayment")){
+    tabs.push({id:"receipt-action", label:t("Rasiidka Lacag-bixinta","Payment Receipt"), icon:"ti-receipt", action:"receipt"});
+  }
   if(hasPerm("viewReports")){
     tabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
     tabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-analytics"});
+    tabs.push({id:"ledger", label:t("Diiwaanka Xisaabaadka","General Ledger"), icon:"ti-book-2"});
   }
   if(hasPerm("collectPayment")){
     tabs.push({id:"reminders", label:t("Xasuusin Bille","Reminders"), icon:"ti-bell"});
@@ -1856,16 +1994,18 @@ function renderTabs(){
     adminTabs.push({id:"activity", label:t("Diiwaanka Dhaqdhaqaaqa","Activity Log"), icon:"ti-history"});
   }
 
-  const navBtn = tab => `<button data-tab="${tab.id}" class="${currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
+  const navBtn = tab => `<button data-tab="${tab.action?'':tab.id}" ${tab.action?`data-action="${tab.action}"`:''} class="${!tab.action && currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
   const navList = document.getElementById("sidebarNavList");
   navList.innerHTML = tabs.map(navBtn).join("")
     + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
     + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : "");
-  navList.querySelectorAll("[data-tab]").forEach(btn=>{
+  navList.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
   });
   const usersBtn = navList.querySelector("[data-action='users']");
   if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
+  const receiptBtn = navList.querySelector("[data-action='receipt']");
+  if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
 
   const footer = document.getElementById("sidebarFooter");
   const roleLabel = currentUserObj.role === "admin" ? t("Maamule","Admin") : t("Shaqaale","Staff");
@@ -1884,10 +2024,12 @@ function renderTabs(){
 
   const mobileTabs = tabs.slice(0,5);
   const nav = document.getElementById("mobileBottomNav");
-  nav.innerHTML = mobileTabs.map(t=>`<button data-tab="${t.id}" class="${currentTab===t.id?'on':''}"><i class="ti ${t.icon}"></i><span>${t.label.split(' ')[0]}</span></button>`).join("");
-  nav.querySelectorAll("[data-tab]").forEach(btn=>{
+  nav.innerHTML = mobileTabs.map(mt=>`<button data-tab="${mt.action?'':mt.id}" ${mt.action?`data-action="${mt.action}"`:''} class="${!mt.action && currentTab===mt.id?'on':''}"><i class="ti ${mt.icon}"></i><span>${mt.label.split(' ')[0]}</span></button>`).join("");
+  nav.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
   });
+  const mobReceiptBtn = nav.querySelector("[data-action='receipt']");
+  if(mobReceiptBtn) mobReceiptBtn.addEventListener("click", openQuickReceiptModal);
 }
 
 function updateMobileLayoutClass(){
@@ -1908,6 +2050,7 @@ function switchTab(tab){
   document.getElementById("accountsView").style.display = tab==="accounts" ? "" : "none";
   document.getElementById("remindersView").style.display = tab==="reminders" ? "" : "none";
   document.getElementById("financialView").style.display = tab==="financial" ? "" : "none";
+  document.getElementById("ledgerView").style.display = tab==="ledger" ? "" : "none";
   renderSummary();
   if(tab==="dashboard") renderDashboardActivity();
   if(tab==="disb") renderDisbursements();
@@ -1916,6 +2059,7 @@ function switchTab(tab){
   if(tab==="accounts") renderAccounts();
   if(tab==="reminders") renderReminders();
   if(tab==="financial") renderFinancialSummary();
+  if(tab==="ledger") renderLedgerView();
 }
 
 function renderReminders(){
@@ -2130,6 +2274,177 @@ function renderAccounts(){
     });
   });
 }
+
+// ---- General Ledger (derived double-entry journal) ----
+// Not a real ledger table in the database — computed live from members/
+// disbursements/accounts so every payment, due, write-off, and expense
+// shows as a debit/credit pair across two accounts, QuickBooks-style.
+function buildJournalEntries(){
+  const AR = t("Xisaabaadka La Sugayo (Xubnaha)","Accounts Receivable — Members");
+  const REVENUE = t("Dakhliga Qoondooyinka","Dues Revenue");
+  const BADDEBT = t("Kharashka Deynta la Cafiyay","Bad Debt Expense");
+  const EQUITY = t("Hantida Bilowga ah","Opening Equity");
+  const acctName = (id)=>{
+    const a = db.accounts.find(x=>x.id===id);
+    return a ? a.name : t("Account aan la sheegin","Unspecified account");
+  };
+  const entries = [];
+  for(const a of db.accounts){
+    if(a.openingBalance){
+      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${a.name}`, debit:a.name, credit:EQUITY, amount:a.openingBalance});
+    }
+  }
+  for(const m of db.members){
+    if(m.openingBalance){
+      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${m.name}`, debit:AR, credit:EQUITY, amount:m.openingBalance});
+    }
+    for(const tx of m.transactions){
+      if(tx.type==="due"){
+        entries.push({date:tx.date, desc:`${t("Qoondo bille","Monthly due")}: ${m.name}`, debit:AR, credit:REVENUE, amount:tx.amount});
+      } else if(tx.type==="payment"){
+        entries.push({date:tx.date, desc:`${t("Lacag-bixin","Payment")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:acctName(tx.account), credit:AR, amount:tx.amount});
+      } else if(tx.type==="writeoff"){
+        entries.push({date:tx.date, desc:`${t("Deyn la cafiyay","Debt written off")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:BADDEBT, credit:AR, amount:tx.amount});
+      }
+    }
+  }
+  for(const d of db.disbursements){
+    entries.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${d.recipient?(' — '+d.recipient):''}`, debit:`${t("Kharashka","Expense")}: ${d.category}`, credit:acctName(d.account), amount:d.amount});
+  }
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  return entries;
+}
+
+let ledgerSubView = "journal";
+
+function renderLedgerView(){
+  document.querySelectorAll("#ledgerViewToggle [data-ledgerview]").forEach(b=>b.classList.toggle("on", b.dataset.ledgerview===ledgerSubView));
+  const el = document.getElementById("ledgerContent");
+  const entries = buildJournalEntries();
+  if(ledgerSubView === "ledger") el.innerHTML = renderLedgerByAccountHtml(entries);
+  else if(ledgerSubView === "trial") el.innerHTML = renderLedgerTrialBalanceHtml(entries);
+  else el.innerHTML = renderLedgerJournalHtml(entries);
+  const sel = document.getElementById("ledgerAccountSelect");
+  if(sel) sel.addEventListener("change", renderLedgerView);
+}
+
+function renderLedgerJournalHtml(entries){
+  return `
+    <div class="muted" style="margin-bottom:8px;">${entries.length} ${t("diiwaan","entries")}</div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr>
+          <th>${t("Taariikhda","Date")}</th><th>${t("Faahfaahin","Description")}</th>
+          <th>${t("Debit account","Debit account")}</th><th>${t("Credit account","Credit account")}</th>
+          <th style="text-align:right">${t("Lacagta","Amount")}</th>
+        </tr></thead>
+        <tbody>
+          ${entries.map(e=>`<tr><td>${e.date}</td><td>${e.desc}</td><td>${e.debit}</td><td>${e.credit}</td><td style="text-align:right">${money(e.amount)}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderLedgerByAccountHtml(entries){
+  const accounts = Array.from(new Set(entries.flatMap(e=>[e.debit,e.credit]))).sort();
+  const prevSel = document.getElementById("ledgerAccountSelect");
+  const current = (prevSel && accounts.includes(prevSel.value)) ? prevSel.value : accounts[0] || "";
+  const rows = entries.filter(e=>e.debit===current || e.credit===current);
+  let bal = 0;
+  const withBal = rows.map(e=>{
+    bal += e.debit===current ? e.amount : -e.amount;
+    return {...e, runningBalance:bal};
+  });
+  return `
+    <div class="frow" style="max-width:360px;">
+      <label>${t("Dooro Account","Select account")}</label>
+      <select id="ledgerAccountSelect">${accounts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}" ${a===current?'selected':''}>${a}</option>`).join("")}</select>
+    </div>
+    <div class="tx-list" style="max-height:520px;">
+      ${withBal.length ? withBal.map(e=>`
+        <div class="tx ${e.debit===current?'due':'payment'}">
+          <div class="l">
+            <span>${e.date} — ${e.desc}</span>
+            <span class="muted">${e.debit===current ? t('Debit','Debit') : t('Credit','Credit')}: ${e.debit===current?e.credit:e.debit}</span>
+          </div>
+          <div style="text-align:right;">
+            <div class="amt">${e.debit===current?'+':'-'}${money(e.amount)}</div>
+            <div class="muted" style="font-size:11px;">${t('Balance','Balance')}: ${money(e.runningBalance)}</div>
+          </div>
+        </div>
+      `).join("") : `<div class="empty">${t("Wax dhaqdhaqaaq ah lama helin.","No transactions found.")}</div>`}
+    </div>
+  `;
+}
+
+function renderLedgerTrialBalanceHtml(entries){
+  const totals = {};
+  for(const e of entries){
+    (totals[e.debit] ||= {debit:0,credit:0}).debit += e.amount;
+    (totals[e.credit] ||= {debit:0,credit:0}).credit += e.amount;
+  }
+  const accounts = Object.keys(totals).sort();
+  let totalDebit=0, totalCredit=0;
+  const rowsHtml = accounts.map(a=>{
+    const {debit,credit} = totals[a];
+    totalDebit += debit; totalCredit += credit;
+    return `<tr><td>${a}</td><td style="text-align:right">${debit?money(debit):'—'}</td><td style="text-align:right">${credit?money(credit):'—'}</td><td style="text-align:right;font-weight:600;">${money(debit-credit)}</td></tr>`;
+  }).join("");
+  const balanced = Math.abs(totalDebit-totalCredit) < 0.01;
+  return `
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>${t("Account","Account")}</th><th style="text-align:right">${t("Debit","Debit")}</th><th style="text-align:right">${t("Credit","Credit")}</th><th style="text-align:right">${t("Net","Net")}</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot><tr style="font-weight:700;border-top:2px solid var(--line);"><td>${t("Wadarta","Total")}</td><td style="text-align:right">${money(totalDebit)}</td><td style="text-align:right">${money(totalCredit)}</td><td style="text-align:right">${money(totalDebit-totalCredit)}</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="muted" style="margin-top:10px;color:${balanced?'var(--accent-ink)':'var(--danger-ink)'}">${balanced ? t('✓ Isku dheelitiran (debits = credits)','✓ Balanced (debits = credits)') : t('⚠ Ma isku dheelitirna','⚠ Not balanced')}</div>
+  `;
+}
+
+function exportLedgerExcel(){
+  const entries = buildJournalEntries();
+  const rows = [[t("Diiwaanka Xisaabaadka","General Ledger")],[],
+    [t("Taariikhda","Date"),t("Faahfaahin","Description"),t("Debit account","Debit account"),t("Credit account","Credit account"),t("Lacagta","Amount")]];
+  for(const e of entries) rows.push([e.date, e.desc, e.debit, e.credit, e.amount]);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:36},{wch:28},{wch:28},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Ledger");
+  XLSX.writeFile(wb, "general_ledger.xlsx");
+}
+
+function exportLedgerPdf(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:"landscape"});
+  const entries = buildJournalEntries();
+  let y = 14;
+  doc.setFontSize(14); doc.text(t("Diiwaanka Xisaabaadka","General Ledger"), 14, y); y += 8;
+  doc.setFontSize(8); doc.setFont(undefined,"bold");
+  doc.text(t("Taariikhda","Date"), 14, y); doc.text(t("Faahfaahin","Description"), 40, y);
+  doc.text(t("Debit account","Debit account"), 130, y); doc.text(t("Credit account","Credit account"), 190, y);
+  doc.text(t("Lacagta","Amount"), 255, y);
+  y += 4; doc.line(14,y,282,y); y += 5;
+  doc.setFont(undefined,"normal");
+  for(const e of entries){
+    if(y > 195){ doc.addPage("landscape"); y = 14; }
+    doc.text(e.date, 14, y);
+    doc.text(String(e.desc).slice(0,42), 40, y);
+    doc.text(String(e.debit).slice(0,32), 130, y);
+    doc.text(String(e.credit).slice(0,32), 190, y);
+    doc.text("$"+e.amount.toFixed(2), 255, y);
+    y += 5;
+  }
+  doc.save("general_ledger.pdf");
+}
+
+document.querySelectorAll("#ledgerViewToggle [data-ledgerview]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{ ledgerSubView = btn.dataset.ledgerview; renderLedgerView(); });
+});
+document.getElementById("btnLedgerExportPdf").addEventListener("click", exportLedgerPdf);
+document.getElementById("btnLedgerExportXlsx").addEventListener("click", exportLedgerExcel);
 
 document.getElementById("btnDisbExportPdf").addEventListener("click", exportDisbursementsPdf);
 document.getElementById("btnDisbExportXlsx").addEventListener("click", exportDisbursementsExcel);

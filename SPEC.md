@@ -108,6 +108,30 @@ Tabs shown depend on permissions (`renderTabs`):
 - Per-group and per-member PDF/Excel exports (jsPDF, SheetJS) — group roster
   with balances, member transaction history.
 - Disbursement exports: full, or filtered by category.
+- **General Ledger** (`buildJournalEntries()` in `index.html`) — not a real
+  ledger table in the database. Computed live from `db.members[].transactions`,
+  `db.disbursements`, and `db.accounts` opening balances into a derived
+  double-entry journal: every due/payment/write-off/expense becomes a
+  debit+credit pair across virtual accounts (`Accounts Receivable — Members`,
+  `Dues Revenue`, `Bad Debt Expense`, `Expense: <category>`) and real bank/cash
+  accounts. Three views share this journal: a chronological **Journal**, a
+  **Ledger by account** (pick one account, see a running balance), and a
+  **Trial Balance** (confirms total debits = total credits). PDF/Excel export
+  matches the existing export patterns.
+
+## Quick payment receipt
+
+`openQuickReceiptModal()` (sidebar → "Rasiidka Lacag-bixinta") is a fast-entry
+flow for processing many in-person dues payments in a row: type a name, pick
+from a live-filtered list of active members, confirm the amount (prefilled
+from `monthlyDue`)/date/account, submit. Posts through the same
+`attemptAction("payment", ...)` path as the per-member payment form — same
+permission gating and pending-approval behavior — then loops back to the
+search step with a running session tally (count + total) instead of closing,
+so an admin/staff can process a queue of people without re-opening the modal
+each time. `playPip()` (a short Web Audio API beep, no external asset) fires
+on every successful payment record, both here and in the per-member payment
+form, as an audible confirmation.
 
 ## Deletion / destructive-action confirmation pattern
 

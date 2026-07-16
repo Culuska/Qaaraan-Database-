@@ -151,6 +151,26 @@ each time. `playPip()` (a short Web Audio API beep, no external asset) fires
 on every successful payment record, both here and in the per-member payment
 form, as an audible confirmation.
 
+## Backup & restore
+
+Settings (admin-only) has a "Backup & Restore" section:
+- **Download Backup** (`downloadBackup()`) — client-side `Blob` download of
+  the entire `db` object as `qaaraan_backup_<date>.json`, wrapped in
+  `{__qaaraan_backup: true, exportedAt, data}`. No server involvement beyond
+  logging the action. Contains everything, including user records with
+  **plaintext passwords** (a pre-existing condition of `db.users` — see
+  CLAUDE.md's known gaps) — the UI warns admins to store the file securely,
+  but doesn't (and can't, client-side) prevent misuse of a downloaded copy.
+- **Restore from Backup** (`openBackupRestoreModal()` → `showRestoreConfirm()`)
+  — file picker reads and parses the JSON, sanity-checks it has a `members`
+  array, shows a preview (counts + backup date) before doing anything, then
+  requires typing the literal word `RESTORE` to confirm — same
+  typed-confirmation tier as deleting a member or an account with financial
+  history. On confirm, `db` is fully replaced (with the same fallback
+  defaults `loadDb()` applies for missing sub-arrays), saved, and the page
+  reloads. This is a full overwrite, not a merge — there's no partial/
+  selective restore.
+
 ## Deletion / destructive-action confirmation pattern
 
 Every hard-delete (member, transaction) uses a two-step modal: confirm

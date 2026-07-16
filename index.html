@@ -2963,6 +2963,14 @@ function openAppSettingsModal(){
       <button id="mCancel">${t("Maya","Cancel")}</button>
       <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
     </div>
+    <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
+      <h3 style="margin:0 0 6px;">${t("Backup & Soo celin","Backup & Restore")}</h3>
+      <p class="muted" style="margin:0 0 10px;">${t("Soo deji nuqul buuxa oo xogtaada ah si aad u haysato haddii server-ku hakado ama xog lumaan dhacdo. Kaydi faylkan meel ammaan ah — wuxuu ka kooban yahay xogta xubnaha oo dhan iyo password-yada users-ka.","Download a full copy of your data to keep in case the server goes down or data is lost. Store this file somewhere safe — it contains every member's data and user passwords.")}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="btnDownloadBackup"><i class="ti ti-download"></i> ${t("Soo deji Backup","Download Backup")}</button>
+        <button class="ghost-warn" id="btnOpenRestore"><i class="ti ti-upload"></i> ${t("Soo celi Backup","Restore from Backup")}</button>
+      </div>
+    </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
@@ -2974,6 +2982,95 @@ function openAppSettingsModal(){
     await saveDb();
     showToast(t("Settings waa la kaydiyay","Settings saved"));
     closeModal();
+  });
+  document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackup);
+  document.getElementById("btnOpenRestore").addEventListener("click", openBackupRestoreModal);
+}
+
+async function downloadBackup(){
+  const payload = { __qaaraan_backup: true, exportedAt: new Date().toISOString(), data: db };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `qaaraan_backup_${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  logActivity("Backup la soo dejiyay", "", "direct");
+  await saveDb();
+  showToast(t("Backup-ka waa la soo dejiyay","Backup downloaded"));
+}
+
+function openBackupRestoreModal(){
+  openModal(`
+    <h3>${t("Soo celi Backup","Restore from Backup")}</h3>
+    <p class="muted" style="color:var(--danger-ink);">${t("Kani wuxuu BEDELI DOONAA dhammaan xogta hadda jirta app-ka. Xaqiiji inaad haysato backup kale ka hor intaadan sii wadin.","This will REPLACE ALL data currently in the app. Make sure you have another backup before continuing.")}</p>
+    <div class="frow"><input type="file" id="restoreFileInput" accept="application/json,.json"></div>
+    <div class="actions"><button id="mCancel">${t("Maya","Cancel")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("restoreFileInput").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      let parsed;
+      try{ parsed = JSON.parse(ev.target.result); }
+      catch(err){ showToast(t("Faylkan ma ahan JSON sax ah.","This file isn't valid JSON.")); return; }
+      const backupData = (parsed && parsed.__qaaraan_backup) ? parsed.data : parsed;
+      if(!backupData || !Array.isArray(backupData.members)){
+        showToast(t("Faylkan uma eka backup Qaaraan ah.","This file doesn't look like a Qaaraan backup."));
+        return;
+      }
+      showRestoreConfirm(backupData, parsed && parsed.exportedAt);
+    };
+    reader.readAsText(file);
+  });
+}
+
+function showRestoreConfirm(backupData, exportedAt){
+  openModal(`
+    <h3>${t("Xaqiiji soo celinta","Confirm restore")}</h3>
+    <p class="muted">${t("Faylkan wuxuu ka kooban yahay","This file contains")}:</p>
+    <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--ink-2);">
+      <li>${t("Xubno","Members")}: ${(backupData.members||[]).length}</li>
+      <li>${t("Kharashaadka Bulshada","Disbursements")}: ${(backupData.disbursements||[]).length}</li>
+      <li>${t("Konoonyada","Accounts")}: ${(backupData.accounts||[]).length}</li>
+      <li>${t("Isticmaalayaasha","Users")}: ${(backupData.users||[]).length}</li>
+      ${exportedAt ? `<li>${t("Taariikhda backup-ka","Backup date")}: ${new Date(exportedAt).toLocaleString()}</li>` : ''}
+    </ul>
+    <p class="muted" style="color:var(--danger-ink);">${t("Haddii aad sii wadato, dhammaan xogta hadda ku jirta app-ka waa la BEDELI DOONAA. Lama soo celin karo.","If you continue, ALL data currently in the app will be REPLACED. This cannot be undone.")}</p>
+    <div class="frow">
+      <label>${t('Si aad u xaqiijiso, qor','To confirm, type')} RESTORE</label>
+      <input type="text" id="restoreConfirmInput" placeholder="RESTORE">
+    </div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="ghost-danger" id="mConfirm">${t("Xaqiiji soo celinta","Confirm restore")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const entered = document.getElementById("restoreConfirmInput").value.trim();
+    if(entered !== "RESTORE"){
+      showToast(t('Qor "RESTORE" si sax ah si aad u xaqiijiso.','Type "RESTORE" exactly to confirm.'));
+      return;
+    }
+    db = backupData;
+    if(!db.disbursements) db.disbursements = [];
+    if(!db.users) db.users = [];
+    if(!db.pendingActions) db.pendingActions = [];
+    if(!db.activityLog) db.activityLog = [];
+    if(!db.accounts) db.accounts = [];
+    if(!db.settings) db.settings = {baseUrl:"", paymentNumber:""};
+    if(!db.payables) db.payables = [];
+    logActivity("Xogta waa la soo celiyay (restore)", "", "direct");
+    await saveDb();
+    showToast(t("Xogta waa la soo celiyay","Data restored"));
+    closeModal();
+    location.reload();
   });
 }
 function doLogout(){

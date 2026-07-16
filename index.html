@@ -50,9 +50,6 @@
   .lang-toggle{display:flex;gap:2px;background:#F4F2EC;border-radius:20px;padding:2px;}
   .lang-toggle button{border:none;background:none;padding:4px 10px;font-size:11px;font-weight:600;border-radius:16px;min-height:auto;color:var(--ink-2);}
   .lang-toggle button.on{background:var(--accent);color:#fff;}
-  .auth-hero .lang-toggle{position:absolute;top:20px;right:20px;z-index:2;background:rgba(255,255,255,.14);}
-  .auth-hero .lang-toggle button{color:rgba(255,255,255,.75);}
-  .auth-hero .lang-toggle button.on{background:#fff;color:var(--accent-ink);}
   .auth-wrap > .lang-toggle{position:absolute;top:14px;right:14px;}
   .main-content{flex:1;min-width:0;padding:26px 30px 60px;max-width:1180px;}
   .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
@@ -185,17 +182,6 @@
   @media (min-width:769px){
     #mobileBackBtn{display:none;}
   }
-  .auth-split{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr;}
-  .auth-hero{
-    position:relative;overflow:hidden;color:#fff;
-    background:linear-gradient(160deg,#12896C 0%,#0F6E56 45%,#073A2F 100%);
-    display:flex;flex-direction:column;justify-content:center;padding:64px;
-  }
-  .auth-hero::before,.auth-hero::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.07);}
-  .auth-hero::before{width:440px;height:440px;top:-150px;right:-130px;}
-  .auth-hero::after{width:300px;height:300px;bottom:-110px;left:-70px;background:rgba(255,255,255,.05);}
-  .auth-hero .hero-logo{margin-bottom:26px;position:relative;z-index:1;}
-  .auth-hero h1{font-size:32px;font-weight:700;margin:0;max-width:440px;line-height:1.28;position:relative;z-index:1;}
   .auth-side{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg);}
   .auth-wrap{position:relative;max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 16px 40px rgba(38,37,31,.08);overflow:hidden;}
   .auth-wrap::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent);}
@@ -211,9 +197,6 @@
   .auth-switch{margin-top:14px;font-size:12px;color:var(--ink-2);text-align:center;}
   .auth-switch a{color:var(--accent-ink);cursor:pointer;text-decoration:underline;}
   @media (max-width:860px){
-    .auth-split{grid-template-columns:1fr;min-height:0;}
-    .auth-hero{padding:40px 24px;}
-    .auth-hero h1{font-size:23px;}
     .auth-side{padding:28px 18px 40px;}
   }
   .user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);}
@@ -2862,64 +2845,19 @@ document.getElementById("disbForm").addEventListener("submit", async (e)=>{
   }
 });
 
-function authHeroHtml(){
-  return `
-    <div class="auth-hero">
-      ${langToggleHtml()}
-      <div class="hero-logo">
-        <svg width="92" height="92" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="#8A93B8" stroke-width="14" stroke-linecap="round" fill="none">
-            <path d="M150,330 L84,396"/>
-            <path d="M150,330 L204,430"/>
-            <path d="M362,330 L308,430"/>
-            <path d="M362,330 L428,396"/>
-          </g>
-          <path d="M150,330 A170,60 0 0 1 362,330" fill="none" stroke="#4FA3F7" stroke-width="28" stroke-linecap="round"/>
-          <path d="M34,426 A50,50 0 0 1 134,426 L134,466 L34,466 Z" fill="#F1555A"/>
-          <circle cx="84" cy="396" r="34" fill="#F5CFA0"/>
-          <path d="M162,456 A42,42 0 0 1 246,456 L246,492 L162,492 Z" fill="#FFB13B"/>
-          <circle cx="204" cy="430" r="28" fill="#F5CFA0"/>
-          <path d="M266,456 A42,42 0 0 1 350,456 L350,492 L266,492 Z" fill="#3BC474"/>
-          <circle cx="308" cy="430" r="28" fill="#F5CFA0"/>
-          <path d="M378,426 A50,50 0 0 1 478,426 L478,466 L378,466 Z" fill="#3D9CEB"/>
-          <circle cx="428" cy="396" r="34" fill="#F5CFA0"/>
-          <g transform="translate(256,190)">
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(45)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(90)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(135)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(180)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(225)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(270)"/>
-            <rect x="-9" y="-78" width="18" height="30" rx="5" fill="#8A93B8" transform="rotate(315)"/>
-            <circle r="54" fill="#8A93B8"/>
-            <circle r="44" fill="#7A84AC"/>
-            <circle r="33" fill="#F6B93B"/>
-            <circle r="33" fill="none" stroke="#E2A227" stroke-width="4"/>
-            <text x="0" y="12" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#FFF6DE" text-anchor="middle">$</text>
-          </g>
-        </svg>
-      </div>
-      <h1>Qaaraan Database</h1>
-    </div>
-  `;
-}
-
 function renderSetupScreen(){
   document.getElementById("appWrap").style.display = "none";
   const root = document.getElementById("authRoot");
   root.innerHTML = `
-    <div class="auth-split">
-      ${authHeroHtml()}
-      <div class="auth-side">
-        <div class="auth-wrap">
-          <h2>${t("Samee account-ka admin-ka ugu horreeya","Create the first admin account")}</h2>
-          <div class="sub">${t('Weli ma jiraan users. Account-kan wuxuu noqon doonaa <b>admin</b> — wuxuu awood u yeelan doonaa inuu maamulo dhammaan xubnaha, users-ka, iyo codsiyada.','No users exist yet. This account will be an <b>admin</b> — able to manage all members, users, and requests.')}</div>
-          <div class="err" id="authErr"></div>
-          <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="setupUser" value="Osman" placeholder="${t('tusaale: Osman','e.g. Osman')}"></div></div>
-          <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="setupPass" placeholder="${t('ugu yaraan 4 xaraf','at least 4 characters')}"></div></div>
-          <button class="primary" id="setupBtn">${t("Samee account-ka admin-ka","Create admin account")}</button>
-        </div>
+    <div class="auth-side" style="min-height:100vh;">
+      <div class="auth-wrap">
+        ${langToggleHtml()}
+        <h2>${t("Samee account-ka admin-ka ugu horreeya","Create the first admin account")}</h2>
+        <div class="sub">${t('Weli ma jiraan users. Account-kan wuxuu noqon doonaa <b>admin</b> — wuxuu awood u yeelan doonaa inuu maamulo dhammaan xubnaha, users-ka, iyo codsiyada.','No users exist yet. This account will be an <b>admin</b> — able to manage all members, users, and requests.')}</div>
+        <div class="err" id="authErr"></div>
+        <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="setupUser" value="Osman" placeholder="${t('tusaale: Osman','e.g. Osman')}"></div></div>
+        <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="setupPass" placeholder="${t('ugu yaraan 4 xaraf','at least 4 characters')}"></div></div>
+        <button class="primary" id="setupBtn">${t("Samee account-ka admin-ka","Create admin account")}</button>
       </div>
     </div>
   `;
@@ -2943,18 +2881,16 @@ function renderLoginScreen(){
   document.getElementById("appWrap").style.display = "none";
   const root = document.getElementById("authRoot");
   root.innerHTML = `
-    <div class="auth-split">
-      ${authHeroHtml()}
-      <div class="auth-side">
-        <div class="auth-wrap">
-          <h2>${t("Gal — Qaaraan Database","Log in — Qaaraan Database")}</h2>
-          <div class="sub">${t("Geli username iyo password-kaaga.","Enter your username and password.")}</div>
-          <div class="err" id="authErr"></div>
-          <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
-          <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
-          <button class="primary" id="loginBtn">${t("Gal","Log in")}</button>
-          <div class="auth-switch"><a id="forgotPasswordLink">${t("Ma illowday password-kaaga?","Forgot your password?")}</a></div>
-        </div>
+    <div class="auth-side" style="min-height:100vh;">
+      <div class="auth-wrap">
+        ${langToggleHtml()}
+        <h2>${t("Gal — Qaaraan Database","Log in — Qaaraan Database")}</h2>
+        <div class="sub">${t("Geli username iyo password-kaaga.","Enter your username and password.")}</div>
+        <div class="err" id="authErr"></div>
+        <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
+        <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
+        <button class="primary" id="loginBtn">${t("Gal","Log in")}</button>
+        <div class="auth-switch"><a id="forgotPasswordLink">${t("Ma illowday password-kaaga?","Forgot your password?")}</a></div>
       </div>
     </div>
   `;

@@ -195,11 +195,7 @@
   .auth-hero::before{width:440px;height:440px;top:-150px;right:-130px;}
   .auth-hero::after{width:300px;height:300px;bottom:-110px;left:-70px;background:rgba(255,255,255,.05);}
   .auth-hero .hero-logo{margin-bottom:26px;position:relative;z-index:1;}
-  .auth-hero h1{font-size:32px;font-weight:700;margin:0 0 14px;max-width:440px;line-height:1.28;position:relative;z-index:1;}
-  .auth-hero p{font-size:14px;color:rgba(255,255,255,.82);max-width:400px;line-height:1.6;position:relative;z-index:1;}
-  .auth-hero .hero-stats{display:flex;gap:32px;margin-top:36px;position:relative;z-index:1;}
-  .auth-hero .hero-stats .n{font-size:21px;font-weight:700;}
-  .auth-hero .hero-stats .l{font-size:11px;color:rgba(255,255,255,.72);margin-top:2px;}
+  .auth-hero h1{font-size:32px;font-weight:700;margin:0;max-width:440px;line-height:1.28;position:relative;z-index:1;}
   .auth-side{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:var(--bg);}
   .auth-wrap{position:relative;max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:0 16px 40px rgba(38,37,31,.08);overflow:hidden;}
   .auth-wrap::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent);}
@@ -218,7 +214,6 @@
     .auth-split{grid-template-columns:1fr;min-height:0;}
     .auth-hero{padding:40px 24px;}
     .auth-hero h1{font-size:23px;}
-    .auth-hero .hero-stats{margin-top:24px;}
     .auth-side{padding:28px 18px 40px;}
   }
   .user-chip{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);}
@@ -2876,12 +2871,7 @@ function authHeroHtml(){
           </g>
         </svg>
       </div>
-      <h1>Qaaranka-Xalane Cadow</h1>
-      <p>${t("Qaaranka waa Insurance qof walbo oo qaraabadaha anfacaayo.","Qaaraan is a community insurance fund that benefits everyone's relatives.")}</p>
-      <div class="hero-stats">
-        <div><div class="n">${db && db.members ? db.members.filter(m=>m.status==="active").length : 0}</div><div class="l">${t("Xubno firfircoon","Active members")}</div></div>
-        <div><div class="n">July–Dec 2026</div><div class="l">${t("Xilliga qoondooyinka","Dues period")}</div></div>
-      </div>
+      <h1>Qaaraan Database</h1>
     </div>
   `;
 }

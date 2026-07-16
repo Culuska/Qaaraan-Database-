@@ -654,6 +654,8 @@ async function loadDb(){
   if(!db.activityLog) db.activityLog = [];
   if(!db.accounts) db.accounts = [{id:"acc_salaam", name:"Salaam Bank", openingBalance:0}];
   if(!db.settings) db.settings = {baseUrl:"", paymentNumber:""};
+  if(db.settings.adminEmail === undefined) db.settings.adminEmail = "cusmanhersi@gmail.com";
+  if(db.settings.adminPhone === undefined) db.settings.adminPhone = "+252615200615";
   if(!db.payables) db.payables = [];
   if(!db.passwordResetRequests) db.passwordResetRequests = [];
   for(const u of db.users){
@@ -785,6 +787,30 @@ async function saveDb(){
     if(!res.ok) throw new Error('save failed');
   }catch(e){ showToast(t("Khalad: lama kaydin karo (storage error)","Error: could not save (storage error)")); }
 }
+
+// Best-effort admin email notification via /api/notify (Resend). Silently
+// no-ops if RESEND_API_KEY isn't configured server-side or the request
+// fails — this must never block the calling action (login, reset request).
+async function notifyAdmin(subject, html, attachment){
+  try{
+    const to = (db.settings && db.settings.adminEmail) || "";
+    if(!to) return;
+    await fetch("/api/notify", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ to, subject, html, attachment })
+    });
+  }catch(e){ /* best-effort */ }
+}
+
+// wa.me deep link to the admin's WhatsApp number — opens with the message
+// prefilled; the admin still has to tap send themselves (no server-side
+// WhatsApp API is configured).
+function waLinkForAdmin(message){
+  const phone = ((db.settings && db.settings.adminPhone) || "").replace(/[^\d]/g,"");
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
 function syncAccruals(){
   const due = monthsDueSoFar();
   for(const m of db.members){
@@ -841,8 +867,8 @@ function renderSummary(){
     <div class="card"><div class="lbl">${t("Lacagta la ururiyay","Total collected")}</div><div class="val pos">${money(totalCollected)}</div></div>
     <div class="card"><div class="lbl">${t("Wadarta kharashka","Total expenses")}</div><div class="val neg">${money(totalDisb)}</div></div>
     ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">${t("Codsi sugaya","Pending requests")}</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
-    ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div></div>` : ''}
-    ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);"><div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div><div class="val" style="color:var(--warn);">${pendingResets.map(r=>r.username).join(", ")}</div></div>` : ''}
+    ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: locked account(s) — ${lockedUsers.map(u=>u.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
+    ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);"><div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div><div class="val" style="color:var(--warn);">${pendingResets.map(r=>r.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: password reset requested — ${pendingResets.map(r=>r.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
   `;
 }
 
@@ -2882,6 +2908,10 @@ function renderLoginScreen(){
           userByName.lockedAt = new Date().toISOString();
           db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:t("Account waa la xiray (isku day khalad ah oo badan)","Account locked (too many failed attempts)"), details:t(`${LOCKOUT_THRESHOLD} isku day oo khalad ah`,`${LOCKOUT_THRESHOLD} failed login attempts`), status:"locked"});
           err.textContent = t(`Account-kan waa la xiray ${LOCKOUT_THRESHOLD} isku day oo khalad ah kadib.`,`This account has been locked after ${LOCKOUT_THRESHOLD} failed attempts.`);
+          notifyAdmin(
+            `Qaaraan: Account locked — ${u}`,
+            `<p>Account "<b>${u}</b>" was locked after ${LOCKOUT_THRESHOLD} failed login attempts.<br>Account-ka "<b>${u}</b>" waa la xiray ${LOCKOUT_THRESHOLD} isku day oo khalad ah kadib.</p>`
+          );
         } else {
           err.textContent = t("Username ama password waa khalad.","Username or password is incorrect.");
         }
@@ -2923,6 +2953,10 @@ function openForgotPasswordModal(){
     if(userExists){
       db.passwordResetRequests.push({id:"pr"+Date.now(), username, requestedAt:new Date().toISOString(), status:"pending"});
       db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:username, action:t("Codsi password cusub","Password reset requested"), details:"", status:"pending"});
+      notifyAdmin(
+        `Qaaraan: Password reset requested — ${username}`,
+        `<p>User "<b>${username}</b>" requested a password reset.<br>User "<b>${username}</b>" ayaa codsaday in password-kiisa la beddelo.</p>`
+      );
       await saveDb();
     }
     showToast(t("Haddii username-kan uu jiro, codsigaaga waa la diray. Admin-ku wuu la xiriiri doonaa.","If that username exists, your request was sent. The admin will contact you."));
@@ -3096,6 +3130,16 @@ function openAppSettingsModal(){
       <input type="text" id="stPaymentNumber" placeholder="32294841" value="${db.settings.paymentNumber||''}">
       <div class="muted" style="margin-top:6px;">${t('Ha ku qorin qoraal — lambarka kaliya (tusaale: 32294841). Haddii la buuxiyo, fariimaha xasuusinta WhatsApp waxay ku darayaan tilmaan sida "*799*<lambarka>*<lacagta>#" oo qof kasta balance-kiisa ku qoran.','Enter the number only, not any other text (e.g. 32294841). If filled in, WhatsApp reminders will include a guide like "*799*<number>*<amount>#" with each member\'s own balance filled in.')}</div>
     </div>
+    <div class="frow">
+      <label>${t("Email-ka Admin-ka (ogeysiisyada)","Admin email (notifications)")}</label>
+      <input type="text" id="stAdminEmail" placeholder="admin@example.com" value="${db.settings.adminEmail||''}">
+      <div class="muted" style="margin-top:6px;">${t("Waxaa email lagu diri doonaa account la xiray, codsiyo password cusub, iyo backup-yada aad rabto in email loo diro.","Used to email you about locked accounts, password reset requests, and any backups you choose to email.")}</div>
+    </div>
+    <div class="frow">
+      <label>${t("Lambarka Admin-ka (WhatsApp)","Admin phone (WhatsApp)")}</label>
+      <input type="text" id="stAdminPhone" placeholder="+252615200615" value="${db.settings.adminPhone||''}">
+      <div class="muted" style="margin-top:6px;">${t("Waxaa loo isticmaalaa badhamada \"Dir WhatsApp\" ee digniinaha (account la xiray, codsi password) — waa gacan-ku-qabsi, lama diro si toos ah.","Used by the \"Send WhatsApp\" buttons on alerts (locked account, reset requests) — you still tap send yourself, nothing goes automatically.")}</div>
+    </div>
     <div class="actions">
       <button id="mCancel">${t("Maya","Cancel")}</button>
       <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
@@ -3105,22 +3149,29 @@ function openAppSettingsModal(){
       <p class="muted" style="margin:0 0 10px;">${t("Soo deji nuqul buuxa oo xogtaada ah si aad u haysato haddii server-ku hakado ama xog lumaan dhacdo. Kaydi faylkan meel ammaan ah — wuxuu ka kooban yahay xogta xubnaha oo dhan iyo password-yada users-ka.","Download a full copy of your data to keep in case the server goes down or data is lost. Store this file somewhere safe — it contains every member's data and user passwords.")}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button id="btnDownloadBackup"><i class="ti ti-download"></i> ${t("Soo deji Backup","Download Backup")}</button>
+        <button id="btnEmailBackup"><i class="ti ti-mail"></i> ${t("Email Backup","Email Backup")}</button>
         <button class="ghost-warn" id="btnOpenRestore"><i class="ti ti-upload"></i> ${t("Soo celi Backup","Restore from Backup")}</button>
       </div>
+      <div class="muted" style="margin-top:6px;">${t("\"Email Backup\" wuxuu u diraa email-ka admin-ka kor lagu qoray nuqulka xogta oo dhan — la socod: si la mid ah faylka la soo dejiyo, wuxuu ka kooban yahay password-yada users-ka, sidaa email-kaaga si ammaan ah u ilaali.","\"Email Backup\" sends the admin email above the full data copy as an attachment — same as the downloaded file, it contains user passwords, so keep that inbox secure.")}</div>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const url = document.getElementById("stBaseUrl").value.trim();
     const paymentNumber = document.getElementById("stPaymentNumber").value.replace(/\D/g,"");
+    const adminEmail = document.getElementById("stAdminEmail").value.trim();
+    const adminPhone = document.getElementById("stAdminPhone").value.trim().replace(/[^\d+]/g,"");
     db.settings.baseUrl = url;
     db.settings.paymentNumber = paymentNumber;
-    logActivity("Cusboonaysiinta Settings", "baseUrl/paymentNumber updated", "direct");
+    db.settings.adminEmail = adminEmail;
+    db.settings.adminPhone = adminPhone;
+    logActivity("Cusboonaysiinta Settings", "baseUrl/paymentNumber/adminEmail/adminPhone updated", "direct");
     await saveDb();
     showToast(t("Settings waa la kaydiyay","Settings saved"));
     closeModal();
   });
   document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackup);
+  document.getElementById("btnEmailBackup").addEventListener("click", emailBackupToAdmin);
   document.getElementById("btnOpenRestore").addEventListener("click", openBackupRestoreModal);
 }
 
@@ -3138,6 +3189,37 @@ async function downloadBackup(){
   logActivity("Backup la soo dejiyay", "", "direct");
   await saveDb();
   showToast(t("Backup-ka waa la soo dejiyay","Backup downloaded"));
+}
+
+async function emailBackupToAdmin(){
+  const to = (db.settings && db.settings.adminEmail) || "";
+  if(!to){ showToast(t("Fadlan marka hore geli email-ka admin-ka ee Settings.","Please set the admin email in Settings first.")); return; }
+  showToast(t("Backup-ka ayaa email loo diraya...","Emailing backup..."));
+  try{
+    const payload = { __qaaraan_backup: true, exportedAt: new Date().toISOString(), data: db };
+    const json = JSON.stringify(payload, null, 2);
+    const contentBase64 = btoa(unescape(encodeURIComponent(json)));
+    const res = await fetch("/api/notify", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        to,
+        subject: `Qaaraan backup — ${todayStr()}`,
+        html: `<p>Attached: a full Qaaraan data backup dated ${todayStr()}.<br>Ku lifaaqan: nuqul buuxa oo xogta Qaaraan ah, taariikhdiisu tahay ${todayStr()}.</p>`,
+        attachment: { filename: `qaaraan_backup_${todayStr()}.json`, contentBase64 }
+      })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.skipped){
+      showToast(data.reason ? t(`Lama dirin: ${data.reason}`,`Not sent: ${data.reason}`) : t("Khalad ayaa dhacay marka email-ka la diraya.","Something went wrong sending the email."));
+      return;
+    }
+    logActivity("Backup loo diray email admin-ka", to, "direct");
+    await saveDb();
+    showToast(t("Backup-ka waa loo diray email-ka admin-ka.","Backup was emailed to the admin."));
+  }catch(e){
+    showToast(t("Khalad ayaa dhacay marka email-ka la diraya.","Something went wrong sending the email."));
+  }
 }
 
 function openBackupRestoreModal(){
@@ -3202,6 +3284,8 @@ function showRestoreConfirm(backupData, exportedAt){
     if(!db.activityLog) db.activityLog = [];
     if(!db.accounts) db.accounts = [];
     if(!db.settings) db.settings = {baseUrl:"", paymentNumber:""};
+    if(db.settings.adminEmail === undefined) db.settings.adminEmail = "cusmanhersi@gmail.com";
+    if(db.settings.adminPhone === undefined) db.settings.adminPhone = "+252615200615";
     if(!db.payables) db.payables = [];
     if(!db.passwordResetRequests) db.passwordResetRequests = [];
     logActivity("Xogta waa la soo celiyay (restore)", "", "direct");

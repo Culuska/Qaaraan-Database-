@@ -63,12 +63,13 @@ mutation, direct or approved/rejected/pending.
   (Manage Users → "Fur" button next to a locked user). This is real,
   server-side-persisted lockout (survives across browsers/devices, since
   `db.users` syncs through Neon) — not just a client-side counter.
-  - There's no email/SMS/push infrastructure in this app, so "admin
-    notification" is in-app: a red-bordered alert card on the Guddoon
-    dashboard naming every currently-locked account (visible to admins the
-    moment they next open the app) plus a red-tagged `activityLog` entry
-    (`status:"locked"`). A true out-of-band notification would need a new
-    external service (e.g. email via Resend/SendGrid) — not present today.
+  - In-app notification: a red-bordered alert card on the Guddoon dashboard
+    naming every currently-locked account (visible to admins the moment
+    they next open the app), a "Dir WhatsApp" quick-send link on that card,
+    plus a red-tagged `activityLog` entry (`status:"locked"`).
+  - Real email notification: `notifyAdmin()` also fires a best-effort POST
+    to `/api/notify` (see "Admin email & WhatsApp notifications" below) the
+    moment the lockout happens.
 - **Forgot password**: the login screen has a "Ma illowday password-kaaga?"
   link (`openForgotPasswordModal()`). Typing a username and submitting pushes
   a record to `db.passwordResetRequests[]` (`{id, username, requestedAt,
@@ -76,10 +77,12 @@ mutation, direct or approved/rejected/pending.
   that username actually exists in `db.users`, but the toast shown to the
   requester is the same generic "if that username exists..." message either
   way, so the login screen can't be used to enumerate valid usernames.
-  - Same in-app-only notification pattern as lockout: an amber alert card
-    ("Codsiyo password cusub") on the admin dashboard lists every username
-    with a pending request, and Manage Users shows a "codsi password"/
-    "password requested" badge next to that user's row.
+  - Same notification pattern as lockout: an amber alert card ("Codsiyo
+    password cusub") on the admin dashboard lists every username with a
+    pending request (with its own "Dir WhatsApp" link), Manage Users shows
+    a "codsi password"/"password requested" badge next to that user's row,
+    and `notifyAdmin()` fires a real email via `/api/notify` the moment a
+    valid request is submitted.
   - Every user row in Manage Users also has an always-visible "Beddel
     Password"/"Reset Password" button (not just users with a pending
     request — an admin can reset anyone's password proactively), wired to
@@ -209,6 +212,33 @@ Settings (admin-only) has a "Backup & Restore" section:
   defaults `loadDb()` applies for missing sub-arrays), saved, and the page
   reloads. This is a full overwrite, not a merge — there's no partial/
   selective restore.
+
+## Admin email & WhatsApp notifications
+
+- `db.settings.adminEmail` (default `cusmanhersi@gmail.com`) and
+  `db.settings.adminPhone` (default `+252615200615`) are set on first load
+  and editable in App Settings (admin-only).
+- **Email**: `notifyAdmin(subject, html, attachment?)` (`index.html`) POSTs
+  to `api/notify.js`, a Vercel serverless function that sends through
+  [Resend](https://resend.com) using a `RESEND_API_KEY` environment
+  variable. If that env var isn't set, `/api/notify` responds
+  `{skipped:true}` instead of erroring, so the app works with or without
+  email configured — same best-effort philosophy as the rest of the app's
+  notifications. Fires automatically on: account lockout, a valid
+  password-reset request. Fires on demand from: "Email Backup" in App
+  Settings (`emailBackupToAdmin()`), which attaches the full `db` as a
+  base64 JSON attachment — **same caveat as Download Backup: it contains
+  plaintext user passwords, so the admin inbox needs to stay secure.**
+  Resend's sandbox sender (`onboarding@resend.dev`) only delivers to the
+  Resend account's own verified address; verify a custom domain in Resend
+  and change the `from` in `api/notify.js` if other recipients are ever
+  needed.
+- **WhatsApp**: `waLinkForAdmin(message)` builds a `wa.me/<adminPhone>`
+  deep link with the message prefilled. Used by "Dir WhatsApp" links on
+  the lockout and password-reset dashboard alert cards. This is
+  manual-send only (opens WhatsApp, admin still taps send) — there's no
+  WhatsApp Business API integration, so nothing goes out automatically
+  through this channel.
 
 ## Deletion / destructive-action confirmation pattern
 

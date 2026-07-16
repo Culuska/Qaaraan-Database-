@@ -1417,13 +1417,12 @@ function buildBalanceMessage(m){
   const hasBaseUrl = !!(db.settings && db.settings.baseUrl);
   const baseUrl = hasBaseUrl ? db.settings.baseUrl.replace(/\/?$/, '') : window.location.href.split('?')[0].split('#')[0];
   const link = `${baseUrl}?member=${m.id}`;
-  const paymentNumber = db.settings && db.settings.paymentNumber;
+  const paymentNumber = ((db.settings && db.settings.paymentNumber) || "").replace(/\D/g,"");
   const amountForUssd = bal % 1 === 0 ? bal : bal.toFixed(2);
   const paymentGuide = (bal>0 && paymentNumber) ? [
     ``,
     `Fadlan habkan ku bixi:`,
-    `*799*${paymentNumber}*${amountForUssd}#`,
-    `Kadib geli Magacaaga Saddexan si aan u ogaano cidda bixisay.`
+    `*799*${paymentNumber}*${amountForUssd}#`
   ] : [];
   return [
     `Salaan ${m.name},`,
@@ -2955,9 +2954,9 @@ function openAppSettingsModal(){
       <div class="muted" style="margin-top:6px;">${t('Kani waa URL-ka aad hesho marka aad riixdo "Publish & copy link" ee artifact-ka. Waxaa loo isticmaalaa si loo dhiso link-yada WhatsApp ee qof kasta.','This is the URL you get when you click "Publish & copy link" on the artifact. It is used to build each member\'s WhatsApp link.')}</div>
     </div>
     <div class="frow">
-      <label>${t("Lambarka EVC Plus ee lacagta loo diro","EVC Plus receiving number")}</label>
+      <label>${t("Lambarka EVC Plus ee lacagta loo diro (lambarka kaliya)","EVC Plus receiving number (digits only)")}</label>
       <input type="text" id="stPaymentNumber" placeholder="32294841" value="${db.settings.paymentNumber||''}">
-      <div class="muted" style="margin-top:6px;">${t('Haddii la buuxiyo, fariimaha xasuusinta WhatsApp waxay ku darayaan tilmaan sida "*799*<lambarka>*<lacagta>#" oo qof kasta balance-kiisa ku qoran.','If filled in, WhatsApp reminders will include a guide like "*799*<number>*<amount>#" with each member\'s own balance filled in.')}</div>
+      <div class="muted" style="margin-top:6px;">${t('Ha ku qorin qoraal — lambarka kaliya (tusaale: 32294841). Haddii la buuxiyo, fariimaha xasuusinta WhatsApp waxay ku darayaan tilmaan sida "*799*<lambarka>*<lacagta>#" oo qof kasta balance-kiisa ku qoran.','Enter the number only, not any other text (e.g. 32294841). If filled in, WhatsApp reminders will include a guide like "*799*<number>*<amount>#" with each member\'s own balance filled in.')}</div>
     </div>
     <div class="actions">
       <button id="mCancel">${t("Maya","Cancel")}</button>
@@ -2967,7 +2966,7 @@ function openAppSettingsModal(){
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const url = document.getElementById("stBaseUrl").value.trim();
-    const paymentNumber = document.getElementById("stPaymentNumber").value.trim();
+    const paymentNumber = document.getElementById("stPaymentNumber").value.replace(/\D/g,"");
     db.settings.baseUrl = url;
     db.settings.paymentNumber = paymentNumber;
     logActivity("Cusboonaysiinta Settings", "baseUrl/paymentNumber updated", "direct");

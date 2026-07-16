@@ -240,6 +240,7 @@
   .status-tag.approved{background:var(--accent-bg);color:var(--accent-ink);}
   .status-tag.rejected{background:var(--danger-bg);color:var(--danger-ink);}
   .status-tag.pending{background:var(--warn-bg);color:var(--warn);}
+  .status-tag.locked{background:var(--danger-bg);color:var(--danger-ink);}
   .no-perm{padding:20px;text-align:center;color:var(--ink-2);font-size:13px;background:#FBFAF7;border-radius:8px;}
   .month-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;}
   .month-row .lbl2{color:var(--ink-2);}
@@ -476,6 +477,8 @@ const HISTORY_REPORTS = {"m1": [{"type": "due", "amount": 160, "date": "2024-02-
 const JOURNAL_DISBURSEMENTS = [{"id": "gj2_2_2024-04-17_300_0", "category": "Guno", "date": "2024-04-17", "amount": 300, "recipient": "Guno March iyo repayment", "memo": "Guno March iyo repayment (Journal #2, Guno(Dahir Cawale))"}, {"id": "gj2_3_2024-04-17_150_1", "category": "Guno", "date": "2024-04-17", "amount": 150, "recipient": "April", "memo": "April (Journal #3, Guno(Dahir Cawale))"}, {"id": "gj2_4_2024-04-30_300_2", "category": "Dhiig nool", "date": "2024-04-30", "amount": 300, "recipient": "Hormaris dhiig nool Cisman xirsi", "memo": "Hormaris dhiig nool Cisman xirsi (Journal #4, Dhiig nool)"}, {"id": "gj2_5_2024-05-02_150_3", "category": "Guno", "date": "2024-05-02", "amount": 150, "recipient": "Guno may 2024", "memo": "Guno may 2024 (Journal #5, Guno(Dahir Cawale))"}, {"id": "gj2_6_2024-05-13_2000_4", "category": "Xalane / Diya", "date": "2024-05-13", "amount": 2000, "recipient": "Hormaris Diyo Abgaal", "memo": "Hormaris Diyo Abgaal (Journal #6, Diyo)"}, {"id": "gj2_7_2024-06-01_150_5", "category": "Guno", "date": "2024-06-01", "amount": 150, "recipient": "Guno June", "memo": "Guno June (Journal #7, Guno(Dahir Cawale))"}, {"id": "gj2_8_2024-06-05_100_6", "category": "Guno", "date": "2024-06-05", "amount": 100, "recipient": "Guno hormaris", "memo": "Guno hormaris (Journal #8, Guno(Dahir Cawale))"}, {"id": "gj2_9_2024-07-01_150_7", "category": "Guno", "date": "2024-07-01", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #9, Guno(Dahir Cawale))"}, {"id": "gj2_10_2024-07-31_150_8", "category": "Guno", "date": "2024-07-31", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #10, Guno(Dahir Cawale))"}, {"id": "gj2_11_2024-08-27_50_9", "category": "Guno", "date": "2024-08-27", "amount": 50, "recipient": "Dahir Adan", "memo": "Dahir Adan (Journal #11, Guno(Dahir Cawale))"}, {"id": "gj2_12_2024-09-01_50_10", "category": "Guno", "date": "2024-09-01", "amount": 50, "recipient": "Guno", "memo": "Guno (Journal #12, Guno(Dahir Cawale))"}, {"id": "gj2_13_2024-09-02_50_11", "category": "Guno", "date": "2024-09-02", "amount": 50, "recipient": "Guno", "memo": "Guno (Journal #13, Account receivable)"}, {"id": "gj2_15_2024-10-01_150_12", "category": "Guno", "date": "2024-10-01", "amount": 150, "recipient": "Guno October", "memo": "Guno October (Journal #15, Guno(Dahir Cawale))"}, {"id": "gj2_16_2024-10-06_200_13", "category": "Xalane / Diya", "date": "2024-10-06", "amount": 200, "recipient": "Diyo Nool Qoobdher", "memo": "Diyo Nool Qoobdher (Journal #16, Guno(Dahir Cawale))"}, {"id": "gj2_18_2024-10-30_150_14", "category": "Guno", "date": "2024-10-30", "amount": 150, "recipient": "Guno November", "memo": "Guno November (Journal #18, Guno(Dahir Cawale))"}, {"id": "gj2_19_2024-11-08_300_15", "category": "Dhiig nool", "date": "2024-11-08", "amount": 300, "recipient": "diyo nool ina abdi siyaad", "memo": "diyo nool ina abdi siyaad (Journal #19, Dhiig nool)"}, {"id": "gj2_20_2024-11-08_800_16", "category": "Dhiig nool", "date": "2024-11-08", "amount": 800, "recipient": "Dhiig nool Osman Hirsi filfil", "memo": "Dhiig nool Osman Hirsi filfil (Journal #20, Dhiig nool)"}, {"id": "gj2_21_2024-11-12_200_17", "category": "Dhiig nool", "date": "2024-11-12", "amount": 200, "recipient": "Diyo nool cali qoobdher", "memo": "Diyo nool cali qoobdher (Journal #21, Dhiig nool)"}, {"id": "gj2_22_2024-11-17_3603_18", "category": "Dhiig nool", "date": "2024-11-17", "amount": 3603, "recipient": "", "memo": "(Journal #22, Dhiig nool)"}, {"id": "gj2_23_2024-11-19_2362_19", "category": "Dhiig nool", "date": "2024-11-19", "amount": 2362, "recipient": "Dhiig nool iyo Diyo", "memo": "Dhiig nool iyo Diyo (Journal #23, Dhiig nool iyo Diyo)"}, {"id": "gj2_24_2024-11-25_150_20", "category": "Guno", "date": "2024-11-25", "amount": 150, "recipient": "December", "memo": "December (Journal #24, Guno(Dahir Cawale))"}, {"id": "gj2_30_2024-12-27_150_21", "category": "Guno", "date": "2024-12-27", "amount": 150, "recipient": "GUNADA BISHA JAN HORUMARIS", "memo": "GUNADA BISHA JAN HORUMARIS (Journal #30, Guno(Dahir Cawale))"}, {"id": "gj2_BAD DEBT_2025-02-03_150_22", "category": "Guno", "date": "2025-02-03", "amount": 150, "recipient": "guno", "memo": "guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-03-01_150_23", "category": "Guno", "date": "2025-03-01", "amount": 150, "recipient": "Guno March", "memo": "Guno March (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-03-01_150_24", "category": "Guno", "date": "2025-03-01", "amount": 150, "recipient": "Guno April", "memo": "Guno April (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-04-30_150_25", "category": "Guno", "date": "2025-04-30", "amount": 150, "recipient": "Guno may", "memo": "Guno may (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-06-01_150_26", "category": "Guno", "date": "2025-06-01", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-06-12_2000_27", "category": "Xalane / Diya", "date": "2025-06-12", "amount": 2000, "recipient": "Diyo Rer Shuriye", "memo": "Diyo Rer Shuriye (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-07-01_150_28", "category": "Guno", "date": "2025-07-01", "amount": 150, "recipient": "Guno July", "memo": "Guno July (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-08-02_150_29", "category": "Guno", "date": "2025-08-02", "amount": 150, "recipient": "Guno Augusto", "memo": "Guno Augusto (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-08-30_150_30", "category": "Guno", "date": "2025-08-30", "amount": 150, "recipient": "Guno September", "memo": "Guno September (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-09-30_150_31", "category": "Guno", "date": "2025-09-30", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-11-01_150_32", "category": "Guno", "date": "2025-11-01", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-11-17_1227_33", "category": "Xalane / Diya", "date": "2025-11-17", "amount": 1227, "recipient": "Diyo Jibril cadow", "memo": "Diyo Jibril cadow (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2025-12-01_150_34", "category": "Guno", "date": "2025-12-01", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-01-02_150_35", "category": "Guno", "date": "2026-01-02", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-01-14_200_36", "category": "Dhiig nool", "date": "2026-01-14", "amount": 200, "recipient": " dhiig noo Gesey Mire", "memo": "dhiig noo Gesey Mire (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-01-14_1000_37", "category": "Xalane / Diya", "date": "2026-01-14", "amount": 1000, "recipient": "Diyo Rage Adan", "memo": "Diyo Rage Adan (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-02-04_300_38", "category": "Dhiig nool", "date": "2026-02-04", "amount": 300, "recipient": "Guhaad Dhiig nool", "memo": "Guhaad Dhiig nool (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-02-04_150_39", "category": "Guno", "date": "2026-02-04", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-02-05_800_40", "category": "Dhiig nool", "date": "2026-02-05", "amount": 800, "recipient": "Guhad Dhiig nool", "memo": "Guhad Dhiig nool (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-03-02_150_41", "category": "Guno", "date": "2026-03-02", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-03-31_150_42", "category": "Guno", "date": "2026-03-31", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-05-02_150_43", "category": "Guno", "date": "2026-05-02", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-05-19_300_44", "category": "Dhiig nool", "date": "2026-05-19", "amount": 300, "recipient": "Suheyb ah X bacar", "memo": "Suheyb ah X bacar (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_GUNO_2026-06-01_150_45", "category": "Guno", "date": "2026-06-01", "amount": 150, "recipient": "Guno", "memo": "Guno (Journal #GUNO, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-06-03_200_46", "category": "Dhiig nool", "date": "2026-06-03", "amount": 200, "recipient": "Suheyb Ali Bacar dhig nol", "memo": "Suheyb Ali Bacar dhig nol (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-06-03_200_47", "category": "Dhiig nool", "date": "2026-06-03", "amount": 200, "recipient": "Suheyb", "memo": "Suheyb (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_BAD DEBT_2026-06-03_100_48", "category": "Dhiig nool", "date": "2026-06-03", "amount": 100, "recipient": "Suheyb", "memo": "Suheyb (Journal #BAD DEBT, Account receivable)"}, {"id": "gj2_dhignol_2026-06-05_150_49", "category": "Dhiig nool", "date": "2026-06-05", "amount": 150, "recipient": "Suheyb", "memo": "Suheyb (Journal #dhignol, Account receivable)"}, {"id": "gj2_Dhiig nool_2026-06-14_200_50", "category": "Dhiig nool", "date": "2026-06-14", "amount": 200, "recipient": "GEESEY Mire Dhig nool Jijile", "memo": "GEESEY Mire Dhig nool Jijile (Journal #Dhiig nool, Account receivable)"}, {"id": "gj2_Dhiig nool_2026-06-14_40_51", "category": "Dhiig nool", "date": "2026-06-14", "amount": 40, "recipient": "Suheyb Ali Bacar", "memo": "Suheyb Ali Bacar (Journal #Dhiig nool, Dhiig nool)"}, {"id": "gj2_BADDEBT_2026-06-23_50_52", "category": "Dhiig nool", "date": "2026-06-23", "amount": 50, "recipient": "Xirsi Abdi Iman-Dhiig Nool", "memo": "Xirsi Abdi Iman-Dhiig Nool (Journal #BADDEBT, Dhiig nool)"}];
 const STORAGE_KEY = "qaaraan-fund-db-v4";
 const SESSION_KEY = "qaaraan-session";
+const LOCKOUT_THRESHOLD = 4;
+const LOCKOUT_MINUTES = 15;
 let currentUser = null;
 let currentUserObj = null;
 
@@ -655,6 +658,8 @@ async function loadDb(){
   for(const u of db.users){
     if(!u.role) u.role = "admin";
     if(!u.permissions) u.permissions = {addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true};
+    if(!u.failedAttempts) u.failedAttempts = 0;
+    if(u.lockedAt === undefined) u.lockedAt = null;
   }
   for(const m of db.members){
     if(!m.status) m.status = "active";
@@ -826,6 +831,7 @@ function renderSummary(){
   const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
   const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
   const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
+  const lockedUsers = db.users.filter(u=>u.lockedAt && (Date.now()-new Date(u.lockedAt).getTime())/60000 < LOCKOUT_MINUTES);
   el.innerHTML = `
     <div class="card"><div class="lbl">${t("Wadarta balance-ka hadda","Total current balance")}</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
     <div class="card"><div class="lbl">${t("Xubnaha (active)","Members (active)")}</div><div class="val">${active.length} / ${db.members.length}</div></div>
@@ -833,6 +839,7 @@ function renderSummary(){
     <div class="card"><div class="lbl">${t("Lacagta la ururiyay","Total collected")}</div><div class="val pos">${money(totalCollected)}</div></div>
     <div class="card"><div class="lbl">${t("Wadarta kharashka","Total expenses")}</div><div class="val neg">${money(totalDisb)}</div></div>
     ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">${t("Codsi sugaya","Pending requests")}</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
+    ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div></div>` : ''}
   `;
 }
 
@@ -2845,16 +2852,47 @@ function renderLoginScreen(){
     </div>
   `;
   wireLangToggle(root);
-  const doLogin = ()=>{
+  const doLogin = async ()=>{
     const u = document.getElementById("loginUser").value.trim();
     const p = document.getElementById("loginPass").value;
     const err = document.getElementById("authErr");
+    const userByName = db.users.find(x=>x.username===u);
+
+    if(userByName && userByName.lockedAt){
+      const minutesSinceLock = (Date.now() - new Date(userByName.lockedAt).getTime()) / 60000;
+      if(minutesSinceLock < LOCKOUT_MINUTES){
+        const remaining = Math.ceil(LOCKOUT_MINUTES - minutesSinceLock);
+        err.textContent = t(`Account-kan waa la xiray. Isku day mar kale ${remaining} daqiiqo kadib, ama admin ha ku furo.`,`This account is locked. Try again in ${remaining} minute(s), or ask an admin to unlock it.`);
+        return;
+      }
+      userByName.lockedAt = null;
+      userByName.failedAttempts = 0;
+    }
+
     const user = db.users.find(x=>x.username===u && x.password===p);
-    if(!user){ err.textContent = t("Username ama password waa khalad.","Username or password is incorrect."); return; }
+    if(!user){
+      if(userByName){
+        userByName.failedAttempts = (userByName.failedAttempts||0) + 1;
+        if(userByName.failedAttempts >= LOCKOUT_THRESHOLD){
+          userByName.lockedAt = new Date().toISOString();
+          db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:t("Account waa la xiray (isku day khalad ah oo badan)","Account locked (too many failed attempts)"), details:t(`${LOCKOUT_THRESHOLD} isku day oo khalad ah`,`${LOCKOUT_THRESHOLD} failed login attempts`), status:"locked"});
+          err.textContent = t(`Account-kan waa la xiray ${LOCKOUT_THRESHOLD} isku day oo khalad ah kadib.`,`This account has been locked after ${LOCKOUT_THRESHOLD} failed attempts.`);
+        } else {
+          err.textContent = t("Username ama password waa khalad.","Username or password is incorrect.");
+        }
+        await saveDb();
+      } else {
+        err.textContent = t("Username ama password waa khalad.","Username or password is incorrect.");
+      }
+      return;
+    }
+
+    user.failedAttempts = 0;
+    user.lockedAt = null;
     currentUser = user.username; currentUserObj = user;
     saveSession(user.username);
     logActivity("Login", "", "direct");
-    saveDb();
+    await saveDb();
     showApp();
   };
   document.getElementById("loginBtn").addEventListener("click", doLogin);
@@ -2886,10 +2924,14 @@ function renderAuthGate(){
 }
 
 function openManageUsersModal(){
+  const isLocked = (u)=> !!(u.lockedAt && (Date.now()-new Date(u.lockedAt).getTime())/60000 < LOCKOUT_MINUTES);
   const rows = db.users.map(u=>`
     <div class="userlist-row">
-      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?` <span class="muted">(${t('adiga','you')})</span>`:''}</span>
-      <button class="ghost-danger" data-uid="${u.id}" ${db.users.length<=1?'disabled':''}>${t("Tirtir","Delete")}</button>
+      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?` <span class="muted">(${t('adiga','you')})</span>`:''}${isLocked(u)?` <span class="status-tag locked">${t('la xiray','locked')}</span>`:''}</span>
+      <span style="display:flex;gap:6px;">
+        ${isLocked(u) ? `<button class="ghost-warn" data-unlock-uid="${u.id}">${t("Fur","Unlock")}</button>` : ''}
+        <button class="ghost-danger" data-uid="${u.id}" ${db.users.length<=1?'disabled':''}>${t("Tirtir","Delete")}</button>
+      </span>
     </div>
   `).join("");
   openModal(`
@@ -2951,6 +2993,18 @@ function openManageUsersModal(){
         showToast(t("User waa la tirtiray","User was deleted"));
         openManageUsersModal();
       });
+    });
+  });
+  document.querySelectorAll("[data-unlock-uid]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const u = db.users.find(x=>x.id===btn.dataset.unlockUid);
+      if(!u) return;
+      u.lockedAt = null;
+      u.failedAttempts = 0;
+      logActivity(t("Account waa la furay","Account unlocked"), u.username, "direct");
+      await saveDb();
+      showToast(t("Account-ka waa la furay","Account unlocked"));
+      openManageUsersModal();
     });
   });
 }

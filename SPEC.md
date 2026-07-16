@@ -51,6 +51,24 @@ mutation, direct or approved/rejected/pending.
 - `?member=<id>` query param bypasses auth entirely and renders a read-only
   public balance view for that one member (`renderPublicMemberView`) —
   intended for the WhatsApp-shared link flow (see below).
+- **Persistent session**: successful login/setup writes the username to
+  `localStorage` (`qaaraan-session`, via `saveSession()`); `renderAuthGate()`
+  checks it before falling back to the login screen, so refreshing the page
+  doesn't force a re-login. Per-browser, not server-side — logging out
+  (`doLogout()`) clears it.
+- **Lockout**: each `db.users[]` entry tracks `failedAttempts` and
+  `lockedAt`. `LOCKOUT_THRESHOLD` (4) wrong-password attempts in a row locks
+  the account for `LOCKOUT_MINUTES` (15), even against the *correct*
+  password, until the cooldown elapses or an admin manually unlocks it
+  (Manage Users → "Fur" button next to a locked user). This is real,
+  server-side-persisted lockout (survives across browsers/devices, since
+  `db.users` syncs through Neon) — not just a client-side counter.
+  - There's no email/SMS/push infrastructure in this app, so "admin
+    notification" is in-app: a red-bordered alert card on the Guddoon
+    dashboard naming every currently-locked account (visible to admins the
+    moment they next open the app) plus a red-tagged `activityLog` entry
+    (`status:"locked"`). A true out-of-band notification would need a new
+    external service (e.g. email via Resend/SendGrid) — not present today.
 
 ## Permissions & approval flow
 

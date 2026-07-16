@@ -45,9 +45,15 @@ mutation, direct or approved/rejected/pending.
 
 - No accounts yet → first-run "setup" screen creates the first user as
   `admin` (`renderSetupScreen`).
-- Otherwise → username/password login against `db.users` (plaintext
-  comparison, no hashing — see Known gaps in CLAUDE.md, this is a
-  pre-existing condition worth revisiting).
+- Otherwise → username/password login against `db.users`. Passwords are
+  hashed (PBKDF2-SHA256, 150k iterations, random salt per user, via the
+  browser's `crypto.subtle` — see `hashPassword()`/`verifyPassword()`,
+  stored as `"<saltHex>:<hashHex>"`), not stored or compared in plaintext.
+  `verifyPassword()` also accepts a legacy plaintext record (no `:`-hex
+  pattern) by direct comparison, and `doLogin()` re-hashes and saves on a
+  successful legacy match — so any accounts created before hashing was
+  added self-migrate to hashed storage the next time each one logs in,
+  with no manual migration step or forced reset needed.
 - `?member=<id>` query param bypasses auth entirely and renders a read-only
   public balance view for that one member (`renderPublicMemberView`) —
   intended for the WhatsApp-shared link flow (see below).
@@ -93,6 +99,49 @@ mutation, direct or approved/rejected/pending.
     logs the activity. A follow-up modal then displays the new password
     back to the admin with an explicit instruction to relay it to the user
     manually (WhatsApp/phone/in-person) — there's no automated delivery.
+    That password is hashed (see above) before being stored/saved — the
+    admin only ever sees the plaintext value they just typed, locally.
+
+## Security
+
+- **`/api/data` and `/api/notify` require a shared secret.** Both
+  serverless functions check an `X-Api-Secret` request header against the
+  `API_SECRET` Vercel environment variable and reject with 401 if it's
+  missing or wrong, and with 500 if `API_SECRET` isn't configured at all
+  (fails closed, not open). The frontend sends this header on every call
+  from a single `API_SECRET` constant near the top of `index.html`'s
+  `<script>` block.
+  - **Why this exists**: before this, both endpoints were fully public —
+    `GET /api/data` returned the entire live database (every member's PII,
+    every transaction, every user's password) to anyone who requested the
+    URL, no login required, and `POST /api/data` could overwrite or wipe
+    it the same way. The login screen only ever gated the client-side UI;
+    it never talked to the server about who's allowed in. `/api/notify`
+    had the same gap, letting anyone burn the Resend email quota.
+  - **What this does and doesn't fix**: it stops opportunistic/automated
+    access — a scanner or a stranger with the URL can no longer just `curl`
+    the database. It does **not** stop a determined attacker: since
+    `index.html` is a single static file with no build step, `API_SECRET`
+    is necessarily embedded in public page source and readable by anyone
+    who views it. A real fix requires moving login verification server-side
+    (a login endpoint that issues a session token tied to an actual
+    username/password check, instead of a single static secret everyone's
+    browser holds) — not implemented, flagged here as the natural next step
+    if a stronger guarantee is needed.
+  - **Deploy requirement**: `API_SECRET` must be set in Vercel (Project →
+    Settings → Environment Variables) with the exact same value baked into
+    `index.html`'s `API_SECRET` constant, then redeployed. Until that env
+    var is set, both endpoints return 500 to everyone, including the app
+    itself (fails closed by design — see above).
+- **Passwords are hashed**, not plaintext — see the Auth section above.
+- **Backups still carry whatever's in `db.users[].password` at export
+  time** — hashed for any account that's logged in since this change
+  shipped, plaintext for any that hasn't yet (self-migrates on next
+  login). Either way, treat backup files as sensitive.
+- **PII is still baked into `index.html`'s source** (`SEED_MEMBERS`,
+  `GROUPS`, `HISTORY_REPORTS`, `JOURNAL_DISBURSEMENTS` — see CLAUDE.md's
+  Known gaps). This is a separate exposure from the API issue above and is
+  not fixed by it.
 
 ## Permissions & approval flow
 

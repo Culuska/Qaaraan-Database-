@@ -19,6 +19,18 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Same shared-secret gate as /api/data — otherwise anyone can use this
+  // endpoint to send email through your Resend account (spam/quota abuse).
+  const apiSecret = process.env.API_SECRET;
+  if (!apiSecret) {
+    res.status(500).json({ error: 'Server not configured: API_SECRET is missing' });
+    return;
+  }
+  if (req.headers['x-api-secret'] !== apiSecret) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     res.status(200).json({ skipped: true, reason: 'RESEND_API_KEY not configured' });

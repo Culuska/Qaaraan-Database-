@@ -120,6 +120,12 @@ GitHub (push to `main`) → Vercel (auto-deploy) → Neon Postgres (via Vercel
 Storage → Marketplace integration, sets `DATABASE_URL` env var
 automatically). See `README.md` for the full Somali-language walkthrough.
 
+**`API_SECRET` is also required** (Vercel → Project → Settings →
+Environment Variables) — `api/data.js` and `api/notify.js` fail closed
+(500) without it. Its value must exactly match the `API_SECRET` constant
+near the top of `index.html`'s `<script>` block; see SPEC.md's Security
+section for why this exists and its limits.
+
 ## Current fiscal window
 
 As of this writing, the app's dues cycle is July–December 2026

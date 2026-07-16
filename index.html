@@ -508,11 +508,40 @@ const STORAGE_KEY = "qaaraan-fund-db-v4";
 const SESSION_KEY = "qaaraan-session";
 const LOCKOUT_THRESHOLD = 4;
 const LOCKOUT_MINUTES = 15;
+// Shared secret gating /api/data and /api/notify — must match the API_SECRET
+// env var set in Vercel. This is embedded in public page source (there's no
+// build step to keep it out of the client bundle), so it stops opportunistic/
+// automated access to the raw API but not a determined attacker reading this
+// file — see SPEC.md "Security" for the full threat-model note.
+const API_SECRET = "a5d9b78fec3889aed0ba03a2b6ba3685077448a56e875d3c";
 let currentUser = null;
 let currentUserObj = null;
 
 function saveSession(username){ localStorage.setItem(SESSION_KEY, username); }
 function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+function bytesToHex(bytes){ return Array.from(bytes).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+function hexToBytes(hex){ const arr = new Uint8Array(hex.length/2); for(let i=0;i<arr.length;i++) arr[i] = parseInt(hex.substr(i*2,2),16); return arr; }
+// PBKDF2-SHA256 password hashing via the browser's built-in Web Crypto API
+// (no extra dependency, matches the no-build-step constraint). Stored as
+// "<saltHex>:<hashHex>".
+async function hashPassword(password, saltHex){
+  const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({name:"PBKDF2", salt, iterations:150000, hash:"SHA-256"}, keyMaterial, 256);
+  return `${bytesToHex(salt)}:${bytesToHex(new Uint8Array(bits))}`;
+}
+function looksHashed(stored){ return typeof stored === "string" && /^[0-9a-f]{32}:[0-9a-f]{64}$/.test(stored); }
+// Verifies a login password against a stored value. Supports legacy plaintext
+// records left over from before password hashing was added — those verify by
+// direct comparison, and the caller re-hashes + saves on success so accounts
+// self-migrate to hashed storage the next time each user logs in.
+async function verifyPassword(password, stored){
+  if(!looksHashed(stored)) return {ok: password === stored, legacy: true};
+  const [saltHex] = stored.split(":");
+  const recomputed = await hashPassword(password, saltHex);
+  return {ok: recomputed === stored, legacy: false};
+}
 let viewMode = "full";
 let currentTab = "members";
 let disbCatFilter = "all";
@@ -668,7 +697,7 @@ async function attemptAction(type, payload, permKey, label){
 
 async function loadDb(){
   try{
-    const res = await fetch('/api/data');
+    const res = await fetch('/api/data', { headers: {'X-Api-Secret': API_SECRET} });
     if(res.ok){
       const json = await res.json();
       if(json && json.value) db = JSON.parse(json.value);
@@ -810,7 +839,7 @@ async function saveDb(){
   try{
     const res = await fetch('/api/data', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-Api-Secret': API_SECRET},
       body: JSON.stringify({value: JSON.stringify(db)})
     });
     if(!res.ok) throw new Error('save failed');
@@ -826,7 +855,7 @@ async function notifyAdmin(subject, html, attachment){
     if(!to) return;
     await fetch("/api/notify", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "X-Api-Secret": API_SECRET},
       body: JSON.stringify({ to, subject, html, attachment })
     });
   }catch(e){ /* best-effort */ }
@@ -2900,7 +2929,7 @@ function renderSetupScreen(){
     const p = document.getElementById("setupPass").value;
     const err = document.getElementById("authErr");
     if(!u || !p || p.length<4){ err.textContent = t("Geli username iyo password (ugu yaraan 4 xaraf)","Enter a username and password (at least 4 characters)"); return; }
-    const user = {id:"u"+Date.now(), username:u, password:p, role:"admin", permissions:{addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true}};
+    const user = {id:"u"+Date.now(), username:u, password:await hashPassword(p), role:"admin", permissions:{addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true}};
     db.users.push(user);
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:"Account-ka admin-ka ugu horreeya waa la sameeyay", details:"", status:"direct"});
     await saveDb();
@@ -2948,7 +2977,12 @@ function renderLoginScreen(){
       userByName.failedAttempts = 0;
     }
 
-    const user = db.users.find(x=>x.username===u && x.password===p);
+    let user = null;
+    let legacyUpgrade = false;
+    if(userByName){
+      const result = await verifyPassword(p, userByName.password);
+      if(result.ok){ user = userByName; legacyUpgrade = result.legacy; }
+    }
     if(!user){
       if(userByName){
         userByName.failedAttempts = (userByName.failedAttempts||0) + 1;
@@ -2972,6 +3006,7 @@ function renderLoginScreen(){
 
     user.failedAttempts = 0;
     user.lockedAt = null;
+    if(legacyUpgrade){ user.password = await hashPassword(p); }
     currentUser = user.username; currentUserObj = user;
     saveSession(user.username);
     logActivity("Login", "", "direct");
@@ -3081,7 +3116,7 @@ function openManageUsersModal(){
     if(db.users.some(x=>x.username===u)){ showToast(t("Username-kan horeba wuu jiraa","This username already exists")); return; }
     const permissions = {};
     PERM_KEYS.forEach(k=>{ permissions[k] = role==="admin" ? true : document.querySelector(`[data-perm="${k}"]`).checked; });
-    db.users.push({id:"u"+Date.now(), username:u, password:p, role, permissions});
+    db.users.push({id:"u"+Date.now(), username:u, password:await hashPassword(p), role, permissions});
     logActivity("Ku darid user cusub", `${u} (${role})`, "direct");
     await saveDb();
     showToast(t("User cusub waa la daray","New user was added"));
@@ -3143,7 +3178,7 @@ function openResetPasswordModal(u){
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const newPass = document.getElementById("rpNewPass").value;
     if(!newPass || newPass.length<4){ showToast(t("Password waa khalad (ugu yaraan 4 xaraf)","Password invalid (at least 4 characters)")); return; }
-    u.password = newPass;
+    u.password = await hashPassword(newPass);
     u.failedAttempts = 0;
     u.lockedAt = null;
     const req = db.passwordResetRequests.find(r=>r.username===u.username && r.status==="pending");
@@ -3249,7 +3284,7 @@ async function emailBackupToAdmin(){
     const contentBase64 = btoa(unescape(encodeURIComponent(json)));
     const res = await fetch("/api/notify", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "X-Api-Secret": API_SECRET},
       body: JSON.stringify({
         to,
         subject: `Qaaraan backup — ${todayStr()}`,

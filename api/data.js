@@ -228,7 +228,27 @@ async function saveState(client, state) {
   }
 }
 
+// Gates every request behind a shared secret (X-Api-Secret header) that must
+// match the API_SECRET env var. Without this, the endpoint returns the full
+// database — including every user's password — to anyone who requests it, no
+// login required, since the frontend's login screen is a client-side-only
+// gate that never talks to the server. Fails closed (500) if API_SECRET
+// isn't configured, rather than silently running unauthenticated.
+function checkAuth(req, res) {
+  const apiSecret = process.env.API_SECRET;
+  if (!apiSecret) {
+    res.status(500).json({ error: 'Server not configured: API_SECRET is missing' });
+    return false;
+  }
+  if (req.headers['x-api-secret'] !== apiSecret) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
 export default async function handler(req, res) {
+  if (!checkAuth(req, res)) return;
   const client = await getPool().connect();
   try {
     await ensureSchema(client);

@@ -655,6 +655,7 @@ async function loadDb(){
   if(!db.accounts) db.accounts = [{id:"acc_salaam", name:"Salaam Bank", openingBalance:0}];
   if(!db.settings) db.settings = {baseUrl:"", paymentNumber:""};
   if(!db.payables) db.payables = [];
+  if(!db.passwordResetRequests) db.passwordResetRequests = [];
   for(const u of db.users){
     if(!u.role) u.role = "admin";
     if(!u.permissions) u.permissions = {addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true};
@@ -832,6 +833,7 @@ function renderSummary(){
   const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
   const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
   const lockedUsers = db.users.filter(u=>u.lockedAt && (Date.now()-new Date(u.lockedAt).getTime())/60000 < LOCKOUT_MINUTES);
+  const pendingResets = db.passwordResetRequests.filter(r=>r.status==="pending");
   el.innerHTML = `
     <div class="card"><div class="lbl">${t("Wadarta balance-ka hadda","Total current balance")}</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
     <div class="card"><div class="lbl">${t("Xubnaha (active)","Members (active)")}</div><div class="val">${active.length} / ${db.members.length}</div></div>
@@ -840,6 +842,7 @@ function renderSummary(){
     <div class="card"><div class="lbl">${t("Wadarta kharashka","Total expenses")}</div><div class="val neg">${money(totalDisb)}</div></div>
     ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">${t("Codsi sugaya","Pending requests")}</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
     ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div></div>` : ''}
+    ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);"><div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div><div class="val" style="color:var(--warn);">${pendingResets.map(r=>r.username).join(", ")}</div></div>` : ''}
   `;
 }
 
@@ -2847,11 +2850,13 @@ function renderLoginScreen(){
           <div class="frow"><label>${t("Username","Username")}</label><div class="input-icon"><i class="ti ti-user"></i><input type="text" id="loginUser" placeholder="username"></div></div>
           <div class="frow"><label>${t("Password","Password")}</label><div class="input-icon"><i class="ti ti-lock"></i><input type="password" id="loginPass" placeholder="password"></div></div>
           <button class="primary" id="loginBtn">${t("Gal","Log in")}</button>
+          <div class="auth-switch"><a id="forgotPasswordLink">${t("Ma illowday password-kaaga?","Forgot your password?")}</a></div>
         </div>
       </div>
     </div>
   `;
   wireLangToggle(root);
+  document.getElementById("forgotPasswordLink").addEventListener("click", openForgotPasswordModal);
   const doLogin = async ()=>{
     const u = document.getElementById("loginUser").value.trim();
     const p = document.getElementById("loginPass").value;
@@ -2899,6 +2904,32 @@ function renderLoginScreen(){
   document.getElementById("loginPass").addEventListener("keydown", (e)=>{ if(e.key==="Enter") doLogin(); });
 }
 
+function openForgotPasswordModal(){
+  const prefill = (document.getElementById("loginUser") && document.getElementById("loginUser").value.trim()) || "";
+  openModal(`
+    <h3>${t("Ma illowday password-kaaga?","Forgot your password?")}</h3>
+    <p class="muted">${t("Geli username-kaaga. Haddii uu jiro, admin-ka ayaa lagu ogeysiin doonaa si uu kuu siiyo password cusub.","Enter your username. If it exists, the admin will be notified so they can set you a new password.")}</p>
+    <div class="frow"><label>Username</label><input type="text" id="fpUsername" value="${prefill}"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Dir codsiga","Send request")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const username = document.getElementById("fpUsername").value.trim();
+    if(!username){ showToast(t("Geli username-ka","Enter your username")); return; }
+    const userExists = db.users.some(x=>x.username===username);
+    if(userExists){
+      db.passwordResetRequests.push({id:"pr"+Date.now(), username, requestedAt:new Date().toISOString(), status:"pending"});
+      db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:username, action:t("Codsi password cusub","Password reset requested"), details:"", status:"pending"});
+      await saveDb();
+    }
+    showToast(t("Haddii username-kan uu jiro, codsigaaga waa la diray. Admin-ku wuu la xiriiri doonaa.","If that username exists, your request was sent. The admin will contact you."));
+    closeModal();
+  });
+}
+
 function showApp(){
   document.getElementById("authRoot").innerHTML = "";
   document.getElementById("appWrap").style.display = "";
@@ -2925,11 +2956,13 @@ function renderAuthGate(){
 
 function openManageUsersModal(){
   const isLocked = (u)=> !!(u.lockedAt && (Date.now()-new Date(u.lockedAt).getTime())/60000 < LOCKOUT_MINUTES);
+  const hasPendingReset = (u)=> db.passwordResetRequests.some(r=>r.username===u.username && r.status==="pending");
   const rows = db.users.map(u=>`
     <div class="userlist-row">
-      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?` <span class="muted">(${t('adiga','you')})</span>`:''}${isLocked(u)?` <span class="status-tag locked">${t('la xiray','locked')}</span>`:''}</span>
+      <span>${u.username} <span class="role-badge ${u.role}">${u.role}</span>${u.username===currentUser?` <span class="muted">(${t('adiga','you')})</span>`:''}${isLocked(u)?` <span class="status-tag locked">${t('la xiray','locked')}</span>`:''}${hasPendingReset(u)?` <span class="status-tag pending">${t('codsi password','password requested')}</span>`:''}</span>
       <span style="display:flex;gap:6px;">
         ${isLocked(u) ? `<button class="ghost-warn" data-unlock-uid="${u.id}">${t("Fur","Unlock")}</button>` : ''}
+        <button data-resetpw-uid="${u.id}">${t("Beddel Password","Reset Password")}</button>
         <button class="ghost-danger" data-uid="${u.id}" ${db.users.length<=1?'disabled':''}>${t("Tirtir","Delete")}</button>
       </span>
     </div>
@@ -3006,6 +3039,42 @@ function openManageUsersModal(){
       showToast(t("Account-ka waa la furay","Account unlocked"));
       openManageUsersModal();
     });
+  });
+  document.querySelectorAll("[data-resetpw-uid]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const u = db.users.find(x=>x.id===btn.dataset.resetpwUid);
+      if(u) openResetPasswordModal(u);
+    });
+  });
+}
+
+function openResetPasswordModal(u){
+  openModal(`
+    <h3>${t("Beddel Password","Reset Password")} — ${u.username}</h3>
+    <div class="frow"><label>${t("Password cusub","New password")}</label><input type="password" id="rpNewPass" placeholder="${t('ugu yaraan 4 xaraf','at least 4 characters')}"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const newPass = document.getElementById("rpNewPass").value;
+    if(!newPass || newPass.length<4){ showToast(t("Password waa khalad (ugu yaraan 4 xaraf)","Password invalid (at least 4 characters)")); return; }
+    u.password = newPass;
+    u.failedAttempts = 0;
+    u.lockedAt = null;
+    const req = db.passwordResetRequests.find(r=>r.username===u.username && r.status==="pending");
+    if(req) req.status = "resolved";
+    logActivity("Beddelka password (admin)", u.username, "direct");
+    await saveDb();
+    openModal(`
+      <h3>${t("Password waa la beddelay","Password reset")}</h3>
+      <p class="muted">${t("Password cusub ee","New password for")} ${u.username}: <b>${newPass}</b></p>
+      <p class="muted">${t("U sheeg qofkan password-kan (WhatsApp, taleefan, iwm) — halkan lagama diro si toos ah.","Tell this person their new password yourself (WhatsApp, phone call, etc.) — it isn't sent automatically.")}</p>
+      <div class="actions"><button class="primary" id="mDone">${t("Xir","Close")}</button></div>
+    `);
+    document.getElementById("mDone").addEventListener("click", ()=>{ closeModal(); openManageUsersModal(); });
   });
 }
 
@@ -3134,6 +3203,7 @@ function showRestoreConfirm(backupData, exportedAt){
     if(!db.accounts) db.accounts = [];
     if(!db.settings) db.settings = {baseUrl:"", paymentNumber:""};
     if(!db.payables) db.payables = [];
+    if(!db.passwordResetRequests) db.passwordResetRequests = [];
     logActivity("Xogta waa la soo celiyay (restore)", "", "direct");
     await saveDb();
     showToast(t("Xogta waa la soo celiyay","Data restored"));

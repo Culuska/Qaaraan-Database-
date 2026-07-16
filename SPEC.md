@@ -69,6 +69,27 @@ mutation, direct or approved/rejected/pending.
     moment they next open the app) plus a red-tagged `activityLog` entry
     (`status:"locked"`). A true out-of-band notification would need a new
     external service (e.g. email via Resend/SendGrid) — not present today.
+- **Forgot password**: the login screen has a "Ma illowday password-kaaga?"
+  link (`openForgotPasswordModal()`). Typing a username and submitting pushes
+  a record to `db.passwordResetRequests[]` (`{id, username, requestedAt,
+  status:"pending"}`) and a `"pending"`-status `activityLog` entry — only if
+  that username actually exists in `db.users`, but the toast shown to the
+  requester is the same generic "if that username exists..." message either
+  way, so the login screen can't be used to enumerate valid usernames.
+  - Same in-app-only notification pattern as lockout: an amber alert card
+    ("Codsiyo password cusub") on the admin dashboard lists every username
+    with a pending request, and Manage Users shows a "codsi password"/
+    "password requested" badge next to that user's row.
+  - Every user row in Manage Users also has an always-visible "Beddel
+    Password"/"Reset Password" button (not just users with a pending
+    request — an admin can reset anyone's password proactively), wired to
+    `openResetPasswordModal(u)`. The admin types a new plaintext password
+    (min 4 chars); saving it clears `failedAttempts`/`lockedAt` (so a reset
+    also lifts a lockout), marks any matching pending
+    `passwordResetRequests` entry `"resolved"` (clearing the badge), and
+    logs the activity. A follow-up modal then displays the new password
+    back to the admin with an explicit instruction to relay it to the user
+    manually (WhatsApp/phone/in-person) — there's no automated delivery.
 
 ## Permissions & approval flow
 

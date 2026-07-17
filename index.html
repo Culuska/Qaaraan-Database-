@@ -755,6 +755,7 @@ async function loadDb(){
   backfillDisbursementAccounts();
   fixCreditMemoAccountTagging();
   fixSalaamBankOpeningBalance();
+  fixSalaamBankOpeningBalance730();
   syncAccruals();
   await saveDb();
 }
@@ -818,6 +819,22 @@ function fixSalaamBankOpeningBalance(){
   if(historicalPayments <= 0) return;
   acc.openingBalance = historicalPayments;
   db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay", details:`Waxaa loo dejiyay ${money(historicalPayments)} (wadarta lacagaha taariikhiga ah ee la ururiyay, kahor inta aan la bilaabin diiwaanka tooska ah) — haddii aanay sax ahayn, wax ka beddel account-ka.`, status:"direct"});
+}
+
+// The auto-derived guess above ($20,621, from summing HISTORY_REPORTS) turned
+// out not to match the real bank statement. The admin gave the actual figure
+// (30 June 2026, per real records): $730. This corrects it once — only when
+// the value is still whatever this code previously guessed (0 or the old
+// $20,621 derivation) — so it won't clobber a value an admin has since set
+// deliberately via Edit Account.
+function fixSalaamBankOpeningBalance730(){
+  const acc = db.accounts.find(a=>a.id==="acc_salaam");
+  if(!acc || acc.openingBalance === 730) return;
+  if(acc.openingBalance === 0 || acc.openingBalance === 20621){
+    const before = acc.openingBalance;
+    acc.openingBalance = 730;
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin)", details:`$${before} → $730 (sida uu xaqiijiyay admin-ka, taariikhda 30 June 2026)`, status:"direct"});
+  }
 }
 
 function backfillDisbursementAccounts(){

@@ -349,7 +349,8 @@ disbursements that predate the live app (`fixLegacyHistoryImport`,
 `removeNonGroupLegacyMembers`, `addMissingSeedMembers`,
 `importCreditMemosAsDisbursements`, `importJournalDisbursements`,
 `backfillDisbursementAccounts`, `fixCreditMemoAccountTagging`,
-`fixSalaamBankOpeningBalance`). These are historical/one-time in intent,
+`fixSalaamBankOpeningBalance`, `fixSalaamBankOpeningBalance730`). These are
+historical/one-time in intent,
 not meant to be extended with new hardcoded people going forward — new
 members should be added through the "Add new customer" flow instead.
 - **`fixCreditMemoAccountTagging`**: `importCreditMemosAsDisbursements`
@@ -374,3 +375,12 @@ members should be added through the "Add new customer" flow instead.
   embedded historical ledger, not a guarantee of matching a real bank
   statement to the penny — an admin should verify and use Edit Account to
   correct it if needed.
+- **`fixSalaamBankOpeningBalance730`**: the auto-derived guess above turned
+  out wrong — the real 30 June 2026 opening balance, per the admin's actual
+  records, is `$730`. This corrects it once, but only while the value is
+  still whatever this code previously set it to (`0` or the old `$20,621`
+  derivation), so a manual Edit Account change is never overridden. This is
+  the kind of one-off numeric correction that should normally just go
+  through Edit Account directly rather than a new hardcoded migration function
+  — it's here because the fix needed to reach an already-deployed database,
+  the same reasoning as every other function in this section.

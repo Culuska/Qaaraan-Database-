@@ -30,6 +30,14 @@ disagree, the code wins; update this file when behavior changes.
 to that account (`accountBalance`). Admin-only "Wax ka beddel"/"Edit" button
 on each account card (`openEditAccountModal()`, Accounts tab) lets the name
 and opening balance be corrected later — logs a before/after diff.
+- Each account card also shows a **"Last 2 days" breakdown**: total
+  deposited/withdrawn/net for that account restricted to `{today,
+  yesterday}` (by date-string membership, not a rolling 48-hour window —
+  transactions only store a date, no time-of-day), plus every individual
+  payment/disbursement in that window listed newest-first, so an admin can
+  cross-check the app's numbers against their own manual records line by
+  line. Computed inline in `renderAccounts()`; `addDays(dateStr, n)` is the
+  shared date-math helper.
 
 **Payable** (`db.payables[]`) — accounts-payable bills owed to vendors.
 `status`: `unpaid`/`paid`. Paying a bill (`openPayBillModal`) creates a

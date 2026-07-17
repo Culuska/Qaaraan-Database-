@@ -169,32 +169,8 @@ Tabs shown depend on permissions (`renderTabs`):
 - **Xasuusin Bille (Reminders)** — visible with `collectPayment` permission.
   Lists members with positive balance, one-click WhatsApp reminder.
 - **Accounts** — visible with `viewReports`. Bank/cash balances.
-- **Xisaabaadka Guud (Financial)** — visible with `viewReports`. A dashboard
-  (`renderFinancialSummary()`) rather than a plain metrics table:
-  - A dark greeting "hero" card (`#financialHero`) showing the combined
-    balance across `db.accounts` (turns red if negative) with quick actions
-    — "Record payment" (`openQuickReceiptModal()`) and "Add bill"
-    (`openAddPayableModal()`), shown only with `collectPayment` permission.
-  - Three highlighted stat cards (income/expense/net-position, colored
-    green/peach/blue) each with a hand-built inline-SVG sparkline
-    (`sparklineSvg()`) and a month-over-month trend badge (`trendHtml()`)
-    where a previous month exists to compare against.
-  - A "Money Flow" line chart (`moneyFlowChartSvg()`) plotting monthly
-    collected-vs-expensed amounts across the fiscal window's months
-    (`monthlyFlow()` buckets `member.transactions` payments and
-    `db.disbursements` by `date.slice(0,7)`) — no charting library, just an
-    inline SVG built from computed point coordinates.
-  - Secondary plain cards for AR, AP, and Bad Debt (the same metrics the
-    dashboard always had, kept for parity, just visually de-emphasized
-    relative to the three headline stats above).
-  - A right-hand column: a merged, date-sorted recent-transactions list
-    (payments in green, disbursements in red) and one gradient "account
-    card" tile per `db.accounts[]` entry showing its live balance
-    (`accountBalance()`).
-  - The accounts-payable (unpaid bills) list stays below, unchanged in
-    function.
-  - All figures are computed live from real `db` data — nothing here is
-    placeholder/mock content.
+- **Xisaabaadka Guud (Financial)** — visible with `viewReports`. AR, AP,
+  expenses, bad debt, net position; accounts-payable bill list.
 - **Pending approvals** — admin only.
 - **Activity log** — admin only.
 

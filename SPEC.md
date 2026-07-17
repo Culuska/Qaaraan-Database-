@@ -234,6 +234,35 @@ Tabs shown depend on permissions (`renderTabs`):
 - Per-group and per-member PDF/Excel exports (jsPDF, SheetJS) — group roster
   with balances, member transaction history.
 - Disbursement exports: full, or filtered by category.
+- **Unified Reports picker** (sidebar → "Warbixinno"/"Reports", visible with
+  `viewReports`) — `openReportsModal()` offers three entry points that all
+  funnel into the same PDF/Excel choice step (`openReportFormatChoice()`):
+  - **Personal** (`openReportPersonPicker()`) — live search-as-you-type
+    member picker, then exports that member's current live data (balance
+    boxes + full `transactions[]` history with a running balance) via
+    `exportMemberLiveReportPdf()`/`exportMemberLiveReportExcel()`. This is
+    a different, newer export than the existing historical-ledger export
+    reachable from a member's "Balance summary" modal (which exports
+    `HISTORY_REPORTS`, the pre-2026 imported ledger, not live transactions)
+    — the two aren't meant to be the same thing.
+  - **Group** (`openReportGroupPicker()`) — pick a `GROUPS` entry, reuses
+    the existing `exportGroupPdf()`/`exportGroupExcel()`.
+  - **Full** (`openReportsModal()`'s third option) — reuses the existing
+    `exportFullListPdf()`/`exportFullListExcel()` across all `db.members`.
+  - If a PDF/Excel generator throws (e.g. the export library failed to
+    load), the format-choice modal catches it, shows a toast, and still
+    closes — it doesn't hang open on failure.
+- **Monthly Forecast** (sidebar → "Saadaasha Billaha"/"Monthly Forecast",
+  visible with `viewReports`) — despite the name, this is an actuals
+  breakdown for a chosen month, not a predictive forecast:
+  `openForecastModal()` shows a month picker (defaults to the current
+  month if it falls in `MONTHS_2026`, else the first fiscal month) and,
+  via `computeMonthForecast(mk)`, the total collected and total expenses
+  for that month, plus how many active-with-`monthlyDue` members paid vs.
+  didn't (a member "paid" a month if they have any `payment` transaction
+  dated in it — not tied to the amount covering that month's due), with a
+  scrollable list of who hasn't paid yet. Switching the month re-renders
+  the modal in place.
 - **General Ledger** (`buildJournalEntries()` in `index.html`) — not a real
   ledger table in the database. Computed live from `db.members[].transactions`,
   `db.disbursements`, `db.payables`, and `db.accounts` opening balances into a

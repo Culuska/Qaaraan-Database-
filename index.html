@@ -228,6 +228,11 @@
   .perm-grid{display:flex;flex-direction:column;gap:8px;margin:10px 0 16px;padding:10px;background:#FBFAF7;border-radius:8px;}
   .perm-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;}
   .perm-grid input[type=checkbox]{width:auto;}
+  .report-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0;}
+  .report-choice{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 10px;border:1px solid var(--line);border-radius:10px;background:#FBFAF7;font-size:13px;font-weight:600;min-height:auto;}
+  .report-choice i{font-size:26px;color:var(--accent-ink);}
+  .report-choice:hover{background:var(--accent-bg);border-color:var(--accent);}
+  @media (max-width:520px){ .report-choice-grid{grid-template-columns:1fr;} }
   .role-badge{font-size:10px;padding:1px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn);margin-left:6px;}
   .role-badge.admin{background:var(--accent-bg);color:var(--accent-ink);}
   .pending-row{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
@@ -1935,6 +1940,219 @@ function openEditMemberModal(m){
   });
 }
 
+// ---- Unified Reports picker: personal / group / full, each with a PDF/Excel choice ----
+function openReportsModal(){
+  if(!hasPerm("viewReports")) return;
+  openModal(`
+    <h3>${t("Warbixinno","Reports")}</h3>
+    <p class="muted">${t("Dooro nooca warbixinta aad rabto.","Choose which kind of report you want.")}</p>
+    <div class="report-choice-grid">
+      <button class="report-choice" data-choice="personal"><i class="ti ti-user"></i><span>${t("Xubin gaar ah","Personal")}</span></button>
+      <button class="report-choice" data-choice="group"><i class="ti ti-users-group"></i><span>${t("Koox","Group")}</span></button>
+      <button class="report-choice" data-choice="full"><i class="ti ti-list-details"></i><span>${t("Dhammaan","Full")}</span></button>
+    </div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.querySelectorAll(".report-choice").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const choice = btn.dataset.choice;
+      if(choice === "personal") openReportPersonPicker();
+      else if(choice === "group") openReportGroupPicker();
+      else openReportFormatChoice(t("Warbixinta oo dhan","Full report"), ()=>exportFullListPdf(db.members), ()=>exportFullListExcel(db.members));
+    });
+  });
+}
+
+function openReportGroupPicker(){
+  openModal(`
+    <h3>${t("Dooro Koox","Choose a group")}</h3>
+    <div class="tx-list" style="max-height:360px;">
+      ${GROUPS.map(g=>`
+        <div class="tx" data-group="${g.group.replace(/"/g,'&quot;')}" style="cursor:pointer;">
+          <div class="l">
+            <span>${g.group}</span>
+            <span class="muted">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${g.memberIds.length} ${t("xubnood","members")}</span>
+          </div>
+          <i class="ti ti-chevron-right"></i>
+        </div>
+      `).join("")}
+    </div>
+    <div class="actions"><button id="mCancel">${t("Dib u noqo","Back")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", openReportsModal);
+  document.querySelectorAll("[data-group]").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      const g = GROUPS.find(x=>x.group===row.dataset.group);
+      const membersById = Object.fromEntries(db.members.map(m=>[m.id,m]));
+      const members = g.memberIds.map(id=>membersById[id]).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+      openReportFormatChoice(g.group, ()=>exportGroupPdf(g, members), ()=>exportGroupExcel(g, members));
+    });
+  });
+}
+
+function openReportPersonPicker(){
+  openModal(`
+    <h3>${t("Dooro Xubin","Choose a member")}</h3>
+    <div class="frow"><input type="text" id="rptSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+    <div id="rptResults" class="tx-list" style="max-height:320px;"></div>
+    <div class="actions"><button id="mCancel">${t("Dib u noqo","Back")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", openReportsModal);
+  const searchEl = document.getElementById("rptSearch");
+  const renderResults = ()=>{
+    const q = searchEl.value.trim().toLowerCase();
+    const matches = q ? db.members.filter(m=>m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const results = document.getElementById("rptResults");
+    results.innerHTML = matches.length ? matches.map(m=>`
+      <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+        <div class="l">
+          <span>${m.name}</span>
+          <span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span>
+        </div>
+        <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+      </div>
+    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.querySelectorAll("[data-mid]").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        const m = db.members.find(x=>x.id===row.dataset.mid);
+        if(m) openReportFormatChoice(m.name, ()=>exportMemberLiveReportPdf(m), ()=>exportMemberLiveReportExcel(m));
+      });
+    });
+  };
+  searchEl.addEventListener("input", renderResults);
+  searchEl.focus();
+}
+
+function openReportFormatChoice(title, onPdf, onXlsx){
+  openModal(`
+    <h3>${title}</h3>
+    <p class="muted">${t("Dooro qaabka aad rabto inaad soo dejiso.","Choose the format you want to download.")}</p>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button id="rptXlsx">Excel</button>
+      <button class="primary" id="rptPdf">PDF</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("rptPdf").addEventListener("click", ()=>{
+    try{ onPdf(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+    closeModal();
+  });
+  document.getElementById("rptXlsx").addEventListener("click", ()=>{
+    try{ onXlsx(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+    closeModal();
+  });
+}
+
+function exportMemberLiveReportExcel(m){
+  const bal = computeBalance(m);
+  const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+  let running = m.openingBalance;
+  const rows = [
+    [t("Magaca","Name"), m.name],
+    [t("Telefoon","Phone"), m.phone||"-"],
+    [t("Qoondo/bil","Due/month"), m.monthlyDue||0],
+    [t("Balance bilowga ah","Opening balance"), m.openingBalance],
+    [t("Wadarta la bixiyay","Total paid"), totalPaid(m)],
+    [t("Deyn la cafiyay","Debt written off"), totalWrittenOff(m)],
+    [t("Balance hadda","Current balance"), bal],
+    [],
+    [t("Taariikhda","Date"), t("Nooca","Type"), t("Lacagta","Amount"), t("Balance ka dib","Balance after"), t("Faahfaahin","Note")]
+  ];
+  for(const tx of sorted){
+    if(tx.type==="due") running += tx.amount; else running -= tx.amount;
+    const label = tx.type==="due" ? t("Qoondo bille","Monthly due") : (tx.type==="writeoff" ? t("Cafinaad","Write-off") : t("Lacag bixin","Payment"));
+    rows.push([tx.date, label, tx.type==="due"?tx.amount:-tx.amount, running, tx.note||""]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:16},{wch:12},{wch:14},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, m.name.replace(/[^a-z0-9]+/gi,"_")+"_personal_report.xlsx");
+}
+
+function exportMemberLiveReportPdf(m){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const bal = computeBalance(m);
+  const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+  let y = 18;
+  doc.setFontSize(14); doc.text(m.name, 14, y); y += 7;
+  doc.setFontSize(10);
+  doc.text(`${t('Telefoon','Phone')}: ${m.phone||'-'}  |  ${t('Qoondo/bil','Due/month')}: $${m.monthlyDue||0}`, 14, y); y += 6;
+  doc.text(`${t('Balance bilowga ah','Opening balance')}: $${m.openingBalance.toFixed(2)}  |  ${t('Wadarta la bixiyay','Total paid')}: $${totalPaid(m).toFixed(2)}  |  ${t('Balance hadda','Current balance')}: $${bal.toFixed(2)}`, 14, y); y += 9;
+  doc.setFontSize(9);
+  doc.text(t("Taariikhda","Date"), 14, y); doc.text(t("Nooca","Type"), 55, y); doc.text(t("Lacagta","Amount"), 105, y); doc.text(t("Balance ka dib","Balance after"), 140, y); doc.text(t("Faahfaahin","Note"), 175, y);
+  y += 4; doc.line(14,y,196,y); y += 5;
+  let running = m.openingBalance;
+  for(const tx of sorted){
+    if(y > 280){ doc.addPage(); y = 18; }
+    if(tx.type==="due") running += tx.amount; else running -= tx.amount;
+    const label = tx.type==="due" ? t("Qoondo bille","Monthly due") : (tx.type==="writeoff" ? t("Cafinaad","Write-off") : t("Lacag bixin","Payment"));
+    doc.text(tx.date, 14, y);
+    doc.text(label, 55, y);
+    doc.text((tx.type==="due"?"+":"-")+"$"+tx.amount.toFixed(2), 105, y);
+    doc.text("$"+running.toFixed(2), 140, y);
+    doc.text((tx.note||"").slice(0,22), 175, y);
+    y += 6;
+  }
+  doc.save(m.name.replace(/[^a-z0-9]+/gi,"_")+"_personal_report.pdf");
+}
+
+// ---- Monthly forecast: collected/expenses + who has/hasn't paid, for a chosen month ----
+function computeMonthForecast(mk){
+  let collected = 0, expensed = 0;
+  const paidIds = new Set();
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment" && tx.date.slice(0,7)===mk){
+        collected += tx.amount;
+        paidIds.add(m.id);
+      }
+    }
+  }
+  for(const d of db.disbursements){
+    if(d.date.slice(0,7)===mk) expensed += d.amount;
+  }
+  const eligible = db.members.filter(m=>m.status==="active" && m.monthlyDue>0);
+  const paid = eligible.filter(m=>paidIds.has(m.id));
+  const notPaid = eligible.filter(m=>!paidIds.has(m.id));
+  return { collected, expensed, eligible, paid, notPaid };
+}
+
+function openForecastModal(mk){
+  if(!hasPerm("viewReports")) return;
+  if(!MONTHS_2026.includes(mk)) mk = MONTHS_2026.includes(currentMonthKey()) ? currentMonthKey() : MONTHS_2026[0];
+  const data = computeMonthForecast(mk);
+  const net = data.collected - data.expensed;
+  openModal(`
+    <h3>${t("Saadaasha Billaha","Monthly Forecast")}</h3>
+    <div class="frow">
+      <label>${t("Dooro Bisha","Choose month")}</label>
+      <select id="fcMonth">${MONTHS_2026.map(mo=>`<option value="${mo}" ${mo===mk?'selected':''}>${MONTH_LABEL[mo]}</option>`).join("")}</select>
+    </div>
+    <div class="bal-row" style="margin:14px 0;">
+      <div class="bal-box"><div class="lbl">${t("La ururiyay","Collected")}</div><div class="val" style="color:var(--accent-ink)">${money(data.collected)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Kharashka","Expenses")}</div><div class="val" style="color:var(--danger-ink)">${money(data.expensed)}</div></div>
+      <div class="bal-box"><div class="lbl">Net</div><div class="val" style="color:${net>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(net)}</div></div>
+    </div>
+    <div class="bal-row" style="margin-bottom:14px;">
+      <div class="bal-box"><div class="lbl">${t("Kuwa bixiyay","Paid")}</div><div class="val" style="color:var(--accent-ink)">${data.paid.length} / ${data.eligible.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Kuwa aan bixin","Not paid")}</div><div class="val" style="color:var(--danger-ink)">${data.notPaid.length} / ${data.eligible.length}</div></div>
+    </div>
+    ${data.notPaid.length ? `
+      <div class="muted" style="margin-bottom:8px;">${t("Xubnaha aan bixin","Members who haven't paid")}:</div>
+      <div class="tx-list" style="max-height:220px;">
+        ${data.notPaid.map(m=>`<div class="tx"><div class="l"><span>${m.name}</span><span class="muted">${m.phone||''}</span></div><span class="amt">${money(m.monthlyDue||0)}</span></div>`).join("")}
+      </div>
+    ` : `<div class="empty">${t("Dhammaan xubnaha ku habboon ayaa bixiyay bishan.","Every eligible member has paid this month.")}</div>`}
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("fcMonth").addEventListener("change", (e)=>openForecastModal(e.target.value));
+}
+
 // ---- Quick payment receipt: fast search-a-member -> record -> repeat flow ----
 let receiptSessionCount = 0;
 let receiptSessionTotal = 0;
@@ -2325,6 +2543,8 @@ function renderTabs(){
     tabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
     tabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-analytics"});
     tabs.push({id:"ledger", label:t("Diiwaanka Xisaabaadka","General Ledger"), icon:"ti-book-2"});
+    tabs.push({id:"reports-action", label:t("Warbixinno","Reports"), icon:"ti-file-report", action:"reports"});
+    tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});
   }
   if(hasPerm("collectPayment")){
     tabs.push({id:"reminders", label:t("Xasuusin Bille","Reminders"), icon:"ti-bell"});
@@ -2347,6 +2567,10 @@ function renderTabs(){
   if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
   const receiptBtn = navList.querySelector("[data-action='receipt']");
   if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
+  const reportsBtn = navList.querySelector("[data-action='reports']");
+  if(reportsBtn) reportsBtn.addEventListener("click", openReportsModal);
+  const forecastBtn = navList.querySelector("[data-action='forecast']");
+  if(forecastBtn) forecastBtn.addEventListener("click", ()=>openForecastModal());
 
   const footer = document.getElementById("sidebarFooter");
   const roleLabel = currentUserObj.role === "admin" ? t("Maamule","Admin") : t("Shaqaale","Staff");
@@ -2371,6 +2595,10 @@ function renderTabs(){
   });
   const mobReceiptBtn = nav.querySelector("[data-action='receipt']");
   if(mobReceiptBtn) mobReceiptBtn.addEventListener("click", openQuickReceiptModal);
+  const mobReportsBtn = nav.querySelector("[data-action='reports']");
+  if(mobReportsBtn) mobReportsBtn.addEventListener("click", openReportsModal);
+  const mobForecastBtn = nav.querySelector("[data-action='forecast']");
+  if(mobForecastBtn) mobForecastBtn.addEventListener("click", ()=>openForecastModal());
 }
 
 function updateMobileLayoutClass(){

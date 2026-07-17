@@ -819,6 +819,8 @@ async function loadDb(){
   importCreditMemosAsDisbursements();
   importJournalDisbursements();
   backfillDisbursementAccounts();
+  fixCreditMemoAccountTagging();
+  fixSalaamBankOpeningBalance();
   syncAccruals();
   await saveDb();
 }
@@ -836,7 +838,7 @@ function importCreditMemosAsDisbursements(){
       if(existingIds.has(id)) continue;
       db.disbursements.push({
         id, category:"Cafinaad (Balance sheet)", amount:t.amount, date:t.date,
-        recipient:m.name, memo:"Credit memo (imported)"+(t.num?(" #"+t.num):""), account:"acc_salaam"
+        recipient:m.name, memo:"Credit memo (imported)"+(t.num?(" #"+t.num):""), account:null
       });
       existingIds.add(id);
       added++;
@@ -847,11 +849,48 @@ function importCreditMemosAsDisbursements(){
   }
 }
 
+// Bad-debt write-offs imported as "Cafinaad (Balance sheet)" disbursements
+// aren't real cash leaving a bank/cash account — they're a receivables
+// write-off, not a withdrawal (matches how buildJournalEntries() treats bad
+// debt as its own virtual account, never touching a real bank account).
+// backfillDisbursementAccounts() used to tag every disbursement (including
+// these) to the default account, which made account balances look far more
+// negative than reality. This un-tags any that got backfilled that way,
+// idempotently, so it also corrects data already saved from before this fix.
+function fixCreditMemoAccountTagging(){
+  let fixed = 0;
+  for(const d of db.disbursements){
+    if(d.category === "Cafinaad (Balance sheet)" && d.account){
+      d.account = null;
+      fixed++;
+    }
+  }
+  if(fixed){
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-ka Cafinaad (Balance sheet)", details:`${fixed} kharash oo laga saaray account-ka bangiga (bad debt ma ahan lacag laga bixiyay)`, status:"direct"});
+  }
+}
+
+// One-time correction: the default account was seeded with openingBalance:0,
+// but historical dues collected before live tracking started (HISTORY_REPORTS
+// payment entries) were never reflected anywhere in the account balance,
+// making it look far more negative than reality. Only fires while the
+// balance is still untouched at exactly 0, so it won't override anything an
+// admin has since set via Edit Account.
+function fixSalaamBankOpeningBalance(){
+  const acc = db.accounts.find(a=>a.id==="acc_salaam");
+  if(!acc || acc.openingBalance !== 0) return;
+  const historicalPayments = Object.values(HISTORY_REPORTS).flat()
+    .filter(tx=>tx.type==="payment").reduce((s,tx)=>s+tx.amount,0);
+  if(historicalPayments <= 0) return;
+  acc.openingBalance = historicalPayments;
+  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay", details:`Waxaa loo dejiyay ${money(historicalPayments)} (wadarta lacagaha taariikhiga ah ee la ururiyay, kahor inta aan la bilaabin diiwaanka tooska ah) — haddii aanay sax ahayn, wax ka beddel account-ka.`, status:"direct"});
+}
+
 function backfillDisbursementAccounts(){
   const defaultAcct = db.accounts[0] ? db.accounts[0].id : "acc_salaam";
   let fixed = 0;
   for(const d of db.disbursements){
-    if(!d.account){
+    if(!d.account && d.category !== "Cafinaad (Balance sheet)"){
       d.account = defaultAcct;
       fixed++;
     }
@@ -2983,7 +3022,7 @@ function renderAccounts(){
     for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
     return `<div class="acct-card">
-      <div class="name">${acc.name} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
+      <div class="name">${acc.name} ${canManage ? `<button class="edit" data-editacctid="${acc.id}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
       <div class="rows">
         <div><div class="lbl">${t("Balance bilowga ah","Opening balance")}</div><div class="val">${money(acc.openingBalance)}</div></div>
         <div><div class="lbl">${t("La saaray (deposits)","Deposited")}</div><div class="val" style="color:var(--accent-ink)">${money(deposited)}</div></div>
@@ -2992,6 +3031,12 @@ function renderAccounts(){
       </div>
     </div>`;
   }).join("");
+  list.querySelectorAll(".edit[data-editacctid]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const acc = db.accounts.find(a=>a.id===btn.dataset.editacctid);
+      if(acc) openEditAccountModal(acc);
+    });
+  });
   list.querySelectorAll(".del[data-acctid]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const acc = db.accounts.find(a=>a.id===btn.dataset.acctid);
@@ -3062,6 +3107,34 @@ function renderAccounts(){
       };
       showStep1();
     });
+  });
+}
+
+function openEditAccountModal(acc){
+  openModal(`
+    <h3>${t("Wax ka beddel account-ka","Edit account")}</h3>
+    <div class="frow"><label>${t("Magaca","Name")}</label><input type="text" id="eaName" value="${acc.name.replace(/"/g,'&quot;')}"></div>
+    <div class="frow"><label>${t("Balance bilowga ah ($)","Opening balance ($)")}</label><input type="number" step="0.01" id="eaOpening" value="${acc.openingBalance||0}"></div>
+    <div class="muted" style="margin-top:-8px;margin-bottom:14px;">${t("Beddelkan wuxuu saameyn doonaa balance-ka account-kan hadda iyo Diiwaanka Xisaabaadka (General Ledger) — isticmaal si taxadar leh.","This change affects the account's current balance and the General Ledger — use carefully.")}</div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const name = document.getElementById("eaName").value.trim();
+    const openingBalance = parseFloat(document.getElementById("eaOpening").value) || 0;
+    if(!name){ showToast(t("Geli magaca account-ka","Enter the account name")); return; }
+    const before = `${acc.name} / $${acc.openingBalance||0}`;
+    acc.name = name;
+    acc.openingBalance = openingBalance;
+    logActivity("Wax ka beddelka account-ka", `${before} → ${acc.name} / $${acc.openingBalance}`, "direct");
+    await saveDb();
+    closeModal();
+    renderAccounts();
+    renderSummary();
+    showToast(t("Account-ka waa la cusboonaysiiyay","Account updated"));
   });
 }
 

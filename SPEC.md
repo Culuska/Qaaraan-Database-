@@ -27,7 +27,9 @@ disagree, the code wins; update this file when behavior changes.
 
 **Account** (`db.accounts[]`) — bank/cash buckets (e.g. "Salaam Bank"). Balance
 = `openingBalance` + payments tagged to that account − disbursements tagged
-to that account (`accountBalance`).
+to that account (`accountBalance`). Admin-only "Wax ka beddel"/"Edit" button
+on each account card (`openEditAccountModal()`, Accounts tab) lets the name
+and opening balance be corrected later — logs a before/after diff.
 
 **Payable** (`db.payables[]`) — accounts-payable bills owed to vendors.
 `status`: `unpaid`/`paid`. Paying a bill (`openPayBillModal`) creates a
@@ -370,6 +372,29 @@ hardcoded constants (`SEED_MEMBERS`, `GROUPS`, `HISTORY_REPORTS`,
 disbursements that predate the live app (`fixLegacyHistoryImport`,
 `removeNonGroupLegacyMembers`, `addMissingSeedMembers`,
 `importCreditMemosAsDisbursements`, `importJournalDisbursements`,
-`backfillDisbursementAccounts`). These are historical/one-time in intent,
+`backfillDisbursementAccounts`, `fixCreditMemoAccountTagging`,
+`fixSalaamBankOpeningBalance`). These are historical/one-time in intent,
 not meant to be extended with new hardcoded people going forward — new
 members should be added through the "Add new customer" flow instead.
+- **`fixCreditMemoAccountTagging`**: `importCreditMemosAsDisbursements`
+  imports historical bad-debt write-offs (`HISTORY_REPORTS` entries with
+  `type:"writeoff"`) as `db.disbursements` with `category:"Cafinaad
+  (Balance sheet)"`. A write-off isn't real cash leaving a bank account —
+  it's a receivables adjustment (same principle the General Ledger already
+  applies: bad debt posts to its own virtual account, never to a real bank
+  account) — so this un-tags any such entry from an `account`, every load,
+  idempotently. `backfillDisbursementAccounts` explicitly skips this
+  category too, so the two functions don't fight each other on repeat
+  loads.
+- **`fixSalaamBankOpeningBalance`**: a one-time correction for the
+  `acc_salaam` account's `openingBalance`, which was seeded at `0` — so the
+  historical dues actually collected before live tracking started were
+  never reflected in any account balance, while historical disbursements
+  were (via the imports above), making the account look far more negative
+  than reality. Only fires while `openingBalance` is still exactly `0`
+  (so it won't override a value an admin has since set via Edit Account);
+  sets it to the sum of every `type:"payment"` entry across
+  `HISTORY_REPORTS`. This is a best-effort reconstruction from the
+  embedded historical ledger, not a guarantee of matching a real bank
+  statement to the penny — an admin should verify and use Edit Account to
+  correct it if needed.

@@ -271,6 +271,49 @@
   .fin-card .lbl{font-size:12px;color:var(--ink-2);margin-bottom:4px;}
   .fin-card .val{font-size:22px;font-weight:600;}
   .fin-card .sub{font-size:11px;color:var(--ink-3);margin-top:4px;}
+  .fin-hero{background:linear-gradient(135deg,#151A23 0%,#242C38 100%);color:#fff;border-radius:16px;padding:24px 26px;margin-bottom:16px;}
+  .fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
+  .fin-hero-top h2{font-size:19px;margin:0;font-weight:700;}
+  .fin-hero-bal-lbl{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:4px;}
+  .fin-hero-bal{font-size:32px;font-weight:700;margin-bottom:18px;}
+  .fin-hero-actions{display:flex;gap:10px;flex-wrap:wrap;}
+  .fin-hero-actions button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.22);border-radius:24px;padding:9px 18px;font-size:13px;min-height:auto;}
+  .fin-hero-actions button:hover{background:rgba(255,255,255,.2);}
+  .fin-hero-actions button.primary{background:#fff;color:#151A23;border-color:#fff;}
+  .fin-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;}
+  .fin-stat-card{border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;min-height:96px;}
+  .fin-stat-card.income{background:#E4F8EC;}
+  .fin-stat-card.expense{background:#FDEEE3;}
+  .fin-stat-card.saving{background:#E8EEFC;}
+  .fin-stat-card .lbl{font-size:12px;color:var(--ink-2);margin-bottom:6px;}
+  .fin-stat-card .val{font-size:20px;font-weight:700;}
+  .fin-stat-card .spark{position:absolute;right:14px;bottom:14px;opacity:.85;}
+  .fin-stat-card .trend{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:600;margin-top:4px;}
+  .fin-stat-card .trend.pos{color:#1E9E5A;}
+  .fin-stat-card .trend.neg{color:#C6432A;}
+  .fin-layout{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:start;margin-bottom:16px;}
+  .fin-flow-panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px;}
+  .fin-flow-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .fin-flow-head h2{font-size:15px;margin:0;}
+  .fin-flow-legend{display:flex;gap:16px;font-size:12px;color:var(--ink-2);}
+  .fin-flow-legend .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+  .fin-secondary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .fin-txn-list{display:flex;flex-direction:column;}
+  .fin-txn-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .fin-txn-row:last-child{border-bottom:none;}
+  .fin-txn-row .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;}
+  .fin-txn-row .ic.in{background:#E4F8EC;color:#1E9E5A;}
+  .fin-txn-row .ic.out{background:#FDEEE3;color:#C6432A;}
+  .fin-txn-row .info{min-width:0;flex:1;}
+  .fin-txn-row .nm{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fin-txn-row .meta{font-size:11px;color:var(--ink-3);}
+  .fin-txn-row .amt{font-size:12.5px;font-weight:700;flex-shrink:0;}
+  .fin-txn-row .amt.in{color:#1E9E5A;}
+  .fin-txn-row .amt.out{color:#C6432A;}
+  .fin-account-card{border-radius:14px;padding:16px 18px;color:#fff;background:linear-gradient(135deg,#2E63C7 0%,#1D4693 100%);margin-bottom:10px;}
+  .fin-account-card .nm{font-size:12px;opacity:.85;}
+  .fin-account-card .bal{font-size:19px;font-weight:700;margin-top:6px;}
+  @media (max-width:980px){ .fin-layout{grid-template-columns:1fr;} }
   .months-compare{background:#FBFAF7;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px;}
   .months-compare .top{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:6px;}
   .months-compare .bar{height:10px;background:var(--danger-bg);border-radius:20px;overflow:hidden;}
@@ -469,7 +512,30 @@
 
   <div id="financialView" style="display:none;">
     <div class="page-head"><h1 data-t-en="Financials">Xisaabaadka Guud</h1></div>
-    <div class="cards" id="financialCards" style="margin-bottom:16px;"></div>
+    <div id="financialHero"></div>
+    <div class="fin-stat-row" id="financialCards"></div>
+    <div class="fin-layout">
+      <div>
+        <div class="fin-flow-panel">
+          <div class="fin-flow-head">
+            <h2 data-t-en="Money Flow">Socodka Lacagta</h2>
+            <div class="fin-flow-legend">
+              <span><i class="dot" style="background:#2E63C7;"></i><span data-t-en="Collected">La ururiyay</span></span>
+              <span><i class="dot" style="background:#E08A3C;"></i><span data-t-en="Expenses">Kharash</span></span>
+            </div>
+          </div>
+          <div id="financialFlowChart"></div>
+        </div>
+        <div class="fin-secondary-row" id="financialSecondaryCards"></div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="panel-head"><h2 data-t-en="Recent Transactions">Dhaqdhaqaaqyada Ugu Dambeeyay</h2></div>
+          <div class="fin-txn-list" id="financialTxnList"></div>
+        </div>
+        <div id="financialAccountCards"></div>
+      </div>
+    </div>
     <div class="panel">
       <div class="panel-head">
         <h2 data-t-en="Accounts Payable (unpaid bills)">Accounts Payable (Deymaha aan la bixin)</h2>
@@ -2351,14 +2417,134 @@ function computeAccountImpact(acc){
   return {paymentCount, paymentTotal, disbCount, disbTotal, balance: accountBalance(acc)};
 }
 
+function monthlyFlow(){
+  const collected = {}, expensed = {};
+  MONTHS_2026.forEach(mk=>{ collected[mk]=0; expensed[mk]=0; });
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment"){
+        const mk = tx.date.slice(0,7);
+        if(collected[mk] !== undefined) collected[mk] += tx.amount;
+      }
+    }
+  }
+  for(const d of db.disbursements){
+    const mk = d.date.slice(0,7);
+    if(expensed[mk] !== undefined) expensed[mk] += d.amount;
+  }
+  return { months: MONTHS_2026, collected: MONTHS_2026.map(mk=>collected[mk]), expensed: MONTHS_2026.map(mk=>expensed[mk]) };
+}
+
+function sparklineSvg(values, color){
+  const vals = values.length ? values : [0,0];
+  const w=76,h=32;
+  const maxV = Math.max(...vals, 1), minV = Math.min(...vals, 0);
+  const range = (maxV-minV) || 1;
+  const x = i => (i/((vals.length-1)||1))*w;
+  const y = v => h - ((v-minV)/range)*(h-4) - 2;
+  const d = vals.map((v,i)=>(i===0?'M':'L')+x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function moneyFlowChartSvg(months, seriesA, seriesB){
+  const w=640,h=210,padL=6,padR=6,padT=10,padB=24;
+  const maxV = Math.max(...seriesA, ...seriesB, 1);
+  const n = months.length;
+  const x = i => padL + (n>1 ? (i/(n-1))*(w-padL-padR) : (w-padL-padR)/2);
+  const y = v => padT + (1 - v/maxV)*(h-padT-padB);
+  const pathFor = series => series.map((v,i)=>(i===0?'M':'L')+x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
+  const grid = [0,0.5,1].map(f=>{
+    const yy = (padT + (1-f)*(h-padT-padB)).toFixed(1);
+    return `<line x1="${padL}" y1="${yy}" x2="${w-padR}" y2="${yy}" stroke="#EEEEEA" stroke-width="1"/>`;
+  }).join('');
+  const labels = months.map((mk,i)=>`<text x="${x(i).toFixed(1)}" y="${h-6}" font-size="10" fill="#9B9787" text-anchor="middle">${(MONTH_LABEL[mk]||mk).split(' ')[0].slice(0,3)}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">
+    ${grid}
+    <path d="${pathFor(seriesA)}" fill="none" stroke="#2E63C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${pathFor(seriesB)}" fill="none" stroke="#E08A3C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,4"/>
+    ${labels}
+  </svg>`;
+}
+
+function trendHtml(cur, prev){
+  if(prev === null || prev === undefined || prev <= 0) return "";
+  const pct = Math.round(((cur-prev)/prev)*100);
+  const cls = pct>=0 ? "pos" : "neg";
+  const icon = pct>=0 ? "ti-arrow-up-right" : "ti-arrow-down-right";
+  return `<span class="trend ${cls}"><i class="ti ${icon}"></i>${Math.abs(pct)}%</span>`;
+}
+
+function recentTransactionsList(){
+  const items = [];
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment") items.push({name:m.name, date:tx.date, amount:tx.amount, dir:"in", sub:t("Lacag bixin","Payment")});
+    }
+  }
+  for(const d of db.disbursements){
+    items.push({name:d.recipient || d.category, date:d.date, amount:d.amount, dir:"out", sub:d.category});
+  }
+  items.sort((a,b)=>b.date.localeCompare(a.date));
+  return items.slice(0,8);
+}
+
 function renderFinancialSummary(){
   const totalAR = db.members.reduce((s,m)=>{ const b = computeBalance(m); return b>0 ? s+b : s; }, 0);
   const totalAP = db.payables.filter(p=>p.status==="unpaid").reduce((s,p)=>s+p.amount,0);
   const totalExpenses = db.disbursements.reduce((s,d)=>s+d.amount,0);
+  const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
   const totalBadDebt = db.members.reduce((s,m)=>s+totalWrittenOff(m),0) + historicalBadDebtTotal();
   const netPosition = totalAR - totalAP;
+  const totalAccountsBalance = db.accounts.reduce((s,a)=>s+accountBalance(a),0);
+  const canManage = hasPerm("collectPayment");
+
+  const flow = monthlyFlow();
+  const netByMonth = flow.months.map((mk,i)=>flow.collected[i]-flow.expensed[i]);
+  const doneCount = monthsDueSoFar().length;
+  const curIdx = Math.max(0, doneCount-1);
+  const prevIdx = curIdx-1;
+
+  document.getElementById("financialHero").innerHTML = `
+    <div class="fin-hero">
+      <div class="fin-hero-top">
+        <h2>${t("Salaan","Hello")}, ${(currentUserObj && currentUserObj.username) || "Admin"} 👋</h2>
+      </div>
+      <div class="fin-hero-bal-lbl">${t("Wadarta lacagta accounts-ka (bank + cash)","Total balance across accounts (bank + cash)")}</div>
+      <div class="fin-hero-bal" style="color:${totalAccountsBalance<0?'#FF8A80':'#fff'}">${money(totalAccountsBalance)}</div>
+      <div class="fin-hero-actions">
+        ${canManage ? `<button class="primary" id="finBtnReceipt"><i class="ti ti-plus"></i> ${t("Diiwaan Lacag","Record payment")}</button>` : ""}
+        ${canManage ? `<button id="finBtnAddBill"><i class="ti ti-file-invoice"></i> ${t("Ku dar Bill","Add bill")}</button>` : ""}
+      </div>
+    </div>
+  `;
+  if(canManage){
+    document.getElementById("finBtnReceipt").addEventListener("click", openQuickReceiptModal);
+    document.getElementById("finBtnAddBill").addEventListener("click", openAddPayableModal);
+  }
 
   document.getElementById("financialCards").innerHTML = `
+    <div class="fin-stat-card income">
+      <div class="lbl">${t("Wadarta la ururiyay","Total Income")}</div>
+      <div class="val">${money(totalCollected)}</div>
+      ${trendHtml(flow.collected[curIdx], flow.collected[prevIdx])}
+      ${sparklineSvg(flow.collected, "#1E9E5A")}
+    </div>
+    <div class="fin-stat-card expense">
+      <div class="lbl">${t("Wadarta Kharashka","Total Expense")}</div>
+      <div class="val">${money(totalExpenses)}</div>
+      ${trendHtml(flow.expensed[curIdx], flow.expensed[prevIdx])}
+      ${sparklineSvg(flow.expensed, "#C6432A")}
+    </div>
+    <div class="fin-stat-card saving">
+      <div class="lbl">Net Position (AR − AP)</div>
+      <div class="val">${money(netPosition)}</div>
+      ${sparklineSvg(netByMonth, "#2E63C7")}
+    </div>
+  `;
+
+  document.getElementById("financialFlowChart").innerHTML = moneyFlowChartSvg(flow.months, flow.collected, flow.expensed);
+
+  document.getElementById("financialSecondaryCards").innerHTML = `
     <div class="fin-card">
       <div class="lbl">Accounts Receivable (AR)</div>
       <div class="val" style="color:var(--warn)">${money(totalAR)}</div>
@@ -2370,21 +2556,31 @@ function renderFinancialSummary(){
       <div class="sub">${t("Bills aan weli la bixin","Bills not yet paid")}</div>
     </div>
     <div class="fin-card">
-      <div class="lbl">${t("Expenses (Kharashaadka)","Expenses")}</div>
-      <div class="val" style="color:var(--ink)">${money(totalExpenses)}</div>
-      <div class="sub">${t("Wadarta guud ee la bixiyay","Total amount paid out")}</div>
-    </div>
-    <div class="fin-card">
       <div class="lbl">Bad Debt</div>
       <div class="val" style="color:var(--danger-ink)">${money(totalBadDebt)}</div>
       <div class="sub">${t("Deyn la cafiyay oo dhan","All debt written off")}</div>
     </div>
-    <div class="fin-card">
-      <div class="lbl">Net Position (AR − AP)</div>
-      <div class="val" style="color:${netPosition>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(netPosition)}</div>
-      <div class="sub">${t("Xaaladda guud ee maaliyadda","Overall financial position")}</div>
-    </div>
   `;
+
+  const txns = recentTransactionsList();
+  document.getElementById("financialTxnList").innerHTML = txns.length ? txns.map(x=>`
+    <div class="fin-txn-row">
+      <div class="ic ${x.dir}"><i class="ti ${x.dir==='in'?'ti-arrow-up-right':'ti-arrow-down-right'}"></i></div>
+      <div class="info">
+        <div class="nm">${x.name}</div>
+        <div class="meta">${x.sub} · ${x.date}</div>
+      </div>
+      <div class="amt ${x.dir}">${x.dir==='in'?'+':'-'}${money(x.amount)}</div>
+    </div>
+  `).join("") : `<div class="empty">${t("Wax dhaqdhaqaaq ah lama helin.","No transactions found.")}</div>`;
+
+  document.getElementById("financialAccountCards").innerHTML = db.accounts.length ? db.accounts.map(a=>`
+    <div class="fin-account-card">
+      <div class="nm">${a.name}</div>
+      <div class="bal">${money(accountBalance(a))}</div>
+    </div>
+  `).join("") : `<div class="empty">${t("Wax accounts ah lama helin.","No accounts found.")}</div>`;
+
   renderPayables();
 }
 

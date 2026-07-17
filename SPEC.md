@@ -153,7 +153,7 @@ mutation, direct or approved/rejected/pending.
     the "Pending approvals" tab (`renderPending`), which calls the same
     `applyAction()` on approve.
 - `applyAction` currently handles: `addCustomer`, `payment`, `writeoff`,
-  `delete`, `statusChange`, `disbursement`.
+  `delete`, `statusChange`, `editMember`, `disbursement`.
 
 ## Views / tabs
 
@@ -209,6 +209,17 @@ Tabs shown depend on permissions (`renderTabs`):
   `collectPayment`), deactivate/activate toggle (needs `deactivate`), delete
   member (needs `delete`), transaction list with per-row delete (two-step
   confirm: yes/no, then type the member's serial number).
+- **Edit member** ("Wax ka beddel", needs `addCustomer` — same permission as
+  adding a new member, since editing basic profile fields is the same tier
+  of everyday member-management work): `openEditMemberModal(m)` lets
+  name/phone/`monthlyDue` be changed via a single-step Save (no destructive
+  confirmation needed — nothing is deleted, it's trivially re-editable).
+  Goes through the normal `attemptAction("editMember", ..., "addCustomer",
+  ...)` path, so staff edits queue for admin approval like any other
+  mutation. Changing `monthlyDue` is **not retroactive** — it doesn't touch
+  already-recorded `due` transactions, only the amount `syncAccruals()`
+  uses for months accrued from then on. The activity log entry records a
+  `before → after` diff of all three fields.
 - "Balance summary" modal: three sub-views — current summary, admin-only
   month-by-month aging (`computeMonthlyAging` — FIFO allocation of payments
   against opening balance then monthly dues, oldest first), and a

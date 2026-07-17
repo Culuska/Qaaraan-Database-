@@ -742,6 +742,15 @@ function applyAction(type, payload){
   } else if(type === "statusChange"){
     const m = db.members.find(x=>x.id===payload.memberId);
     if(m){ m.status = payload.newStatus; desc = `${payload.newStatus==="active"?"Activate":"De-activate"}: ${m.name}`; }
+  } else if(type === "editMember"){
+    const m = db.members.find(x=>x.id===payload.memberId);
+    if(m){
+      const before = `${m.name} / ${m.phone||'—'} / $${m.monthlyDue||0}`;
+      m.name = payload.name;
+      m.phone = payload.phone;
+      m.monthlyDue = payload.monthlyDue;
+      desc = `${before} → ${m.name} / ${m.phone||'—'} / $${m.monthlyDue||0}`;
+    }
   } else if(type === "disbursement"){
     db.disbursements.push({id:"d"+Date.now(), category:payload.category, amount:payload.amount, date:payload.date, recipient:payload.recipient, sharedWith:payload.sharedWith, memo:payload.memo, account:payload.account});
     desc = `Kharash (${payload.category}): $${payload.amount} — ${payload.memo}`;
@@ -1325,6 +1334,7 @@ function renderDetail(){
   const canPay = hasPerm("collectPayment");
   const canDeact = hasPerm("deactivate");
   const canDel = hasPerm("delete");
+  const canEdit = hasPerm("addCustomer");
   panel.innerHTML = `
     <div class="detail-head">
       <div style="display:flex;align-items:flex-start;gap:8px;">
@@ -1335,6 +1345,7 @@ function renderDetail(){
         </div>
       </div>
       <div class="detail-actions">
+        ${canEdit ? `<button id="btnEditMember"><i class="ti ti-pencil"></i> ${t("Wax ka beddel","Edit")}</button>` : ''}
         <button id="btnBalanceSummary">${t("Balance summary","Balance summary")}</button>
         <button id="btnSendWhatsapp">${t("Dir WhatsApp","Send WhatsApp")}</button>
         ${canDeact ? `<button id="btnToggleStatus">${inactive?t('Dib u activate','Reactivate'):t('De-activate','Deactivate')}</button>` : ''}
@@ -1553,6 +1564,9 @@ function renderDetail(){
     });
   }
 
+  if(canEdit){
+    document.getElementById("btnEditMember").addEventListener("click", ()=>openEditMemberModal(m));
+  }
   document.getElementById("btnBalanceSummary").addEventListener("click", ()=>openBalanceSummaryModal(m));
   const backBtn = document.getElementById("mobileBackBtn");
   if(backBtn) backBtn.addEventListener("click", ()=>{ selectedId = null; renderList(); renderDetail(); });
@@ -1889,6 +1903,32 @@ function openAddCustomerModal(){
     const r = await attemptAction("addCustomer", {name, phone, monthlyDue:due, openingBalance:opening}, "addCustomer", `Ku darid xubin cusub: ${name}`);
     closeModal();
     if(r.status === "applied") selectedId = r.resultId;
+    if(r.status !== "denied"){
+      renderSummary(); renderList(); renderDetail();
+    }
+  });
+}
+
+function openEditMemberModal(m){
+  openModal(`
+    <h3>${t("Wax ka beddel xubinta","Edit member")}</h3>
+    <div class="frow"><label>${t("Magaca","Name")}</label><input type="text" id="emName" value="${m.name.replace(/"/g,'&quot;')}" placeholder="${t('Magaca oo dhan','Full name')}"></div>
+    <div class="frow"><label>${t("Telefoon (ikhtiyaari)","Phone (optional)")}</label><input type="text" id="emPhone" value="${(m.phone||'').replace(/"/g,'&quot;')}" placeholder="61xxxxxxx"></div>
+    <div class="frow"><label>${t("Qoondada bille ($)","Monthly due ($)")}</label><input type="number" step="0.01" id="emDue" value="${m.monthlyDue||0}"></div>
+    <div class="muted" style="margin-top:-8px;margin-bottom:14px;">${t("Beddelka qoondada billaha kuma saameyn doono qoondooyinka bilaha hore ee horeba loo diiwaangeliyay — waxay khusaysaa bilaha soo socda kaliya.","Changing the monthly due won't rewrite already-recorded past months' dues — it only applies going forward.")}</div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Kaydi","Save")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const name = document.getElementById("emName").value.trim();
+    const phone = document.getElementById("emPhone").value.trim();
+    const monthlyDue = parseFloat(document.getElementById("emDue").value) || 0;
+    if(!name){ showToast(t("Geli magaca qofka","Enter the person's name")); return; }
+    const r = await attemptAction("editMember", {memberId:m.id, name, phone, monthlyDue}, "addCustomer", `Wax ka beddelka xubinta: ${m.name}`);
+    closeModal();
     if(r.status !== "denied"){
       renderSummary(); renderList(); renderDetail();
     }

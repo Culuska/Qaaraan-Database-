@@ -262,8 +262,6 @@
   .acct-card .rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
   .acct-card .rows .lbl{font-size:11px;color:var(--ink-2);margin-bottom:2px;}
   .acct-card .rows .val{font-size:16px;font-weight:600;}
-  .acct-recent{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);}
-  .acct-recent-head{font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:8px;}
   .rem-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);}
   .rem-row .l{display:flex;flex-direction:column;}
   .rem-row .l .nm{font-weight:600;font-size:13px;}
@@ -612,7 +610,6 @@ function money(n){
   return (n<0? "-$"+s : "$"+s);
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
-function addDays(dateStr, n){ const d = new Date(dateStr+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function currentMonthKey(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 function monthsDueSoFar(){ const cur=currentMonthKey(); return MONTHS_2026.filter(m=>m<=cur); }
 function newTxId(){ return "t"+Date.now()+"_"+(txCounter++); }
@@ -2840,33 +2837,11 @@ function renderAccounts(){
   const canManage = isAdmin();
   document.getElementById("btnAddAccount").style.display = canManage ? "" : "none";
   const list = document.getElementById("accountsList");
-  const today = todayStr();
-  const yesterday = addDays(today, -1);
-  const recentDates = new Set([today, yesterday]);
   list.innerHTML = db.accounts.map(acc=>{
     const bal = accountBalance(acc);
     let deposited = 0, withdrawn = 0;
-    let recentDeposited = 0, recentWithdrawn = 0;
-    const recentTxns = [];
-    for(const m of db.members){
-      for(const tx of m.transactions){
-        if(tx.type!=="payment" || tx.account!==acc.id) continue;
-        deposited += tx.amount;
-        if(recentDates.has(tx.date)){
-          recentDeposited += tx.amount;
-          recentTxns.push({date:tx.date, name:m.name, amount:tx.amount, dir:"in", note:tx.note||t("Lacag bixin","Payment")});
-        }
-      }
-    }
-    for(const d of db.disbursements){
-      if(d.account!==acc.id) continue;
-      withdrawn += d.amount;
-      if(recentDates.has(d.date)){
-        recentWithdrawn += d.amount;
-        recentTxns.push({date:d.date, name:d.recipient||d.category, amount:d.amount, dir:"out", note:d.category});
-      }
-    }
-    recentTxns.sort((a,b)=> b.date===a.date ? 0 : (b.date.localeCompare(a.date)));
+    for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
+    for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
     return `<div class="acct-card">
       <div class="name">${acc.name} ${canManage ? `<button class="edit" data-editacctid="${acc.id}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
       <div class="rows">
@@ -2874,22 +2849,6 @@ function renderAccounts(){
         <div><div class="lbl">${t("La saaray (deposits)","Deposited")}</div><div class="val" style="color:var(--accent-ink)">${money(deposited)}</div></div>
         <div><div class="lbl">${t("Laga bixiyay (withdrawals)","Withdrawn")}</div><div class="val" style="color:var(--danger-ink)">${money(withdrawn)}</div></div>
         <div><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-      </div>
-      <div class="acct-recent">
-        <div class="acct-recent-head">${t("Dhaqdhaqaaqyadii 2 maalmood ee ugu dambeeyay","Last 2 days")} (${yesterday} → ${today})</div>
-        <div class="rows">
-          <div><div class="lbl">${t("La saaray","Deposited")}</div><div class="val" style="color:var(--accent-ink);font-size:16px;">${money(recentDeposited)}</div></div>
-          <div><div class="lbl">${t("Laga bixiyay","Withdrawn")}</div><div class="val" style="color:var(--danger-ink);font-size:16px;">${money(recentWithdrawn)}</div></div>
-          <div><div class="lbl">Net</div><div class="val" style="font-size:16px;">${money(recentDeposited-recentWithdrawn)}</div></div>
-        </div>
-        ${recentTxns.length ? `<div class="tx-list" style="margin-top:8px;">
-          ${recentTxns.map(x=>`
-            <div class="tx">
-              <div class="l"><span>${x.name}</span><span class="muted">${x.note} · ${x.date}</span></div>
-              <span class="amt" style="color:${x.dir==='in'?'var(--accent-ink)':'var(--danger-ink)'}">${x.dir==='in'?'+':'-'}${money(x.amount)}</span>
-            </div>
-          `).join("")}
-        </div>` : `<div class="empty" style="padding:10px 0;">${t("Wax dhaqdhaqaaq ah lama helin 2-dii maalmood ee ugu dambeeyay.","No transactions in the last 2 days.")}</div>`}
       </div>
     </div>`;
   }).join("");

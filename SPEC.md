@@ -304,6 +304,34 @@ Settings (admin-only) has a "Backup & Restore" section:
   reloads. This is a full overwrite, not a merge — there's no partial/
   selective restore.
 
+## Import balances (Excel/CSV)
+
+Settings (admin-only) also has an **Import balances** section
+(`handleImportBalancesFile()` / `showImportBalancesPreview()`), for pushing a
+corrected set of member balances (e.g. a hand-edited copy of a `full_report`
+export) back into the app:
+- Reads the first sheet via SheetJS (`XLSX`), auto-detecting `Customer` /
+  `Main Phone` / `Balance Total` columns by fuzzy header name.
+- Matches each row to a member by **normalized phone first** (last 9 digits,
+  so leading `0`/country code don't matter), then normalized name as a
+  fallback. A member already matched by an earlier row is not matched again —
+  the duplicate row is reported as unmatched (`"member matched twice"`)
+  rather than silently applied, which matters because the real data contains
+  at least one pair of near-duplicate people sharing a phone number.
+- Shows a full **preview** before any write: counts (matched / will-change /
+  unchanged / unmatched), every member whose balance would change with
+  `current → target` and the signed delta, and every unmatched row with the
+  reason. Applying requires typing the literal word `IMPORT` (same
+  typed-confirmation tier as Restore).
+- **Apply mechanism**: for each changed member, `openingBalance` is nudged by
+  `(target − currentBalance)` so `computeBalance()` ends up exactly equal to
+  the file's figure — **no transaction history is deleted**, and each change
+  plus a summary is written to the activity log. Unmatched members are left
+  completely untouched.
+- Because balances are computed against live `db` data, the preview's
+  "will change" set reflects the real diff at import time — an admin should
+  read it before confirming rather than assuming the whole file applies.
+
 ## Admin email & WhatsApp notifications
 
 - `db.settings.adminEmail` (default `cusmanhersi@gmail.com`) and

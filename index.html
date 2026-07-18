@@ -3720,7 +3720,23 @@ function handleImportBalancesFile(file){
       let member = null, via = "";
       const ph = normImportPhone(rawPhone);
       if(ph && appByPhone[ph]){ member = appByPhone[ph]; via = t("telefoon","phone"); }
-      else { const nm = normImportName(rawName); if(nm && appByName[nm]){ member = appByName[nm]; via = t("magac","name"); } }
+      else {
+        const nm = normImportName(rawName);
+        if(nm && appByName[nm]){ member = appByName[nm]; via = t("magac","name"); }
+        else if(nm){
+          // Tolerant fallback: a UNIQUE member whose normalized name differs
+          // only by a short trailing bit (dropped/added last letter or two,
+          // e.g. "...ahmedabd" vs "...ahmedabdi"). Requires exactly one
+          // candidate so it never bridges genuinely different people.
+          const cands = db.members.filter(mm=>{
+            const a = normImportName(mm.name);
+            if(!a || a===nm) return a===nm;
+            const [short, long] = a.length < nm.length ? [a, nm] : [nm, a];
+            return long.startsWith(short) && (long.length - short.length) <= 2;
+          });
+          if(cands.length === 1){ member = cands[0]; via = t("magac (u dhow)","name (approx)"); }
+        }
+      }
       if(!member){ unmatched.push({name:rawName, phone:rawPhone, reason:t("lama helin xubin","no member found")}); continue; }
       if(usedMemberIds.has(member.id)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("xubin labo jeer","member matched twice")}); continue; }
       usedMemberIds.add(member.id);

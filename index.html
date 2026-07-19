@@ -3713,8 +3713,14 @@ function handleImportFile(file){
     let rows;
     try{
       const wb = XLSX.read(ev.target.result, {type:"array", cellDates:true});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(ws, {defval:null, raw:false});
+      // Some exports (QuickBooks included) put a blank cover sheet first or
+      // spread data across multiple tabs — use the first sheet that actually
+      // has rows instead of assuming SheetNames[0] is the data.
+      rows = [];
+      for(const name of wb.SheetNames){
+        const parsed = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:null, raw:false});
+        if(parsed.length){ rows = parsed; break; }
+      }
     }catch(err){
       showToast(t("Faylka lama akhriyi karo.","Could not read the file."));
       return;

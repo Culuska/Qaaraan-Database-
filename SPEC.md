@@ -304,15 +304,28 @@ Settings (admin-only) has a "Backup & Restore" section:
   reloads. This is a full overwrite, not a merge — there's no partial/
   selective restore.
 
-## Import balances (Excel/CSV)
+## Import file (Excel/CSV)
 
-Settings (admin-only) also has an **Import balances** section
-(`handleImportBalancesFile()` / `showImportBalancesPreview()`), for pushing a
-corrected set of member balances (e.g. a hand-edited copy of a `full_report`
-export) back into the app:
-- Reads the first sheet via SheetJS (`XLSX`), auto-detecting `Customer` /
-  `Main Phone` / `Balance Total` columns by fuzzy header name.
-- Matches each row to a member by **normalized phone first** (last 9 digits,
+Settings (admin-only) has an **Import file** section (`handleImportFile()`),
+which reads the first sheet via SheetJS (`XLSX`) and **auto-detects the file
+kind by its columns**, routing to one of two importers:
+- a `Type` + `Amount` file (without `Balance Total`) → **transactions import**
+  (`runTransactionsImport()`), see below;
+- otherwise → **balance import** (`runBalanceImport()`), described here.
+
+Both share one matcher, `matchMemberForImport(rawName, rawPhone)`: normalized
+phone first (last 9 digits, so leading `0`/country code don't matter), then
+exact normalized name, then a UNIQUE short-trailing-difference name (≤2 chars,
+for typos like `"…Abd"` vs `"…Abdi"`) — never bridging genuinely different
+people.
+
+### Balance import (`runBalanceImport` / `showImportBalancesPreview`)
+
+For pushing a corrected set of member balances (e.g. a hand-edited copy of a
+`full_report` export) back into the app:
+- Auto-detects `Customer` / `Main Phone` / `Balance Total` columns by fuzzy
+  header name.
+- Matches each row to a member via the shared matcher (phone first,
   so leading `0`/country code don't matter), then normalized name as a
   fallback. A member already matched by an earlier row is not matched again —
   the duplicate row is reported as unmatched (`"member matched twice"`)
@@ -331,6 +344,36 @@ export) back into the app:
 - Because balances are computed against live `db` data, the preview's
   "will change" set reflects the real diff at import time — an admin should
   read it before confirming rather than assuming the whole file applies.
+
+### Transactions import (`runTransactionsImport` / `showTransactionsImportPreview`)
+
+For rebuilding members' full ledgers from a QuickBooks-style transaction
+export (columns `Name`, `Type`, `Date`, `Num`, `Account`, `Amount`,
+`Balance`):
+- Rows are grouped by member; a **blank `Name` continues the previous member**
+  (QuickBooks groups rows under one name header, then leaves it blank).
+- `Type` is mapped to an internal type by keyword (`mapImportTxType`):
+  invoice/due/charge/bill → `due`; payment/receipt/deposit/paid → `payment`;
+  credit/write-off/bad-debt/discount → `writeoff`. Amount is stored as
+  `Math.abs()` with the sign implied by the mapped type, so the file's own
+  `+/−` sign convention can't flip a value the wrong way.
+- **Two independent safety gates, both required to enable Apply:**
+  1. **Unknown-type gate** — any `Type` value the keyword map doesn't
+     recognize is collected and shown; while any exist, Apply is disabled
+     entirely (nothing gets silently miscategorized).
+  2. **Balance self-check** — for each member the summed transactions are
+     compared against that member's **last stated `Balance`** in the file; a
+     member whose computed total doesn't reproduce the file's running balance
+     is flagged `mismatch` and **excluded** from the applied set. This makes a
+     wrong mapping visible instead of corrupting data.
+- Applying (typed `IMPORT`) **replaces** each ok member's `transactions[]`
+  with the imported set, sets `openingBalance = 0` (history now starts from
+  the file's first row, not a 30-June cutover), and seeds `accruedMonths`
+  with the months that already have a `due` so `syncAccruals()` won't
+  double-add them. Imported payments are left untagged to a bank account
+  (`account` unset) so a bulk history import doesn't unexpectedly swing
+  account balances. This is destructive to existing history for matched
+  members — the preview carries a bold warning to take a Backup first.
 
 ## Admin email & WhatsApp notifications
 

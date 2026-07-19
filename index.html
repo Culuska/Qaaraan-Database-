@@ -3635,10 +3635,10 @@ function openAppSettingsModal(){
       <div class="muted" style="margin-top:6px;">${t("\"Email Backup\" wuxuu u diraa email-ka admin-ka kor lagu qoray nuqulka xogta oo dhan — la socod: si la mid ah faylka la soo dejiyo, wuxuu ka kooban yahay password-yada users-ka, sidaa email-kaaga si ammaan ah u ilaali.","\"Email Backup\" sends the admin email above the full data copy as an attachment — same as the downloaded file, it contains user passwords, so keep that inbox secure.")}</div>
     </div>
     <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
-      <h3 style="margin:0 0 6px;">${t("Soo dejinta balance-ka (Excel)","Import balances (Excel)")}</h3>
-      <p class="muted" style="margin:0 0 10px;">${t("Soo geli fayl Excel ah (sida full_report) oo leh 'Customer', 'Main Phone', iyo 'Balance Total'. Xubin kasta waxaa lagu waafajin doonaa telefoon/magac, kadibna waxaa lagu tusi doonaa horudhac ka hor inta aan wax la beddelin.","Upload an Excel file (like a full_report) with 'Customer', 'Main Phone', and 'Balance Total' columns. Each row is matched to a member by phone/name, and you get a full preview before anything changes.")}</p>
+      <h3 style="margin:0 0 6px;">${t("Soo dejinta fayl","Import file")}</h3>
+      <p class="muted" style="margin:0 0 10px;">${t("Soo geli fayl Excel ah. Waa la aqoonsan doonaa nooca faylka: (1) fayl balance ah oo leh 'Customer'/'Balance Total', ama (2) fayl dhaqdhaqaaqyada oo leh 'Name','Type','Date','Num','Account','Amount','Balance'. Mar walba horudhac ayaa lagu tusayaa ka hor inta aan wax la beddelin.","Upload an Excel file. The file type is auto-detected: (1) a balance file with 'Customer'/'Balance Total', or (2) a full-transactions file with 'Name','Type','Date','Num','Account','Amount','Balance'. You always get a preview before anything changes.")}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <input type="file" id="importBalancesFile" accept=".xlsx,.xls,.csv" style="font-size:12px;">
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="font-size:12px;">
       </div>
     </div>
   `);
@@ -3660,9 +3660,9 @@ function openAppSettingsModal(){
   document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackup);
   document.getElementById("btnEmailBackup").addEventListener("click", emailBackupToAdmin);
   document.getElementById("btnOpenRestore").addEventListener("click", openBackupRestoreModal);
-  document.getElementById("importBalancesFile").addEventListener("change", (e)=>{
+  document.getElementById("importFile").addEventListener("change", (e)=>{
     const file = e.target.files[0];
-    if(file) handleImportBalancesFile(file);
+    if(file) handleImportFile(file);
   });
 }
 
@@ -3682,70 +3682,212 @@ function normImportName(n){
   return String(n).toLowerCase().replace(/\(.*?\)/g,"").replace(/[^a-z0-9]/g,"");
 }
 
-function handleImportBalancesFile(file){
+// Shared member matcher for imports: phone first, then exact normalized name,
+// then a UNIQUE short-trailing-difference name (typo tolerance). Returns
+// {member, via} or null. Never bridges genuinely different people.
+function matchMemberForImport(rawName, rawPhone){
+  const ph = normImportPhone(rawPhone);
+  if(ph){
+    const byPhone = db.members.find(m=>normImportPhone(m.phone)===ph);
+    if(byPhone) return {member:byPhone, via:t("telefoon","phone")};
+  }
+  const nm = normImportName(rawName);
+  if(!nm) return null;
+  const exact = db.members.find(m=>normImportName(m.name)===nm);
+  if(exact) return {member:exact, via:t("magac","name")};
+  const cands = db.members.filter(mm=>{
+    const a = normImportName(mm.name);
+    if(!a || a===nm) return a===nm;
+    const [short, long] = a.length < nm.length ? [a, nm] : [nm, a];
+    return long.startsWith(short) && (long.length - short.length) <= 2;
+  });
+  if(cands.length === 1) return {member:cands[0], via:t("magac (u dhow)","name (approx)")};
+  return null;
+}
+
+// Reads the file, detects whether it's a balance file or a full-transactions
+// file by the columns present, and routes to the right importer.
+function handleImportFile(file){
   const reader = new FileReader();
   reader.onload = (ev)=>{
     let rows;
     try{
-      const wb = XLSX.read(ev.target.result, {type:"array"});
+      const wb = XLSX.read(ev.target.result, {type:"array", cellDates:true});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(ws, {defval:null});
+      rows = XLSX.utils.sheet_to_json(ws, {defval:null, raw:false});
     }catch(err){
       showToast(t("Faylka lama akhriyi karo.","Could not read the file."));
       return;
     }
-    // find the relevant columns by fuzzy header name
-    const keys = rows.length ? Object.keys(rows[0]) : [];
+    if(!rows.length){ showToast(t("Faylku waa madhan yahay.","The file is empty.")); return; }
+    const keys = Object.keys(rows[0]);
     const findKey = (subs)=> keys.find(k=>subs.some(s=>k.toLowerCase().replace(/\s/g,"").includes(s)));
-    const nameKey = findKey(["customer","name","magac"]);
-    const phoneKey = findKey(["phone","telefoon","tel"]);
-    const balKey = findKey(["balancetotal","balance","hadhaaga","balancehadda"]);
-    if(!nameKey || !balKey){
-      showToast(t("Faylku waa in uu leeyahay tiirar 'Customer' iyo 'Balance Total'.","The file must have 'Customer' and 'Balance Total' columns."));
-      return;
+    const typeKey = findKey(["type","nooca"]);
+    const amountKey = findKey(["amount","lacagta","qadarka"]);
+    const balTotalKey = findKey(["balancetotal","balancehadda","hadhaaga"]);
+    // A transactions file has Type + Amount rows; a balance file has Balance Total.
+    if(typeKey && amountKey && !balTotalKey){
+      runTransactionsImport(rows, keys, findKey);
+    } else {
+      runBalanceImport(rows, keys, findKey);
     }
-    const appByPhone = {};
-    for(const m of db.members){ const ph = normImportPhone(m.phone); if(ph) appByPhone[ph] = m; }
-    const appByName = {};
-    for(const m of db.members){ const nm = normImportName(m.name); if(nm && !appByName[nm]) appByName[nm] = m; }
-
-    const matches = [];      // {member, target, current, delta, via}
-    const unmatched = [];    // rows with no member
-    const usedMemberIds = new Set();
-    for(const r of rows){
-      const rawName = r[nameKey], rawPhone = phoneKey ? r[phoneKey] : null;
-      const target = parseFloat(r[balKey]);
-      if((rawName==null || String(rawName).trim()==="") && isNaN(target)) continue; // blank row
-      if(isNaN(target)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("balance khaldan","invalid balance")}); continue; }
-      let member = null, via = "";
-      const ph = normImportPhone(rawPhone);
-      if(ph && appByPhone[ph]){ member = appByPhone[ph]; via = t("telefoon","phone"); }
-      else {
-        const nm = normImportName(rawName);
-        if(nm && appByName[nm]){ member = appByName[nm]; via = t("magac","name"); }
-        else if(nm){
-          // Tolerant fallback: a UNIQUE member whose normalized name differs
-          // only by a short trailing bit (dropped/added last letter or two,
-          // e.g. "...ahmedabd" vs "...ahmedabdi"). Requires exactly one
-          // candidate so it never bridges genuinely different people.
-          const cands = db.members.filter(mm=>{
-            const a = normImportName(mm.name);
-            if(!a || a===nm) return a===nm;
-            const [short, long] = a.length < nm.length ? [a, nm] : [nm, a];
-            return long.startsWith(short) && (long.length - short.length) <= 2;
-          });
-          if(cands.length === 1){ member = cands[0]; via = t("magac (u dhow)","name (approx)"); }
-        }
-      }
-      if(!member){ unmatched.push({name:rawName, phone:rawPhone, reason:t("lama helin xubin","no member found")}); continue; }
-      if(usedMemberIds.has(member.id)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("xubin labo jeer","member matched twice")}); continue; }
-      usedMemberIds.add(member.id);
-      const current = computeBalance(member);
-      matches.push({member, target, current, delta: Math.round((target-current)*100)/100, via});
-    }
-    showImportBalancesPreview(matches, unmatched);
   };
   reader.readAsArrayBuffer(file);
+}
+
+function runBalanceImport(rows, keys, findKey){
+  const nameKey = findKey(["customer","name","magac"]);
+  const phoneKey = findKey(["phone","telefoon","tel"]);
+  const balKey = findKey(["balancetotal","balance","hadhaaga","balancehadda"]);
+  if(!nameKey || !balKey){
+    showToast(t("Faylku waa in uu leeyahay tiirar 'Customer' iyo 'Balance Total'.","The file must have 'Customer' and 'Balance Total' columns."));
+    return;
+  }
+  const matches = [];
+  const unmatched = [];
+  const usedMemberIds = new Set();
+  for(const r of rows){
+    const rawName = r[nameKey], rawPhone = phoneKey ? r[phoneKey] : null;
+    const target = parseFloat(r[balKey]);
+    if((rawName==null || String(rawName).trim()==="") && isNaN(target)) continue;
+    if(isNaN(target)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("balance khaldan","invalid balance")}); continue; }
+    const hit = matchMemberForImport(rawName, rawPhone);
+    if(!hit){ unmatched.push({name:rawName, phone:rawPhone, reason:t("lama helin xubin","no member found")}); continue; }
+    if(usedMemberIds.has(hit.member.id)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("xubin labo jeer","member matched twice")}); continue; }
+    usedMemberIds.add(hit.member.id);
+    const current = computeBalance(hit.member);
+    matches.push({member:hit.member, target, current, delta: Math.round((target-current)*100)/100, via:hit.via});
+  }
+  showImportBalancesPreview(matches, unmatched);
+}
+
+// Maps a spreadsheet "Type" value to an internal transaction type.
+// Returns "due" | "payment" | "writeoff" | null (unknown).
+function mapImportTxType(raw){
+  const s = String(raw||"").toLowerCase();
+  if(/invoice|due|qoondo|charge|bill|deyn/.test(s)) return "due";
+  if(/payment|receipt|deposit|lacag|bixin|paid/.test(s)) return "payment";
+  if(/credit|write|cafi|bad\s*debt|baddebt|discount|adjust/.test(s)) return "writeoff";
+  return null;
+}
+function normImportDate(v){
+  if(v==null) return "";
+  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  const s = String(v).trim();
+  // already ISO
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  // M/D/YYYY or D/M/YYYY (assume M/D/YYYY, QuickBooks default)
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ let y=m[3]; if(y.length===2) y="20"+y; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; }
+  const d = new Date(s);
+  return isNaN(d) ? s : d.toISOString().slice(0,10);
+}
+
+// Full-transactions import: rebuilds each matched member's transaction history
+// from the file. Uses the file's own running "Balance" column as a correctness
+// check — a member is only applied if the transactions we build reproduce the
+// file's final stated balance, so a wrong Type mapping can't silently corrupt data.
+function runTransactionsImport(rows, keys, findKey){
+  const nameKey = findKey(["name","customer","magac"]);
+  const typeKey = findKey(["type","nooca"]);
+  const dateKey = findKey(["date","taariikh"]);
+  const numKey  = findKey(["num","number","lambar"]);
+  const amountKey = findKey(["amount","lacagta","qadarka"]);
+  const balKey  = findKey(["balance","hadhaaga"]);
+  if(!nameKey || !typeKey || !amountKey){
+    showToast(t("Faylku waa in uu leeyahay 'Name', 'Type', iyo 'Amount'.","The file must have 'Name', 'Type', and 'Amount' columns."));
+    return;
+  }
+  const byMember = new Map();      // member.id -> {member, via, txns:[], lastBalance}
+  const unknownTypes = new Set();
+  const unmatchedNames = new Set();
+  let skippedRows = 0, totalTxnRows = 0;
+  let lastName = null;
+  for(const r of rows){
+    let rawName = r[nameKey];
+    if(rawName!=null && String(rawName).trim()!=="") lastName = rawName; else rawName = lastName; // QB groups by name, blank = same as above
+    const rawType = r[typeKey];
+    const amt = parseFloat(String(r[amountKey]).replace(/[^0-9.\-]/g,""));
+    if(rawName==null || rawType==null || isNaN(amt)) { continue; } // header/subtotal/blank line
+    const type = mapImportTxType(rawType);
+    if(!type){ unknownTypes.add(String(rawType)); skippedRows++; continue; }
+    const hit = matchMemberForImport(rawName, null);
+    if(!hit){ unmatchedNames.add(String(rawName)); continue; }
+    totalTxnRows++;
+    let bucket = byMember.get(hit.member.id);
+    if(!bucket){ bucket = {member:hit.member, via:hit.via, txns:[], lastBalance:null}; byMember.set(hit.member.id, bucket); }
+    const date = normImportDate(dateKey ? r[dateKey] : null) || todayStr();
+    const note = numKey && r[numKey]!=null ? String(r[numKey]) : "";
+    bucket.txns.push({ id:newTxId(), type, amount:Math.abs(amt), date, note });
+    if(balKey){ const b = parseFloat(String(r[balKey]).replace(/[^0-9.\-]/g,"")); if(!isNaN(b)) bucket.lastBalance = b; }
+  }
+
+  // Validate each member: does summing the imported txns reproduce the file's final balance?
+  const members = [];
+  for(const bucket of byMember.values()){
+    const computed = bucket.txns.reduce((s,tx)=> s + (tx.type==="due" ? tx.amount : -tx.amount), 0);
+    const stated = bucket.lastBalance;
+    const ok = stated==null ? null : Math.abs(computed - stated) < 0.01;
+    members.push({ ...bucket, computed: Math.round(computed*100)/100, stated, ok });
+  }
+  members.sort((a,b)=> a.member.name.localeCompare(b.member.name));
+  showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows);
+}
+
+function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows){
+  const okMembers = members.filter(m=>m.ok !== false);   // ok===true or ok===null (no balance column to check)
+  const badMembers = members.filter(m=>m.ok === false);
+  const canApply = okMembers.length > 0 && unknownTypes.size === 0;
+  const listHtml = members.map(m=>`
+    <div class="tx">
+      <div class="l">
+        <span>${m.member.name} ${m.ok===false?`<span class="status-tag locked">${t('isku mid maaha','mismatch')}</span>`:''}</span>
+        <span class="muted">${m.txns.length} ${t("dhaqdhaqaaq","txns")} · ${t("balance",".")} ${money(m.computed)}${m.stated!=null?` / ${t('faylka','file')} ${money(m.stated)}`:''} <span style="opacity:.7;">(${m.via})</span></span>
+      </div>
+      <span class="amt" style="color:${m.ok===false?'var(--danger-ink)':'var(--accent-ink)'}">${money(m.computed)}</span>
+    </div>
+  `).join("");
+
+  openModal(`
+    <h3>${t("Horudhaca soo dejinta dhaqdhaqaaqyada","Transactions import preview")}</h3>
+    <div class="bal-row" style="margin-bottom:12px;">
+      <div class="bal-box"><div class="lbl">${t("Xubno la waafajiyay","Members matched")}</div><div class="val" style="font-size:15px;">${members.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Dhaqdhaqaaqyo","Transactions")}</div><div class="val" style="font-size:15px;">${totalTxnRows}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Isku mid maaha","Mismatched")}</div><div class="val" style="font-size:15px;color:${badMembers.length?'var(--danger-ink)':'var(--ink)'};">${badMembers.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Nooc aan la garan","Unknown types")}</div><div class="val" style="font-size:15px;color:${unknownTypes.size?'var(--danger-ink)':'var(--ink)'};">${unknownTypes.size}</div></div>
+    </div>
+    ${unknownTypes.size ? `<p class="muted" style="color:var(--danger-ink);">${t("Noocyo aan la aqoonsan (waa in la sameeyo map ka hor soo dejinta)","Unrecognized Type values (must be mapped before importing)")}: ${Array.from(unknownTypes).join(", ")}</p>` : ''}
+    <div class="muted" style="margin-bottom:6px;">${t("Xubin kasta iyo tirada dhaqdhaqaaqyada + balance la xisaabiyay","Each member: transaction count + computed balance")}:</div>
+    <div class="tx-list" style="max-height:240px;">${listHtml || `<div class="empty">${t("Waxba lama helin.","Nothing found.")}</div>`}</div>
+    ${badMembers.length ? `<p class="muted" style="margin-top:8px;color:var(--danger-ink);">${t("Xubnaha 'isku mid maaha' — balance-ka la xisaabiyay kuma waafaqsana kan faylka, sidaa lama soo dejin doono ilaa la hubiyo.","'Mismatch' members — computed balance doesn't equal the file's stated balance, so they will NOT be imported until checked.")}</p>` : ''}
+    ${unmatchedNames.size ? `<p class="muted" style="margin-top:8px;">${t("Magacyo aan la waafajin","Unmatched names")}: ${Array.from(unmatchedNames).slice(0,20).join(", ")}${unmatchedNames.size>20?'…':''}</p>` : ''}
+    <p class="muted" style="margin-top:12px;color:var(--danger-ink);">${t("DIGNIIN: tan waxay BEDDELAYSAA taariikhda dhaqdhaqaaqyada ee xubnaha la waafajiyay (balance bilowga ah waxaa loo dejin doonaa 0, dhaqdhaqaaqyada faylka ayaa lagu beddeli doonaa). Samee Backup ka hor!","WARNING: this REPLACES the transaction history of every matched member (opening balance set to 0, replaced by the file's transactions). Take a Backup first!")}</p>
+    ${canApply ? `<div class="frow"><label>${t('Si aad u xaqiijiso, qor','To confirm, type')} IMPORT</label><input type="text" id="txImportConfirm" placeholder="IMPORT"></div>` : ''}
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      ${canApply ? `<button class="ghost-danger" id="mConfirm">${t("Soo deji dhaqdhaqaaqyada","Import transactions")} (${okMembers.length})</button>` : ''}
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  const confirmBtn = document.getElementById("mConfirm");
+  if(confirmBtn){
+    confirmBtn.addEventListener("click", async ()=>{
+      const entered = (document.getElementById("txImportConfirm").value||"").trim();
+      if(entered !== "IMPORT"){ showToast(t('Qor "IMPORT" si sax ah.','Type "IMPORT" exactly.')); return; }
+      for(const m of okMembers){
+        m.member.transactions = m.txns.slice().sort((a,b)=>a.date.localeCompare(b.date));
+        m.member.openingBalance = 0;
+        m.member.accruedMonths = Array.from(new Set(m.txns.filter(tx=>tx.type==="due").map(tx=>tx.date.slice(0,7))));
+        logActivity("Soo dejinta dhaqdhaqaaqyada (Excel)", `${m.member.name}: ${m.txns.length} ${t("dhaqdhaqaaq","txns")}, balance ${money(m.computed)}`, "direct");
+      }
+      db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta dhaqdhaqaaqyada (Excel)", details:`${okMembers.length} ${t("xubnood","members")}, ${totalTxnRows} ${t("dhaqdhaqaaq","transactions")}`, status:"direct"});
+      await saveDb();
+      closeModal();
+      renderSummary(); renderList(); renderDetail(); renderAccounts();
+      showToast(t(`${okMembers.length} xubnood dhaqdhaqaaqyadooda waa la soo dejiyay.`,`Imported transactions for ${okMembers.length} members.`));
+    });
+  }
 }
 
 function showImportBalancesPreview(matches, unmatched){

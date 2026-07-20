@@ -464,6 +464,18 @@ empty-default-db fallback inside `loadDb()` is legitimate only for a
 genuine first-run server response (fetch succeeded, tables are actually
 empty) — never for a failed fetch.
 
+**`api/data.js`'s `saveState()` batches its inserts** (`batchInsert()`,
+chunked multi-row `INSERT ... VALUES (...),(...),...` statements, 500 rows
+per statement) rather than one awaited round-trip per row. Every save
+rewrites every table in full (see "Known gaps" #1 in `CLAUDE.md`), so at
+real data volumes (hundreds of members, thousands of transactions) a
+one-row-at-a-time loop means thousands of sequential network round-trips
+on every single save — not just imports, any payment/edit — which is
+enough to exceed a serverless function's execution time limit. This was
+found and fixed after a real production outage following a full-history
+import. If you touch `saveState()` again, keep the batching — reverting to
+row-by-row inserts reintroduces this ceiling.
+
 ## Data seeding / one-time imports
 
 On every `loadDb()`, several idempotent migration functions run against the

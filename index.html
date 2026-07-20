@@ -2834,11 +2834,7 @@ function renderTabs(){
     reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
     reportTabs.push({id:"acctreport-action", label:t("Warbixinta Accounts","Account Balance Report"), icon:"ti-building-bank", action:"acctreport"});
   }
-  tabs.push({id:"disb", label:t("Kharashaadka Bulshada","Community Expenses"), icon:"ti-report-money"});
   if(hasPerm("viewReports")){
-    tabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
-    tabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-analytics"});
-    tabs.push({id:"ledger", label:t("Diiwaanka Xisaabaadka","General Ledger"), icon:"ti-book-2"});
     tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});
   }
   if(hasPerm("collectPayment")){

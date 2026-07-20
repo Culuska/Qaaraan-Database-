@@ -3819,6 +3819,11 @@ function openAppSettingsModal(){
         <span class="muted" id="importFileName"></span>
       </div>
     </div>
+    <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
+      <h3 style="margin:0 0 6px;color:var(--danger-ink);">${t("Nadiifinta xogta maaliyadeed","Reset financial data")}</h3>
+      <p class="muted" style="margin:0 0 10px;">${t("Ka tirtir dhammaan dhaqdhaqaaqyada xubnaha (due/payment/writeoff) iyo dhammaan Kharashaadka Bulshada (Guno/Diya/Dhiig nool/Bad Debt) — xubnaha (magacyada, telefoonada, monthly due) iyo accounts-ka (Salaam Bank, iwm) waa la ilaalinayaa sidoodii. Waxaa loogu talagalay in dib loo bilaabo entries saxan oo laga soo dejiyo fayl QuickBooks ah oo cusub.","Deletes every member's transactions (due/payment/writeoff) and every Community Expense (Guno/Diya/Dhiig nool/Bad Debt) — members (names, phones, monthly due) and accounts (Salaam Bank, etc.) are left untouched. Meant for starting over with correct entries from a fresh QuickBooks import.")}</p>
+      <button class="ghost-danger" id="btnResetFinancialData"><i class="ti ti-trash"></i> ${t("Nadiifi dhammaan entries-ka","Clear all entries")}</button>
+    </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
@@ -3847,6 +3852,48 @@ function openAppSettingsModal(){
       importQueue = files;
       processNextQueuedImport();
     }
+  });
+  document.getElementById("btnResetFinancialData").addEventListener("click", openResetFinancialDataConfirm);
+}
+
+// Wipes every member's transaction history and all Community Expenses
+// (disbursements), leaving members (name/phone/monthly due), accounts
+// (Salaam Bank, etc.), users, and settings untouched — for starting over
+// with a clean, correct import after the entries have gotten tangled.
+// Same typed-confirmation tier as Restore from Backup, since this is just
+// as irreversible.
+function openResetFinancialDataConfirm(){
+  const txCount = db.members.reduce((s,m)=>s+m.transactions.length,0);
+  const disbCount = db.disbursements.length;
+  openModal(`
+    <h3>${t("Xaqiiji nadiifinta","Confirm reset")}</h3>
+    <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--ink-2);">
+      <li>${t("Dhaqdhaqaaqyada xubnaha oo la tirtirayo","Member transactions to be deleted")}: ${txCount}</li>
+      <li>${t("Kharashaadka Bulshada oo la tirtirayo","Community Expenses to be deleted")}: ${disbCount}</li>
+      <li>${t("Xubnaha (magacyada) — waa la ilaalinayaa","Members (names) — kept as-is")}: ${db.members.length}</li>
+    </ul>
+    <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo. Samee Backup ka hor haddii aadan hore u samayn.","This cannot be undone. Take a Backup first if you haven't already.")}</p>
+    <div class="frow"><label>${t('Si aad u xaqiijiso, qor','To confirm, type')} RESET</label><input type="text" id="resetConfirmInput" placeholder="RESET"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="ghost-danger" id="mConfirm">${t("Nadiifi dhammaan","Clear everything")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const entered = (document.getElementById("resetConfirmInput").value||"").trim();
+    if(entered !== "RESET"){ showToast(t('Qor "RESET" si sax ah.','Type "RESET" exactly.')); return; }
+    for(const m of db.members){
+      m.transactions = [];
+      m.openingBalance = 0;
+      m.accruedMonths = [];
+    }
+    db.disbursements = [];
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Nadiifinta xogta maaliyadeed", details:`${txCount} ${t("dhaqdhaqaaq","transactions")}, ${disbCount} ${t("kharash","expenses")} la tirtiray — xubnaha waa la ilaaliyay`, status:"direct"});
+    await saveDb();
+    closeModal();
+    renderSummary(); renderList(); renderDetail(); renderAccounts();
+    showToast(t("Xogta maaliyadeed waa la nadiifiyay.","Financial data cleared."));
   });
 }
 

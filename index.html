@@ -866,7 +866,7 @@ function importCreditMemosAsDisbursements(){
     }
   }
   if(added){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Import Credit Memo-yada Balance sheet-ka sida Kharashaadka Bulshada", details:`${added} kharash oo la daray`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Import Credit Memo-yada Balance sheet-ka sida Kharashaadka Bulshada", details:`${added} kharash oo la daray`, status:"direct"});
   }
 }
 
@@ -887,7 +887,7 @@ function fixCreditMemoAccountTagging(){
     }
   }
   if(fixed){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-ka Cafinaad (Balance sheet)", details:`${fixed} kharash oo laga saaray account-ka bangiga (bad debt ma ahan lacag laga bixiyay)`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-ka Cafinaad (Balance sheet)", details:`${fixed} kharash oo laga saaray account-ka bangiga (bad debt ma ahan lacag laga bixiyay)`, status:"direct"});
   }
 }
 
@@ -904,7 +904,7 @@ function fixSalaamBankOpeningBalance(){
     .filter(tx=>tx.type==="payment").reduce((s,tx)=>s+tx.amount,0);
   if(historicalPayments <= 0) return;
   acc.openingBalance = historicalPayments;
-  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay", details:`Waxaa loo dejiyay ${money(historicalPayments)} (wadarta lacagaha taariikhiga ah ee la ururiyay, kahor inta aan la bilaabin diiwaanka tooska ah) — haddii aanay sax ahayn, wax ka beddel account-ka.`, status:"direct"});
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay", details:`Waxaa loo dejiyay ${money(historicalPayments)} (wadarta lacagaha taariikhiga ah ee la ururiyay, kahor inta aan la bilaabin diiwaanka tooska ah) — haddii aanay sax ahayn, wax ka beddel account-ka.`, status:"direct"});
 }
 
 // The auto-derived guess above ($20,621, from summing HISTORY_REPORTS) turned
@@ -919,7 +919,7 @@ function fixSalaamBankOpeningBalance730(){
   if(acc.openingBalance === 0 || acc.openingBalance === 20621){
     const before = acc.openingBalance;
     acc.openingBalance = 730;
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin)", details:`$${before} → $730 (sida uu xaqiijiyay admin-ka, taariikhda 30 June 2026)`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin)", details:`$${before} → $730 (sida uu xaqiijiyay admin-ka, taariikhda 30 June 2026)`, status:"direct"});
   }
 }
 
@@ -935,7 +935,7 @@ function fixSalaamBankOpeningBalance578(){
   const acc = db.accounts.find(a=>a.id==="acc_salaam");
   if(!acc || acc.openingBalance !== 730) return;
   acc.openingBalance = 578;
-  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin - taariikh dhamaystiran)", details:"$730 → $578 (sida uu xaqiijiyay admin-ka, taariikhda 10 February 2024, marka ay ka bilaabmeen diiwaanka QuickBooks)", status:"direct"});
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin - taariikh dhamaystiran)", details:"$730 → $578 (sida uu xaqiijiyay admin-ka, taariikhda 10 February 2024, marka ay ka bilaabmeen diiwaanka QuickBooks)", status:"direct"});
 }
 
 // Payments imported via the QuickBooks transactions importer are deliberately
@@ -958,7 +958,7 @@ function tagImportedPaymentsToSalaamBank(){
     }
   }
   if(tagged){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Diiwaan-gelinta lacagaha la soo dejiyay ee Salaam Bank", details:`${tagged} ${t("lacag oo la soo dejiyay ayaa loo diiwaan-geliyay Salaam Bank (sida uu xaqiijiyay admin-ka)","imported payments tagged to Salaam Bank (confirmed by admin)")}`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Diiwaan-gelinta lacagaha la soo dejiyay ee Salaam Bank", details:`${tagged} ${t("lacag oo la soo dejiyay ayaa loo diiwaan-geliyay Salaam Bank (sida uu xaqiijiyay admin-ka)","imported payments tagged to Salaam Bank (confirmed by admin)")}`, status:"direct"});
   }
 }
 
@@ -971,7 +971,7 @@ function tagImportedPaymentsToSalaamBank(){
 function addExternalCasesAccount(){
   if(db.accounts.some(a=>a.id==="acc_external_cases")) return;
   db.accounts.push({id:"acc_external_cases", name:t("External Cases","External Cases"), openingBalance:636});
-  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
 }
 
 function backfillDisbursementAccounts(){
@@ -992,7 +992,7 @@ function backfillDisbursementAccounts(){
     }
   }
   if(fixed){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Cusboonaysiinta account-ka kharashaadka (Salaam Bank)", details:`${fixed} kharash oo la saxay`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Cusboonaysiinta account-ka kharashaadka (Salaam Bank)", details:`${fixed} kharash oo la saxay`, status:"direct"});
   }
 }
 
@@ -1022,7 +1022,7 @@ function fixDanglingDisbursementAccounts(){
     }
   }
   if(fixed){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-yada kharash ee lama helin", details:`${fixed} kharash oo lahaa account aan jirin — waxaa loo beddelay ${db.accounts.find(a=>a.id===defaultAcct)?.name||defaultAcct}`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-yada kharash ee lama helin", details:`${fixed} kharash oo lahaa account aan jirin — waxaa loo beddelay ${db.accounts.find(a=>a.id===defaultAcct)?.name||defaultAcct}`, status:"direct"});
   }
 }
 
@@ -1041,7 +1041,7 @@ function fixMisassignedExternalCasesDisbursements(){
     }
   }
   if(fixed){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka kharashaadka si khalad ah loogu diiwaan-geliyay External Cases", details:`${fixed} kharash oo la beddelay Salaam Bank (External Cases ma aha account lagu bixiyo kharash)`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka kharashaadka si khalad ah loogu diiwaan-geliyay External Cases", details:`${fixed} kharash oo la beddelay Salaam Bank (External Cases ma aha account lagu bixiyo kharash)`, status:"direct"});
   }
 }
 
@@ -1068,7 +1068,7 @@ function importJournalDisbursements(){
     added++;
   });
   if(added || removedOld){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Cusboonaysiinta General Journal (Guno, Diya, Dhiig nool)", details:`${added} kharash oo cusub, ${removedOld} oo nooc hore ah oo la saaray`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Cusboonaysiinta General Journal (Guno, Diya, Dhiig nool)", details:`${added} kharash oo cusub, ${removedOld} oo nooc hore ah oo la saaray`, status:"direct"});
   }
 }
 
@@ -1078,7 +1078,7 @@ function removeNonGroupLegacyMembers(){
   const removedNames = db.members.filter(m=>EXCLUDED_IDS.has(m.id)).map(m=>m.name);
   db.members = db.members.filter(m => !EXCLUDED_IDS.has(m.id));
   if(db.members.length !== before){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Ka saarid xubno aan ku jirin groups file-ka", details:removedNames.join(", "), status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ka saarid xubno aan ku jirin groups file-ka", details:removedNames.join(", "), status:"direct"});
   }
 }
 
@@ -1092,7 +1092,7 @@ function addMissingSeedMembers(){
     }
   }
   if(added.length){
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Ku darid xubno cusub (groups list)", details:added.join(", "), status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid xubno cusub (groups list)", details:added.join(", "), status:"direct"});
   }
 }
 
@@ -3568,7 +3568,7 @@ function renderSetupScreen(){
     if(!u || !p || p.length<4){ err.textContent = t("Geli username iyo password (ugu yaraan 4 xaraf)","Enter a username and password (at least 4 characters)"); return; }
     const user = {id:"u"+Date.now(), username:u, password:await hashPassword(p), role:"admin", permissions:{addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true}};
     db.users.push(user);
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:"Account-ka admin-ka ugu horreeya waa la sameeyay", details:"", status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:u, action:"Account-ka admin-ka ugu horreeya waa la sameeyay", details:"", status:"direct"});
     await saveDb();
     currentUser = u; currentUserObj = user;
     saveSession(u);
@@ -3627,7 +3627,7 @@ function renderLoginScreen(){
         userByName.failedAttempts = (userByName.failedAttempts||0) + 1;
         if(userByName.failedAttempts >= LOCKOUT_THRESHOLD){
           userByName.lockedAt = new Date().toISOString();
-          db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:u, action:t("Account waa la xiray (isku day khalad ah oo badan)","Account locked (too many failed attempts)"), details:t(`${LOCKOUT_THRESHOLD} isku day oo khalad ah`,`${LOCKOUT_THRESHOLD} failed login attempts`), status:"locked"});
+          db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:u, action:t("Account waa la xiray (isku day khalad ah oo badan)","Account locked (too many failed attempts)"), details:t(`${LOCKOUT_THRESHOLD} isku day oo khalad ah`,`${LOCKOUT_THRESHOLD} failed login attempts`), status:"locked"});
           err.textContent = t(`Account-kan waa la xiray ${LOCKOUT_THRESHOLD} isku day oo khalad ah kadib.`,`This account has been locked after ${LOCKOUT_THRESHOLD} failed attempts.`);
           notifyAdmin(
             `Qaaraan: Account locked — ${u}`,
@@ -3674,7 +3674,7 @@ function openForgotPasswordModal(){
     const userExists = db.users.some(x=>x.username===username);
     if(userExists){
       db.passwordResetRequests.push({id:"pr"+Date.now(), username, requestedAt:new Date().toISOString(), status:"pending"});
-      db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:username, action:t("Codsi password cusub","Password reset requested"), details:"", status:"pending"});
+      db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:username, action:t("Codsi password cusub","Password reset requested"), details:"", status:"pending"});
       notifyAdmin(
         `Qaaraan: Password reset requested — ${username}`,
         `<p>User "<b>${username}</b>" requested a password reset.<br>User "<b>${username}</b>" ayaa codsaday in password-kiisa la beddelo.</p>`
@@ -3960,7 +3960,7 @@ function openResetFinancialDataConfirm(){
     // would see the hardcoded seed data as "not yet imported" against this
     // now-empty list and silently re-add all of it on the very next load.
     db.settings.financialDataReset = true;
-    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Nadiifinta xogta maaliyadeed", details:`${txCount} ${t("dhaqdhaqaaq","transactions")}, ${disbCount} ${t("kharash","expenses")} la tirtiray — xubnaha waa la ilaaliyay`, status:"direct"});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Nadiifinta xogta maaliyadeed", details:`${txCount} ${t("dhaqdhaqaaq","transactions")}, ${disbCount} ${t("kharash","expenses")} la tirtiray — xubnaha waa la ilaaliyay`, status:"direct"});
     await saveDb();
     closeModal();
     renderSummary(); renderList(); renderDetail(); renderAccounts();
@@ -4260,7 +4260,7 @@ function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, to
         m.member.accruedMonths = Array.from(new Set(m.txns.filter(tx=>tx.type==="due").map(tx=>tx.date.slice(0,7))));
         logActivity("Soo dejinta dhaqdhaqaaqyada (Excel)", `${m.member.name}: ${m.txns.length} ${t("dhaqdhaqaaq","txns")}, balance ${money(m.computed)}`, "direct");
       }
-      db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta dhaqdhaqaaqyada (Excel)", details:`${okMembers.length} ${t("xubnood","members")}, ${totalTxnRows} ${t("dhaqdhaqaaq","transactions")}`, status:"direct"});
+      db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta dhaqdhaqaaqyada (Excel)", details:`${okMembers.length} ${t("xubnood","members")}, ${totalTxnRows} ${t("dhaqdhaqaaq","transactions")}`, status:"direct"});
       await saveDb();
       closeModal();
       renderSummary(); renderList(); renderDetail(); renderAccounts();
@@ -4317,7 +4317,7 @@ function showImportBalancesPreview(matches, unmatched, onDone){
         x.member.openingBalance = Math.round((x.member.openingBalance + x.delta)*100)/100;
         logActivity("Saxitaanka balance (Excel import)", `${x.member.name}: ${money(beforeBal)} → ${money(x.target)}`, "direct");
       }
-      db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta balance-ka (Excel)", details:`${changing.length} ${t("xubnood la saxay","members corrected")}, ${unmatched.length} ${t("lama waafajin","unmatched")}`, status:"direct"});
+      db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta balance-ka (Excel)", details:`${changing.length} ${t("xubnood la saxay","members corrected")}, ${unmatched.length} ${t("lama waafajin","unmatched")}`, status:"direct"});
       await saveDb();
       closeModal();
       renderSummary(); renderList(); renderDetail(); renderAccounts();

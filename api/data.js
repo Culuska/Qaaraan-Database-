@@ -167,7 +167,17 @@ async function loadState(client) {
 // of sequential network round-trips per save — easily enough to exceed a
 // serverless function's execution time limit. A single multi-row INSERT
 // per chunk does the same work in a handful of round-trips.
-async function batchInsert(client, table, columns, rows, chunkSize = 500) {
+//
+// ON CONFLICT DO NOTHING on conflictKey is critical, not cosmetic: this
+// runs right after DELETE FROM <table> in the same transaction, so the
+// only way a unique-constraint violation happens is a duplicate id/key
+// *within the incoming data itself* (e.g. two accounts that both ended up
+// with id "acc_external_cases" from an earlier bug). Without this, that
+// single duplicate throws, the whole transaction rolls back, and NOTHING
+// saves — every save fails forever afterward, always reverting to
+// whatever was last actually persisted. Silently dropping the duplicate
+// is far safer than that.
+async function batchInsert(client, table, columns, rows, conflictKey = 'id', chunkSize = 500) {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
     const params = [];
@@ -177,7 +187,7 @@ async function batchInsert(client, table, columns, rows, chunkSize = 500) {
       return `(${placeholders.join(',')})`;
     });
     await client.query(
-      `INSERT INTO ${table} (${columns.join(',')}) VALUES ${tuples.join(',')}`,
+      `INSERT INTO ${table} (${columns.join(',')}) VALUES ${tuples.join(',')} ON CONFLICT (${conflictKey}) DO NOTHING`,
       params
     );
   }
@@ -242,7 +252,8 @@ async function saveState(client, state) {
     await batchInsert(
       client, 'app_settings',
       ['key', 'value'],
-      Object.entries(state.settings || {}).map(([key, value]) => [key, String(value)])
+      Object.entries(state.settings || {}).map(([key, value]) => [key, String(value)]),
+      'key'
     );
     await client.query('COMMIT');
   } catch (e) {

@@ -715,14 +715,33 @@ async function attemptAction(type, payload, permKey, label){
   return {status:"pending"};
 }
 
+// Returns true if the server was reached and returned usable data, false on
+// any network/auth/parse failure. Retries once after a short delay to ride
+// out a cold-start Neon connection before giving up.
+async function fetchDb(){
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const res = await fetch('/api/data', { headers: {'X-Api-Secret': API_SECRET} });
+      if(res.ok){
+        const json = await res.json();
+        if(json && typeof json.value === "string"){ db = JSON.parse(json.value); return true; }
+      }
+    }catch(e){ /* fall through to retry/failure */ }
+    if(attempt===0) await new Promise(r=>setTimeout(r, 1500));
+  }
+  return false;
+}
+
 async function loadDb(){
-  try{
-    const res = await fetch('/api/data', { headers: {'X-Api-Secret': API_SECRET} });
-    if(res.ok){
-      const json = await res.json();
-      if(json && json.value) db = JSON.parse(json.value);
-    }
-  }catch(e){ db = null; }
+  const ok = await fetchDb();
+  if(!ok){
+    // Do NOT fabricate an empty/default db here — loadDb() ends by calling
+    // saveDb(), which would overwrite the real server data with an empty
+    // shell on a merely transient failure (network blip, cold Neon
+    // connection). Show a retry screen and stop instead of touching db.
+    renderLoadFailedScreen();
+    return false;
+  }
   if(!db){
     db = { members: SEED_MEMBERS.map(m=>({...m, status:"active", transactions:[], accruedMonths:[]})), disbursements: [], users: [], pendingActions: [], activityLog: [] };
   }
@@ -758,6 +777,19 @@ async function loadDb(){
   fixSalaamBankOpeningBalance730();
   syncAccruals();
   await saveDb();
+  return true;
+}
+
+function renderLoadFailedScreen(){
+  document.getElementById("appWrap").style.display = "none";
+  document.getElementById("authRoot").innerHTML = `
+    <div class="auth-wrap">
+      <h2>${t("Xogta lama soo dejin karin","Could not load your data")}</h2>
+      <div class="sub">${t("Khalad ayaa dhacay marka xogta laga soo dejinayay server-ka — waxaa laga yaabaa xiriir internet oo ah, ama server-ku wuu hakaday hadhow. Xogtaada waa ammaan, halkan lama beddelin.","Something went wrong loading your data from the server — could be a connection issue or the server waking up. Your data is safe and hasn't been touched.")}</div>
+      <button class="primary" id="btnRetryLoad" style="margin-top:16px;">${t("Isku day mar kale","Try again")}</button>
+    </div>
+  `;
+  document.getElementById("btnRetryLoad").addEventListener("click", ()=>location.reload());
 }
 
 function importCreditMemosAsDisbursements(){
@@ -4183,7 +4215,8 @@ function renderPublicMemberView(memberId){
 (async function init(){
   applyStaticTranslations();
   document.getElementById("disbDate").value = todayStr();
-  await loadDb();
+  const ok = await loadDb();
+  if(!ok) return; // renderLoadFailedScreen() already shown — don't render over it with an empty db
   const params = new URLSearchParams(window.location.search);
   const memberParam = params.get("member");
   if(memberParam){

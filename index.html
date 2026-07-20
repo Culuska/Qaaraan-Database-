@@ -827,6 +827,11 @@ function renderLoadFailedScreen(){
 }
 
 function importCreditMemosAsDisbursements(){
+  // Once an admin has deliberately reset financial data, treat that as
+  // final — without this, every hardcoded HISTORY_REPORTS credit memo
+  // looks "never imported yet" against an empty db.disbursements and
+  // silently reappears on the very next load.
+  if(db.settings.financialDataReset) return;
   const existingIds = new Set(db.disbursements.map(d=>d.id));
   const byId = Object.fromEntries(db.members.map(m=>[m.id,m]));
   let added = 0;
@@ -991,6 +996,11 @@ function fixDanglingDisbursementAccounts(){
 }
 
 function importJournalDisbursements(){
+  // Same reasoning as importCreditMemosAsDisbursements() above — a
+  // deliberate financial-data reset must stick, not get silently undone by
+  // this hardcoded seed re-populating itself against an empty disbursements
+  // list on the next load.
+  if(db.settings.financialDataReset) return;
   // Remove old-scheme entries from a previous import version (id started with gj_<idx>_)
   const before = db.disbursements.length;
   db.disbursements = db.disbursements.filter(d => !/^gj_\d+_/.test(d.id));
@@ -3889,6 +3899,10 @@ function openResetFinancialDataConfirm(){
       m.accruedMonths = [];
     }
     db.disbursements = [];
+    // Without this, importCreditMemosAsDisbursements()/importJournalDisbursements()
+    // would see the hardcoded seed data as "not yet imported" against this
+    // now-empty list and silently re-add all of it on the very next load.
+    db.settings.financialDataReset = true;
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Nadiifinta xogta maaliyadeed", details:`${txCount} ${t("dhaqdhaqaaq","transactions")}, ${disbCount} ${t("kharash","expenses")} la tirtiray — xubnaha waa la ilaaliyay`, status:"direct"});
     await saveDb();
     closeModal();

@@ -1048,15 +1048,22 @@ function addMissingSeedMembers(){
 
 function fixLegacyHistoryImport(){
   db.members = db.members.filter(m => !String(m.id).startsWith("m_hist_"));
-  const seedById = Object.fromEntries(SEED_MEMBERS.map(m=>[m.id,m]));
+  // This used to also force m.openingBalance back to SEED_MEMBERS's value on
+  // every single load — a one-time historical correction that had no guard,
+  // so it ran forever and permanently overwrote every legitimate later
+  // change to a member's opening balance (a balance import, a transactions
+  // import resetting it to 0, a manual Edit Member, a full financial Reset)
+  // back to the original hardcoded seed value on the very next page load.
+  // This was a real, serious, long-standing bug — it silently undid Reset
+  // financial data (and very likely earlier corrections too). Removed
+  // outright rather than gated, since even letting it fire one more time
+  // on the next deploy would re-clobber balances that were just corrected.
   for(const m of db.members){
     m.transactions = m.transactions.filter(t => !(
       (t.type==="due" && t.note && t.note.startsWith("Invoice")) ||
       (t.type==="payment" && t.note==="Payment (imported)") ||
       (t.type==="writeoff" && t.note && t.note.includes("Credit memo (imported)"))
     ));
-    const seed = seedById[m.id];
-    if(seed) m.openingBalance = seed.openingBalance;
     m.accruedMonths = (m.accruedMonths||[]).filter(mk => m.transactions.some(t=>t.type==="due" && t.date.slice(0,7)===mk));
   }
 }

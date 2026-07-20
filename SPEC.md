@@ -307,8 +307,13 @@ Settings (admin-only) has a "Backup & Restore" section:
 ## Import file (Excel/CSV)
 
 Settings (admin-only) has an **Import file** section (`handleImportFile()`),
-which reads the first sheet via SheetJS (`XLSX`) and **auto-detects the file
-kind by its columns**, routing to one of two importers:
+surfaced as a "Choose file to import" button (`btnChooseImportFile`) that
+triggers a hidden file input — not a bare `<input type="file">`, so it reads
+as a clickable action rather than a stray form control. It reads every sheet
+via SheetJS (`XLSX`) and uses the first one that actually has rows (some
+exports, QuickBooks included, put a blank cover sheet first), then
+**auto-detects the file kind by its columns**, routing to one of two
+importers:
 - a `Type` + `Amount` file (without `Balance Total`) → **transactions import**
   (`runTransactionsImport()`), see below;
 - otherwise → **balance import** (`runBalanceImport()`), described here.

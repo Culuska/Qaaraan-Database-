@@ -3638,7 +3638,9 @@ function openAppSettingsModal(){
       <h3 style="margin:0 0 6px;">${t("Soo dejinta fayl","Import file")}</h3>
       <p class="muted" style="margin:0 0 10px;">${t("Soo geli fayl Excel ah. Waa la aqoonsan doonaa nooca faylka: (1) fayl balance ah oo leh 'Customer'/'Balance Total', ama (2) fayl dhaqdhaqaaqyada oo leh 'Name','Type','Date','Num','Account','Amount','Balance'. Mar walba horudhac ayaa lagu tusayaa ka hor inta aan wax la beddelin.","Upload an Excel file. The file type is auto-detected: (1) a balance file with 'Customer'/'Balance Total', or (2) a full-transactions file with 'Name','Type','Date','Num','Account','Amount','Balance'. You always get a preview before anything changes.")}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="font-size:12px;">
+        <button id="btnChooseImportFile"><i class="ti ti-file-import"></i> ${t("Doorso fayl si aad u soo dejiso","Choose file to import")}</button>
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none;">
+        <span class="muted" id="importFileName"></span>
       </div>
     </div>
   `);
@@ -3660,9 +3662,15 @@ function openAppSettingsModal(){
   document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackup);
   document.getElementById("btnEmailBackup").addEventListener("click", emailBackupToAdmin);
   document.getElementById("btnOpenRestore").addEventListener("click", openBackupRestoreModal);
+  document.getElementById("btnChooseImportFile").addEventListener("click", ()=>{
+    document.getElementById("importFile").click();
+  });
   document.getElementById("importFile").addEventListener("change", (e)=>{
     const file = e.target.files[0];
-    if(file) handleImportFile(file);
+    if(file){
+      document.getElementById("importFileName").textContent = file.name;
+      handleImportFile(file);
+    }
   });
 }
 

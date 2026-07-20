@@ -40,6 +40,7 @@
   .sidebar-nav button:hover{background:#F4F2EC;color:var(--ink);}
   .sidebar-nav button.on{background:var(--accent-bg);color:var(--accent-ink);font-weight:600;}
   .sidebar-divider{height:1px;background:var(--line);margin:10px 6px;}
+  .sidebar-group-label{padding:12px 10px 4px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);}
   .sidebar-footer{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;}
   .sidebar-user{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px;gap:8px;}
   .sidebar-user .nm{font-size:13px;font-weight:600;}
@@ -701,6 +702,9 @@ function applyAction(type, payload){
   } else if(type === "payment"){
     const m = db.members.find(x=>x.id===payload.memberId);
     if(m){ m.transactions.push({id:newTxId(), type:"payment", amount:payload.amount, date:payload.date, note:payload.note, account:payload.account}); desc = `Payment: ${m.name} $${payload.amount}`; }
+  } else if(type === "invoice"){
+    const m = db.members.find(x=>x.id===payload.memberId);
+    if(m){ m.transactions.push({id:newTxId(), type:"due", amount:payload.amount, date:payload.date, note:payload.note||"Invoice"}); desc = `Invoice: ${m.name} $${payload.amount}${payload.note?' — '+payload.note:''}`; }
   } else if(type === "writeoff"){
     const m = db.members.find(x=>x.id===payload.memberId);
     if(m){ m.transactions.push({id:newTxId(), type:"writeoff", amount:payload.amount, date:todayStr(), note:"BAD DEBT — "+payload.memo}); desc = `Bad debt cafinaad: ${m.name} $${payload.amount} — ${payload.memo}`; }
@@ -721,7 +725,7 @@ function applyAction(type, payload){
       desc = `${before} → ${m.name} / ${m.phone||'—'} / $${m.monthlyDue||0}`;
     }
   } else if(type === "disbursement"){
-    db.disbursements.push({id:"d"+Date.now(), category:payload.category, amount:payload.amount, date:payload.date, recipient:payload.recipient, sharedWith:payload.sharedWith, memo:payload.memo, account:payload.account});
+    db.disbursements.push({id:"d"+Date.now()+"_"+Math.random().toString(36).slice(2,7), category:payload.category, amount:payload.amount, date:payload.date, recipient:payload.recipient, sharedWith:payload.sharedWith, memo:payload.memo, account:payload.account});
     desc = `Kharash (${payload.category}): $${payload.amount} — ${payload.memo}`;
   }
   return {desc, resultId};
@@ -2446,6 +2450,87 @@ function renderReceiptConfirmStep(m){
   });
 }
 
+// Manual one-off due/charge entry — distinct from the automatic monthly
+// accrual (syncAccruals()); for a one-time charge outside the normal
+// dues cycle. Same search -> confirm two-step pattern as the Payment
+// Receipt flow above.
+function openInvoiceEntryModal(){
+  if(!hasPerm("collectPayment")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  renderInvoiceSearchStep();
+}
+
+function renderInvoiceSearchStep(){
+  openModal(`
+    <h3>${t("Invoice cusub","New Invoice")}</h3>
+    <div class="frow">
+      <label>${t("Raadi xubin (magaca)","Search member (name)")}</label>
+      <input type="text" id="invSearch" placeholder="${t('Qor magaca...','Type a name...')}">
+    </div>
+    <div id="invResults" class="tx-list" style="max-height:320px;"></div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  const searchEl = document.getElementById("invSearch");
+  const renderResults = ()=>{
+    const q = searchEl.value.trim().toLowerCase();
+    const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const results = document.getElementById("invResults");
+    results.innerHTML = matches.length ? matches.map(m=>`
+      <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+        <div class="l">
+          <span>${m.name}</span>
+          <span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span>
+        </div>
+        <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+      </div>
+    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.querySelectorAll("[data-mid]").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        const m = db.members.find(x=>x.id===row.dataset.mid);
+        if(m) renderInvoiceConfirmStep(m);
+      });
+    });
+  };
+  searchEl.addEventListener("input", renderResults);
+  searchEl.focus();
+}
+
+function renderInvoiceConfirmStep(m){
+  const bal = computeBalance(m);
+  openModal(`
+    <h3>${t("Invoice cusub","New Invoice")}</h3>
+    <div class="bal-row" style="margin-bottom:14px;">
+      <div class="bal-box"><div class="lbl">${t("Magaca","Full name")}</div><div class="val" style="font-size:14px;">${m.name}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+    </div>
+    <form id="invForm">
+      <div class="frow"><label>${t("Lacagta (invoice)","Invoice amount")}</label><input required type="number" step="0.01" min="0.01" id="invAmount" value="${m.monthlyDue||''}"></div>
+      <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="invDate" value="${todayStr()}"></div>
+      <div class="frow"><label>${t("Faahfaahin (ikhtiyaari)","Note (optional)")}</label><input type="text" id="invNote" placeholder="${t('tusaale: qoondo dheeraad ah','e.g. extra charge')}"></div>
+      <div class="actions">
+        <button type="button" id="invBack">${t("Dib u noqo","Back")}</button>
+        <button type="submit" class="primary" id="invSubmit">${t("Diiwaangeli Invoice","Record Invoice")}</button>
+      </div>
+    </form>
+  `);
+  document.getElementById("invBack").addEventListener("click", renderInvoiceSearchStep);
+  document.getElementById("invForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById("invAmount").value);
+    const date = document.getElementById("invDate").value;
+    const note = document.getElementById("invNote").value.trim();
+    if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+    const r = await attemptAction("invoice", {memberId:m.id, amount, date, note}, "collectPayment", `Invoice: ${m.name}`);
+    if(r.status === "denied") return;
+    renderSummary(); renderList(); renderDetail();
+    closeModal();
+    showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka","Your request is awaiting admin approval") : t("Invoice-ka waa la diiwaangeliyay","Invoice recorded"));
+  });
+}
+
 function updateDisbFormVisibility(){
   const canPay = hasPerm("collectPayment");
   const form = document.getElementById("disbForm");
@@ -2730,16 +2815,27 @@ function renderTabs(){
   const tabs = [
     {id:"dashboard", label:t("Guddoon","Dashboard"), icon:"ti-layout-grid"},
     {id:"members", label:t("Xubnaha","Members"), icon:"ti-users"},
-    {id:"disb", label:t("Kharashaadka Bulshada","Community Expenses"), icon:"ti-report-money"}
   ];
+  // "Entry" group: quick actions that create a single transaction, grouped
+  // together so staff don't have to hunt for them among the report/view tabs.
+  const entryTabs = [];
   if(hasPerm("collectPayment")){
-    tabs.push({id:"receipt-action", label:t("Rasiidka Lacag-bixinta","Payment Receipt"), icon:"ti-receipt", action:"receipt"});
+    entryTabs.push({id:"invoice-action", label:t("Invoice","Invoice"), icon:"ti-file-invoice", action:"invoice"});
+    entryTabs.push({id:"receipt-action", label:t("Rasiid","Receipt"), icon:"ti-receipt", action:"receipt"});
+    entryTabs.push({id:"payment-action", label:t("Lacag-bixin","Payment"), icon:"ti-cash", action:"payment"});
   }
+  // "Report" group: read-only exports/lookups, separate from the Entry
+  // actions above.
+  const reportTabs = [];
+  if(hasPerm("viewReports")){
+    reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
+    reportTabs.push({id:"acctreport-action", label:t("Warbixinta Accounts","Account Balance Report"), icon:"ti-building-bank", action:"acctreport"});
+  }
+  tabs.push({id:"disb", label:t("Kharashaadka Bulshada","Community Expenses"), icon:"ti-report-money"});
   if(hasPerm("viewReports")){
     tabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
     tabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-analytics"});
     tabs.push({id:"ledger", label:t("Diiwaanka Xisaabaadka","General Ledger"), icon:"ti-book-2"});
-    tabs.push({id:"reports-action", label:t("Warbixinno","Reports"), icon:"ti-file-report", action:"reports"});
     tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});
   }
   if(hasPerm("collectPayment")){
@@ -2752,8 +2848,12 @@ function renderTabs(){
   }
 
   const navBtn = tab => `<button data-tab="${tab.action?'':tab.id}" ${tab.action?`data-action="${tab.action}"`:''} class="${!tab.action && currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
+  const groupLabel = txt => `<div class="sidebar-group-label">${txt}</div>`;
   const navList = document.getElementById("sidebarNavList");
-  navList.innerHTML = tabs.map(navBtn).join("")
+  navList.innerHTML = tabs.slice(0,2).map(navBtn).join("")
+    + (entryTabs.length ? groupLabel(t("GALINTA","ENTRY")) + entryTabs.map(navBtn).join("") : "")
+    + (reportTabs.length ? groupLabel(t("WARBIXINNO","REPORT")) + reportTabs.map(navBtn).join("") : "")
+    + tabs.slice(2).map(navBtn).join("")
     + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
     + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : "");
   navList.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
@@ -2761,10 +2861,16 @@ function renderTabs(){
   });
   const usersBtn = navList.querySelector("[data-action='users']");
   if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
+  const invoiceBtn = navList.querySelector("[data-action='invoice']");
+  if(invoiceBtn) invoiceBtn.addEventListener("click", openInvoiceEntryModal);
   const receiptBtn = navList.querySelector("[data-action='receipt']");
   if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
-  const reportsBtn = navList.querySelector("[data-action='reports']");
-  if(reportsBtn) reportsBtn.addEventListener("click", openReportsModal);
+  const paymentBtn = navList.querySelector("[data-action='payment']");
+  if(paymentBtn) paymentBtn.addEventListener("click", ()=>switchTab("members"));
+  const membersReportBtn = navList.querySelector("[data-action='membersreport']");
+  if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
+  const acctReportBtn = navList.querySelector("[data-action='acctreport']");
+  if(acctReportBtn) acctReportBtn.addEventListener("click", openAccountBalanceReportModal);
   const forecastBtn = navList.querySelector("[data-action='forecast']");
   if(forecastBtn) forecastBtn.addEventListener("click", ()=>openForecastModal());
 
@@ -2783,16 +2889,22 @@ function renderTabs(){
   const settingsBtn = document.getElementById("btnAppSettings");
   if(settingsBtn) settingsBtn.addEventListener("click", openAppSettingsModal);
 
-  const mobileTabs = tabs.slice(0,5);
+  // Dashboard/Members + the Entry quick-actions (Invoice/Receipt/Payment) —
+  // the transactions staff need on the go — take priority in the limited
+  // mobile bottom-nav space; falls back to the next tabs if entryTabs is
+  // empty (no collectPayment permission).
+  const mobileTabs = tabs.slice(0,2).concat(entryTabs.length ? entryTabs : tabs.slice(2)).slice(0,5);
   const nav = document.getElementById("mobileBottomNav");
   nav.innerHTML = mobileTabs.map(mt=>`<button data-tab="${mt.action?'':mt.id}" ${mt.action?`data-action="${mt.action}"`:''} class="${!mt.action && currentTab===mt.id?'on':''}"><i class="ti ${mt.icon}"></i><span>${mt.label.split(' ')[0]}</span></button>`).join("");
   nav.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
   });
+  const mobInvoiceBtn = nav.querySelector("[data-action='invoice']");
+  if(mobInvoiceBtn) mobInvoiceBtn.addEventListener("click", openInvoiceEntryModal);
   const mobReceiptBtn = nav.querySelector("[data-action='receipt']");
   if(mobReceiptBtn) mobReceiptBtn.addEventListener("click", openQuickReceiptModal);
-  const mobReportsBtn = nav.querySelector("[data-action='reports']");
-  if(mobReportsBtn) mobReportsBtn.addEventListener("click", openReportsModal);
+  const mobPaymentBtn = nav.querySelector("[data-action='payment']");
+  if(mobPaymentBtn) mobPaymentBtn.addEventListener("click", ()=>switchTab("members"));
   const mobForecastBtn = nav.querySelector("[data-action='forecast']");
   if(mobForecastBtn) mobForecastBtn.addEventListener("click", ()=>openForecastModal());
 }
@@ -2865,6 +2977,65 @@ function accountBalance(acc){
     if(d.account===acc.id) bal -= d.amount;
   }
   return bal;
+}
+
+// One row per account: opening balance, total deposited (payments tagged
+// to it), total withdrawn (disbursements tagged to it), and current
+// balance — the same figures already shown on each Accounts-tab card,
+// packaged for export.
+function accountBalanceReportRows(){
+  return db.accounts.map(acc=>{
+    let deposited = 0, withdrawn = 0;
+    for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
+    for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
+    return {name:acc.name, opening:acc.openingBalance, deposited, withdrawn, balance:accountBalance(acc)};
+  });
+}
+
+function openAccountBalanceReportModal(){
+  if(!hasPerm("viewReports")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  openReportFormatChoice(t("Warbixinta Balance-ka Accounts","Account Balance Report"), exportAccountBalancesPdf, exportAccountBalancesExcel);
+}
+
+function exportAccountBalancesPdf(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const rows = accountBalanceReportRows();
+  let y = 18;
+  doc.setFontSize(14); doc.text(t("Warbixinta Balance-ka Accounts","Account Balance Report"), 14, y); y += 8;
+  doc.setFontSize(9); doc.setFont(undefined, "bold");
+  doc.text(t("Account","Account"), 14, y); doc.text(t("Bilowga","Opening"), 85, y); doc.text(t("La saaray","Deposited"), 115, y); doc.text(t("Laga bixiyay","Withdrawn"), 148, y); doc.text(t("Balance hadda","Current"), 180, y);
+  y += 4; doc.line(14, y, 196, y); y += 5;
+  doc.setFont(undefined, "normal");
+  let totalBal = 0;
+  for(const r of rows){
+    doc.text(r.name, 14, y);
+    doc.text("$"+r.opening.toFixed(2), 85, y);
+    doc.text("$"+r.deposited.toFixed(2), 115, y);
+    doc.text("$"+r.withdrawn.toFixed(2), 148, y);
+    doc.text("$"+r.balance.toFixed(2), 180, y);
+    y += 6;
+    totalBal += r.balance;
+  }
+  y += 2; doc.line(14, y, 196, y); y += 7;
+  doc.setFontSize(11); doc.setFont(undefined, "bold");
+  doc.text(t("Wadarta guud","Grand total")+": $"+totalBal.toFixed(2), 14, y);
+  doc.save("account_balance_report.pdf");
+}
+
+function exportAccountBalancesExcel(){
+  const rows = accountBalanceReportRows();
+  const data = [[t("Warbixinta Balance-ka Accounts","Account Balance Report")], [],
+    [t("Account","Account"), t("Balance bilowga","Opening"), t("La saaray","Deposited"), t("Laga bixiyay","Withdrawn"), t("Balance hadda","Current")]];
+  for(const r of rows) data.push([r.name, r.opening, r.deposited, r.withdrawn, r.balance]);
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:24},{wch:14},{wch:14},{wch:14},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Accounts");
+  XLSX.writeFile(wb, "account_balance_report.xlsx");
 }
 
 function computeAccountImpact(acc){

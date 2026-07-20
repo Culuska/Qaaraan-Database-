@@ -3812,10 +3812,10 @@ function openAppSettingsModal(){
     </div>
     <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
       <h3 style="margin:0 0 6px;">${t("Soo dejinta fayl","Import file")}</h3>
-      <p class="muted" style="margin:0 0 10px;">${t("Soo geli fayl Excel ah. Waa la aqoonsan doonaa nooca faylka: (1) fayl balance ah oo leh 'Customer'/'Balance Total', ama (2) fayl dhaqdhaqaaqyada oo leh 'Name','Type','Date','Num','Account','Amount','Balance'. Mar walba horudhac ayaa lagu tusayaa ka hor inta aan wax la beddelin.","Upload an Excel file. The file type is auto-detected: (1) a balance file with 'Customer'/'Balance Total', or (2) a full-transactions file with 'Name','Type','Date','Num','Account','Amount','Balance'. You always get a preview before anything changes.")}</p>
+      <p class="muted" style="margin:0 0 10px;">${t("Soo geli hal fayl ama dhowr fayl oo Excel ah. Waa la aqoonsan doonaa nooca fayl kasta: (1) fayl balance ah oo leh 'Customer'/'Balance Total', ama (2) fayl dhaqdhaqaaqyada oo leh 'Name','Type','Date','Num','Account','Amount','Balance'. Haddii aad dhowr fayl doorato, mid mid ayaa lagu tusayaa horudhac — ka hor inta aan mid la xaqiijin ama la joojin, kan xiga ma soo bixi doono.","Select one file or several at once. Each file's type is auto-detected: (1) a balance file with 'Customer'/'Balance Total', or (2) a full-transactions file with 'Name','Type','Date','Num','Account','Amount','Balance'. If you pick multiple, they're previewed one at a time — the next one only opens after you confirm or cancel the current one.")}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button id="btnChooseImportFile"><i class="ti ti-file-import"></i> ${t("Doorso fayl si aad u soo dejiso","Choose file to import")}</button>
-        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none;">
+        <input type="file" id="importFile" accept=".xlsx,.xls,.csv" multiple style="display:none;">
         <span class="muted" id="importFileName"></span>
       </div>
     </div>
@@ -3842,12 +3842,27 @@ function openAppSettingsModal(){
     document.getElementById("importFile").click();
   });
   document.getElementById("importFile").addEventListener("change", (e)=>{
-    const file = e.target.files[0];
-    if(file){
-      document.getElementById("importFileName").textContent = file.name;
-      handleImportFile(file);
+    const files = Array.from(e.target.files||[]);
+    if(files.length){
+      importQueue = files;
+      processNextQueuedImport();
     }
   });
+}
+
+// Multiple files can be selected at once (e.g. a balance file and a
+// transactions file together) — each is previewed and confirmed on its own,
+// one at a time, so a mixed batch never gets silently combined into one
+// apply. processNextQueuedImport() is passed as handleImportFile's onDone
+// callback, so the next file's preview only opens once the current one's
+// modal actually closes (via Cancel or a successful Apply/Import).
+let importQueue = [];
+function processNextQueuedImport(){
+  if(!importQueue.length) return;
+  const file = importQueue.shift();
+  const nameEl = document.getElementById("importFileName");
+  if(nameEl) nameEl.textContent = importQueue.length ? `${file.name} (+${importQueue.length} ${t("kale oo sugaya","more queued")})` : file.name;
+  handleImportFile(file, processNextQueuedImport);
 }
 
 // ---- Import corrected balances from an Excel/CSV export ----
@@ -3891,7 +3906,8 @@ function matchMemberForImport(rawName, rawPhone){
 
 // Reads the file, detects whether it's a balance file or a full-transactions
 // file by the columns present, and routes to the right importer.
-function handleImportFile(file){
+function handleImportFile(file, onDone){
+  onDone = onDone || (()=>{});
   const reader = new FileReader();
   reader.onload = (ev)=>{
     let rows;
@@ -3906,10 +3922,11 @@ function handleImportFile(file){
         if(parsed.length){ rows = parsed; break; }
       }
     }catch(err){
-      showToast(t("Faylka lama akhriyi karo.","Could not read the file."));
+      showToast(t("Faylka lama akhriyi karo.","Could not read the file.")+` (${file.name})`);
+      onDone();
       return;
     }
-    if(!rows.length){ showToast(t("Faylku waa madhan yahay.","The file is empty.")); return; }
+    if(!rows.length){ showToast(t("Faylku waa madhan yahay.","The file is empty.")+` (${file.name})`); onDone(); return; }
     const keys = Object.keys(rows[0]);
     const findKey = (subs)=> keys.find(k=>subs.some(s=>k.toLowerCase().replace(/\s/g,"").includes(s)));
     const typeKey = findKey(["type","nooca"]);
@@ -3917,9 +3934,9 @@ function handleImportFile(file){
     const balTotalKey = findKey(["balancetotal","balancehadda","hadhaaga"]);
     // A transactions file has Type + Amount rows; a balance file has Balance Total.
     if(typeKey && amountKey && !balTotalKey){
-      runTransactionsImport(rows, keys, findKey);
+      runTransactionsImport(rows, keys, findKey, onDone);
     } else {
-      runBalanceImport(rows, keys, findKey);
+      runBalanceImport(rows, keys, findKey, onDone);
     }
   };
   reader.readAsArrayBuffer(file);
@@ -3943,12 +3960,14 @@ function parseImportAmount(v){
   if(isNaN(n)) return NaN;
   return neg ? -Math.abs(n) : n;
 }
-function runBalanceImport(rows, keys, findKey){
+function runBalanceImport(rows, keys, findKey, onDone){
+  onDone = onDone || (()=>{});
   const nameKey = findKey(["customer","name","magac"]);
   const phoneKey = findKey(["phone","telefoon","tel"]);
   const balKey = findKey(["balancetotal","balance","hadhaaga","balancehadda"]);
   if(!nameKey || !balKey){
     showToast(t("Faylku waa in uu leeyahay tiirar 'Customer' iyo 'Balance Total'.","The file must have 'Customer' and 'Balance Total' columns."));
+    onDone();
     return;
   }
   const matches = [];
@@ -3966,7 +3985,7 @@ function runBalanceImport(rows, keys, findKey){
     const current = computeBalance(hit.member);
     matches.push({member:hit.member, target, current, delta: Math.round((target-current)*100)/100, via:hit.via});
   }
-  showImportBalancesPreview(matches, unmatched);
+  showImportBalancesPreview(matches, unmatched, onDone);
 }
 
 // Maps a spreadsheet "Type" value to an internal transaction type.
@@ -4022,7 +4041,8 @@ function findImportNameColumnFallback(rows, keys, typeKey, amountKey){
 // from the file. Uses the file's own running "Balance" column as a correctness
 // check — a member is only applied if the transactions we build reproduce the
 // file's final stated balance, so a wrong Type mapping can't silently corrupt data.
-function runTransactionsImport(rows, keys, findKey){
+function runTransactionsImport(rows, keys, findKey, onDone){
+  onDone = onDone || (()=>{});
   const typeKey = findKey(["type","nooca"]);
   const dateKey = findKey(["date","taariikh"]);
   const numKey  = findKey(["num","number","lambar"]);
@@ -4032,6 +4052,7 @@ function runTransactionsImport(rows, keys, findKey){
   const nameKey = findKey(["name","customer","magac"]) || findImportNameColumnFallback(rows, keys, typeKey, amountKey);
   if(!nameKey || !typeKey || !amountKey){
     showToast(t("Faylku waa in uu leeyahay 'Name', 'Type', iyo 'Amount'.","The file must have 'Name', 'Type', and 'Amount' columns."));
+    onDone();
     return;
   }
   const byMember = new Map();      // member.id -> {member, via, txns:[], lastBalance}
@@ -4071,10 +4092,11 @@ function runTransactionsImport(rows, keys, findKey){
     members.push({ ...bucket, computed: Math.round(computed*100)/100, stated, ok });
   }
   members.sort((a,b)=> a.member.name.localeCompare(b.member.name));
-  showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows);
+  showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows, onDone);
 }
 
-function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows){
+function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, totalTxnRows, skippedRows, onDone){
+  onDone = onDone || (()=>{});
   const okMembers = members.filter(m=>m.ok !== false);   // ok===true or ok===null (no balance column to check)
   const badMembers = members.filter(m=>m.ok === false);
   const canApply = okMembers.length > 0 && unknownTypes.size === 0;
@@ -4108,7 +4130,7 @@ function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, to
       ${canApply ? `<button class="ghost-danger" id="mConfirm">${t("Soo deji dhaqdhaqaaqyada","Import transactions")} (${okMembers.length})</button>` : ''}
     </div>
   `);
-  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mCancel").addEventListener("click", ()=>{ closeModal(); onDone(); });
   const confirmBtn = document.getElementById("mConfirm");
   if(confirmBtn){
     confirmBtn.addEventListener("click", async ()=>{
@@ -4125,11 +4147,13 @@ function showTransactionsImportPreview(members, unknownTypes, unmatchedNames, to
       closeModal();
       renderSummary(); renderList(); renderDetail(); renderAccounts();
       showToast(t(`${okMembers.length} xubnood dhaqdhaqaaqyadooda waa la soo dejiyay.`,`Imported transactions for ${okMembers.length} members.`));
+      onDone();
     });
   }
 }
 
-function showImportBalancesPreview(matches, unmatched){
+function showImportBalancesPreview(matches, unmatched, onDone){
+  onDone = onDone || (()=>{});
   const changing = matches.filter(x=>Math.abs(x.delta) >= 0.005);
   const unchanged = matches.length - changing.length;
   const rowsHtml = changing.length ? changing.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).map(x=>`
@@ -4164,7 +4188,7 @@ function showImportBalancesPreview(matches, unmatched){
       ${changing.length ? `<button class="primary" id="mConfirm">${t("Sameyso isbeddelka","Apply changes")}</button>` : ''}
     </div>
   `);
-  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mCancel").addEventListener("click", ()=>{ closeModal(); onDone(); });
   const confirmBtn = document.getElementById("mConfirm");
   if(confirmBtn){
     confirmBtn.addEventListener("click", async ()=>{
@@ -4180,6 +4204,7 @@ function showImportBalancesPreview(matches, unmatched){
       closeModal();
       renderSummary(); renderList(); renderDetail(); renderAccounts();
       showToast(t(`${changing.length} balance oo la saxay.`,`${changing.length} balances corrected.`));
+      onDone();
     });
   }
 }

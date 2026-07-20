@@ -444,6 +444,26 @@ confirm-and-required-memo modals. New destructive features should match
 whichever tier of friction fits their risk (irreversible data loss → two-step
 typed confirmation; reversible or already-logged → single confirm).
 
+## Data loading safety (`loadDb()` / `fetchDb()`)
+
+`loadDb()` calls `fetchDb()`, which `GET`s `/api/data` with one retry (after
+a 1.5s delay, to ride out a cold Neon connection) before giving up.
+**Critically, `loadDb()` must never fabricate a default/empty `db` and then
+call `saveDb()` when the fetch failed** — `saveDb()`'s full delete-and-
+reinsert would overwrite the real server data with that empty shell on a
+merely transient failure. This was a real, previously-shipped bug: any GET
+failure (network blip, cold start, transient 500) fell back to
+`{users: [], ...}`, which `renderAuthGate()` reads as "no admin set up
+yet" (shows Setup instead of Login) — and the very next line unconditionally
+saved that empty state back to the server, wiping real data. On a genuine
+fetch failure, `fetchDb()` returns `false`, `loadDb()` calls
+`renderLoadFailedScreen()` (a "could not load, try again" screen, no
+Setup/Login rendered) and returns `false` without touching `db`; `init()`
+checks that return value and stops rather than rendering over it. The
+empty-default-db fallback inside `loadDb()` is legitimate only for a
+genuine first-run server response (fetch succeeded, tables are actually
+empty) — never for a failed fetch.
+
 ## Data seeding / one-time imports
 
 On every `loadDb()`, several idempotent migration functions run against the

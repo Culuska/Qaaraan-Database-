@@ -3749,6 +3749,21 @@ function handleImportFile(file){
   reader.readAsArrayBuffer(file);
 }
 
+// Import cells are read with raw:false (needed so dates come through as
+// formatted text), which means currency-formatted numeric cells arrive as
+// display strings too (e.g. "$1,234.56", or "(200.00)" for negatives) —
+// plain parseFloat mangles those. Strip formatting before parsing.
+function parseImportAmount(v){
+  if(v==null) return NaN;
+  let s = String(v).trim();
+  if(!s) return NaN;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  s = s.replace(/[^0-9.\-]/g,"");
+  const n = parseFloat(s);
+  if(isNaN(n)) return NaN;
+  return neg ? -Math.abs(n) : n;
+}
 function runBalanceImport(rows, keys, findKey){
   const nameKey = findKey(["customer","name","magac"]);
   const phoneKey = findKey(["phone","telefoon","tel"]);
@@ -3762,7 +3777,7 @@ function runBalanceImport(rows, keys, findKey){
   const usedMemberIds = new Set();
   for(const r of rows){
     const rawName = r[nameKey], rawPhone = phoneKey ? r[phoneKey] : null;
-    const target = parseFloat(r[balKey]);
+    const target = parseImportAmount(r[balKey]);
     if((rawName==null || String(rawName).trim()==="") && isNaN(target)) continue;
     if(isNaN(target)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("balance khaldan","invalid balance")}); continue; }
     const hit = matchMemberForImport(rawName, rawPhone);
@@ -3822,7 +3837,7 @@ function runTransactionsImport(rows, keys, findKey){
     let rawName = r[nameKey];
     if(rawName!=null && String(rawName).trim()!=="") lastName = rawName; else rawName = lastName; // QB groups by name, blank = same as above
     const rawType = r[typeKey];
-    const amt = parseFloat(String(r[amountKey]).replace(/[^0-9.\-]/g,""));
+    const amt = parseImportAmount(r[amountKey]);
     if(rawName==null || rawType==null || isNaN(amt)) { continue; } // header/subtotal/blank line
     const type = mapImportTxType(rawType);
     if(!type){ unknownTypes.add(String(rawType)); skippedRows++; continue; }
@@ -3834,7 +3849,7 @@ function runTransactionsImport(rows, keys, findKey){
     const date = normImportDate(dateKey ? r[dateKey] : null) || todayStr();
     const note = numKey && r[numKey]!=null ? String(r[numKey]) : "";
     bucket.txns.push({ id:newTxId(), type, amount:Math.abs(amt), date, note });
-    if(balKey){ const b = parseFloat(String(r[balKey]).replace(/[^0-9.\-]/g,"")); if(!isNaN(b)) bucket.lastBalance = b; }
+    if(balKey){ const b = parseImportAmount(r[balKey]); if(!isNaN(b)) bucket.lastBalance = b; }
   }
 
   // Validate each member: does summing the imported txns reproduce the file's final balance?

@@ -99,16 +99,21 @@ async function ensureSchema(client) {
 }
 
 async function loadState(client) {
+  // ORDER BY everywhere: without it, Postgres doesn't guarantee row order,
+  // and since saveState() fully deletes and reinserts every table on every
+  // save, row order can drift between saves. Application code (e.g. which
+  // account is treated as the default "first" one) must never assume a
+  // SELECT with no ORDER BY comes back in insertion order.
   const [members, transactions, disbursements, users, accounts, payables, activityLog, pendingActions, settingsRows] =
     await Promise.all([
-      client.query('SELECT * FROM members'),
-      client.query('SELECT * FROM transactions'),
-      client.query('SELECT * FROM disbursements'),
-      client.query('SELECT * FROM users'),
-      client.query('SELECT * FROM accounts'),
-      client.query('SELECT * FROM payables'),
-      client.query('SELECT * FROM activity_log'),
-      client.query('SELECT * FROM pending_actions'),
+      client.query('SELECT * FROM members ORDER BY id'),
+      client.query('SELECT * FROM transactions ORDER BY id'),
+      client.query('SELECT * FROM disbursements ORDER BY id'),
+      client.query('SELECT * FROM users ORDER BY id'),
+      client.query('SELECT * FROM accounts ORDER BY id'),
+      client.query('SELECT * FROM payables ORDER BY id'),
+      client.query('SELECT * FROM activity_log ORDER BY id'),
+      client.query('SELECT * FROM pending_actions ORDER BY id'),
       client.query('SELECT * FROM app_settings'),
     ]);
 

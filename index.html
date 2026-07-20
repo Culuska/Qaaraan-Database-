@@ -817,6 +817,7 @@ async function loadDb(){
   }
   backfillDisbursementAccounts();
   fixDanglingDisbursementAccounts();
+  fixMisassignedExternalCasesDisbursements();
   fixCreditMemoAccountTagging();
   fixSalaamBankOpeningBalance();
   fixSalaamBankOpeningBalance730();
@@ -974,7 +975,15 @@ function addExternalCasesAccount(){
 }
 
 function backfillDisbursementAccounts(){
-  const defaultAcct = db.accounts[0] ? db.accounts[0].id : "acc_salaam";
+  // Always prefer the real Salaam Bank account by its known ID over
+  // db.accounts[0] — the accounts table is fully deleted and reinserted on
+  // every save (see api/data.js's saveState()), and a plain SELECT with no
+  // ORDER BY doesn't guarantee row order comes back the same way. Relying
+  // on array position here previously let disbursements get silently
+  // tagged to whichever account happened to load first (e.g. External
+  // Cases), which is never the right fallback for a Guno/Diyo/Dhiignool
+  // expense.
+  const defaultAcct = db.accounts.some(a=>a.id==="acc_salaam") ? "acc_salaam" : (db.accounts[0] ? db.accounts[0].id : "acc_salaam");
   let fixed = 0;
   for(const d of db.disbursements){
     if(!d.account && d.category !== "Cafinaad (Balance sheet)"){
@@ -996,7 +1005,15 @@ function backfillDisbursementAccounts(){
 // default bank account, same as the missing-account case.
 function fixDanglingDisbursementAccounts(){
   const validIds = new Set(db.accounts.map(a=>a.id));
-  const defaultAcct = db.accounts[0] ? db.accounts[0].id : "acc_salaam";
+  // Always prefer the real Salaam Bank account by its known ID over
+  // db.accounts[0] — the accounts table is fully deleted and reinserted on
+  // every save (see api/data.js's saveState()), and a plain SELECT with no
+  // ORDER BY doesn't guarantee row order comes back the same way. Relying
+  // on array position here previously let disbursements get silently
+  // tagged to whichever account happened to load first (e.g. External
+  // Cases), which is never the right fallback for a Guno/Diyo/Dhiignool
+  // expense.
+  const defaultAcct = db.accounts.some(a=>a.id==="acc_salaam") ? "acc_salaam" : (db.accounts[0] ? db.accounts[0].id : "acc_salaam");
   let fixed = 0;
   for(const d of db.disbursements){
     if(d.account && !validIds.has(d.account) && d.category !== "Cafinaad (Balance sheet)"){
@@ -1006,6 +1023,25 @@ function fixDanglingDisbursementAccounts(){
   }
   if(fixed){
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-yada kharash ee lama helin", details:`${fixed} kharash oo lahaa account aan jirin — waxaa loo beddelay ${db.accounts.find(a=>a.id===defaultAcct)?.name||defaultAcct}`, status:"direct"});
+  }
+}
+
+// One-time correction for real bad data caused by the db.accounts[0]
+// ordering bug above: some Guno/Diyo/Dhiignool disbursements ended up
+// tagged to "acc_external_cases" (a receivable-like line, never a real
+// bank/cash account money is actually paid from) instead of Salaam Bank.
+// External Cases should never be the paying account for a community
+// expense, so any disbursement tagged to it is repointed to Salaam Bank.
+function fixMisassignedExternalCasesDisbursements(){
+  let fixed = 0;
+  for(const d of db.disbursements){
+    if(d.account === "acc_external_cases"){
+      d.account = "acc_salaam";
+      fixed++;
+    }
+  }
+  if(fixed){
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka kharashaadka si khalad ah loogu diiwaan-geliyay External Cases", details:`${fixed} kharash oo la beddelay Salaam Bank (External Cases ma aha account lagu bixiyo kharash)`, status:"direct"});
   }
 }
 

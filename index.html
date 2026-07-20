@@ -281,6 +281,36 @@
   .months-compare .bar{height:10px;background:var(--danger-bg);border-radius:20px;overflow:hidden;}
   .months-compare .bar .fill{height:100%;background:var(--accent);border-radius:20px;}
   .months-compare .nums{display:flex;justify-content:space-between;margin-top:8px;font-size:13px;}
+
+  /* LedgerLine — dark double-entry style, scoped to the General Ledger tab only */
+  .ll-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;}
+  .ll-panel{background:#0A0E17;border:1px solid #1B2233;border-radius:12px;overflow:hidden;color:#C9D3E0;}
+  .ll-tabs{display:flex;gap:4px;padding:12px 14px;border-bottom:1px solid #1B2233;flex-wrap:wrap;}
+  .ll-tabs button{display:flex;align-items:center;gap:7px;padding:8px 14px;font-size:12.5px;border-radius:8px;border:1px solid transparent;background:none;color:#7C8AA5;font-family:var(--font);}
+  .ll-tabs button i{font-size:15px;}
+  .ll-tabs button:hover{background:#131A2A;color:#C9D3E0;}
+  .ll-tabs button.on{background:#151C2E;border-color:#2A3450;color:#3DDC97;font-weight:600;}
+  .ll-table-wrap{overflow-x:auto;}
+  .ll-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .ll-table th{text-align:left;padding:10px 14px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#5B6A8A;border-bottom:1px solid #1B2233;white-space:nowrap;}
+  .ll-table td{padding:11px 14px;border-bottom:1px solid #131A2A;vertical-align:top;}
+  .ll-table tbody tr:hover{background:#0E1420;}
+  .ll-table .ll-desc{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#C9D3E0;}
+  .ll-table .ll-debit{color:#3DDC97;}
+  .ll-table .ll-credit{color:#E8A94C;}
+  .ll-table .ll-num{text-align:right;white-space:nowrap;}
+  .ll-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:600;letter-spacing:.02em;}
+  .ll-badge-inv{background:#0F2E22;color:#3DDC97;}
+  .ll-badge-pmt{background:#332310;color:#E8A94C;}
+  .ll-badge-exp{background:#211B38;color:#9B8CF2;}
+  .ll-badge-wo{background:#331414;color:#E8635E;}
+  .ll-badge-bill{background:#1A2438;color:#6FA8E8;}
+  .ll-badge-ob{background:#1B2233;color:#7C8AA5;}
+  .ll-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:11.5px;color:#5B6A8A;border-top:1px solid #1B2233;}
+  .ll-panel .frow label{color:#7C8AA5;}
+  .ll-panel select{background:#0E1420;color:#C9D3E0;border-color:#2A3450;}
+  .ll-panel .ll-balanced{color:#3DDC97;}
+  .ll-panel .ll-unbalanced{color:#E8635E;}
 </style>
 </head>
 <body>
@@ -494,13 +524,13 @@
         <button id="btnLedgerExportXlsx">Export Excel</button>
       </div>
     </div>
-    <div class="panel">
-      <div class="view-toggle" id="ledgerViewToggle" style="padding:10px 14px 0;">
-        <button data-ledgerview="journal" class="on" data-t-en="Journal">Diiwaanka Dhaqdhaqaaqyada</button>
-        <button data-ledgerview="ledger" data-t-en="Ledger by account">Xisaabta Account kasta</button>
-        <button data-ledgerview="trial" data-t-en="Trial Balance">Trial Balance</button>
+    <div class="ll-panel">
+      <div class="ll-tabs" id="ledgerViewToggle">
+        <button data-ledgerview="journal" class="on"><i class="ti ti-list-details"></i><span data-t-en="Journal">Diiwaanka Dhaqdhaqaaqyada</span></button>
+        <button data-ledgerview="ledger"><i class="ti ti-book-2"></i><span data-t-en="Ledger by account">Xisaabta Account kasta</span></button>
+        <button data-ledgerview="trial"><i class="ti ti-scale"></i><span data-t-en="Trial Balance">Trial Balance</span></button>
       </div>
-      <div id="ledgerContent" style="padding:16px;"></div>
+      <div id="ledgerContent"></div>
     </div>
   </div>
 
@@ -3074,20 +3104,20 @@ function buildJournalEntries(){
   const entries = [];
   for(const a of db.accounts){
     if(a.openingBalance){
-      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${a.name}`, debit:a.name, credit:EQUITY, amount:a.openingBalance});
+      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${a.name}`, debit:a.name, credit:EQUITY, amount:a.openingBalance, kind:"ob"});
     }
   }
   for(const m of db.members){
     if(m.openingBalance){
-      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${m.name}`, debit:AR, credit:EQUITY, amount:m.openingBalance});
+      entries.push({date:"2026-06-30", desc:`${t("Balance bilowga ah","Opening balance")}: ${m.name}`, debit:AR, credit:EQUITY, amount:m.openingBalance, kind:"ob"});
     }
     for(const tx of m.transactions){
       if(tx.type==="due"){
-        entries.push({date:tx.date, desc:`${t("Qoondo bille","Monthly due")}: ${m.name}`, debit:AR, credit:REVENUE, amount:tx.amount});
+        entries.push({date:tx.date, desc:`${t("Qoondo bille","Monthly due")}: ${m.name}`, debit:AR, credit:REVENUE, amount:tx.amount, kind:"inv"});
       } else if(tx.type==="payment"){
-        entries.push({date:tx.date, desc:`${t("Lacag-bixin","Payment")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:acctName(tx.account), credit:AR, amount:tx.amount});
+        entries.push({date:tx.date, desc:`${t("Lacag-bixin","Payment")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:acctName(tx.account), credit:AR, amount:tx.amount, kind:"pmt"});
       } else if(tx.type==="writeoff"){
-        entries.push({date:tx.date, desc:`${t("Deyn la cafiyay","Debt written off")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:BADDEBT, credit:AR, amount:tx.amount});
+        entries.push({date:tx.date, desc:`${t("Deyn la cafiyay","Debt written off")}: ${m.name}${tx.note?' — '+tx.note:''}`, debit:BADDEBT, credit:AR, amount:tx.amount, kind:"wo"});
       }
     }
   }
@@ -3099,16 +3129,28 @@ function buildJournalEntries(){
   for(const p of db.payables){
     const linkedDisb = db.disbursements.find(d=>d.payableId===p.id);
     const category = linkedDisb ? linkedDisb.category : UNCATEGORIZED_AP_EXPENSE;
-    entries.push({date:p.createdDate||todayStr(), desc:`${t("Bill la helay","Bill received")}: ${p.vendor}${p.description?(' — '+p.description):''}`, debit:linkedDisb ? expenseAcctName(category) : category, credit:AP, amount:p.amount});
+    entries.push({date:p.createdDate||todayStr(), desc:`${t("Bill la helay","Bill received")}: ${p.vendor}${p.description?(' — '+p.description):''}`, debit:linkedDisb ? expenseAcctName(category) : category, credit:AP, amount:p.amount, kind:"bill"});
     if(linkedDisb){
-      entries.push({date:p.paidDate||linkedDisb.date, desc:`${t("Bill la bixiyay","Bill paid")}: ${p.vendor}`, debit:AP, credit:acctName(linkedDisb.account), amount:p.amount});
+      entries.push({date:p.paidDate||linkedDisb.date, desc:`${t("Bill la bixiyay","Bill paid")}: ${p.vendor}`, debit:AP, credit:acctName(linkedDisb.account), amount:p.amount, kind:"pmt"});
     }
   }
   for(const d of db.disbursements){
     if(d.payableId) continue; // already posted above as a Dr AP / Cr Bank entry
-    entries.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${d.recipient?(' — '+d.recipient):''}`, debit:expenseAcctName(d.category), credit:acctName(d.account), amount:d.amount});
+    entries.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${d.recipient?(' — '+d.recipient):''}`, debit:expenseAcctName(d.category), credit:acctName(d.account), amount:d.amount, kind:"exp"});
   }
   entries.sort((a,b)=>a.date.localeCompare(b.date));
+  // Tag each entry with a short reference code (INV-001, PMT-001, ...) and a
+  // sequential journal number (J001, J002, ...), assigned in the final
+  // chronological order — purely cosmetic labeling, doesn't affect any of
+  // the amounts/accounts computed above.
+  const REF_PREFIX = {ob:"OB", inv:"INV", pmt:"PMT", wo:"WO", bill:"BILL", exp:"EXP"};
+  const counters = {};
+  entries.forEach((e,i)=>{
+    const prefix = REF_PREFIX[e.kind] || "GJ";
+    counters[prefix] = (counters[prefix]||0) + 1;
+    e.ref = `${prefix}-${String(counters[prefix]).padStart(3,'0')}`;
+    e.num = `J${String(i+1).padStart(3,'0')}`;
+  });
   return entries;
 }
 
@@ -3127,19 +3169,28 @@ function renderLedgerView(){
 
 function renderLedgerJournalHtml(entries){
   return `
-    <div class="muted" style="margin-bottom:8px;">${entries.length} ${t("diiwaan","entries")}</div>
-    <div style="overflow-x:auto;">
-      <table>
+    <div class="ll-table-wrap">
+      <table class="ll-table ll-mono">
         <thead><tr>
-          <th>${t("Taariikhda","Date")}</th><th>${t("Faahfaahin","Description")}</th>
+          <th>#</th><th>${t("Taariikhda","Date")}</th><th>${t("Tixraac","Ref")}</th><th style="min-width:200px;">${t("Faahfaahin","Description")}</th>
           <th>${t("Debit account","Debit account")}</th><th>${t("Credit account","Credit account")}</th>
-          <th style="text-align:right">${t("Lacagta","Amount")}</th>
+          <th style="text-align:right">DR</th><th style="text-align:right">CR</th>
         </tr></thead>
         <tbody>
-          ${entries.map(e=>`<tr><td>${e.date}</td><td>${e.desc}</td><td>${e.debit}</td><td>${e.credit}</td><td style="text-align:right">${money(e.amount)}</td></tr>`).join("")}
+          ${entries.map(e=>`<tr>
+            <td>${e.num}</td>
+            <td>${e.date}</td>
+            <td><span class="ll-badge ll-badge-${e.kind}">${e.ref}</span></td>
+            <td class="ll-desc" title="${e.desc.replace(/"/g,'&quot;')}">${e.desc}</td>
+            <td class="ll-debit">${e.debit}</td>
+            <td class="ll-credit">${e.credit}</td>
+            <td class="ll-num">${money(e.amount)}</td>
+            <td class="ll-num">${money(e.amount)}</td>
+          </tr>`).join("")}
         </tbody>
       </table>
     </div>
+    <div class="ll-foot"><span>${entries.length} ${t("diiwaan","entries")}</span></div>
   `;
 }
 
@@ -3154,23 +3205,28 @@ function renderLedgerByAccountHtml(entries){
     return {...e, runningBalance:bal};
   });
   return `
-    <div class="frow" style="max-width:360px;">
+    <div class="frow" style="max-width:360px;padding:14px 14px 0;">
       <label>${t("Dooro Account","Select account")}</label>
       <select id="ledgerAccountSelect">${accounts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}" ${a===current?'selected':''}>${a}</option>`).join("")}</select>
     </div>
-    <div class="tx-list" style="max-height:520px;">
-      ${withBal.length ? withBal.map(e=>`
-        <div class="tx ${e.debit===current?'due':'payment'}">
-          <div class="l">
-            <span>${e.date} — ${e.desc}</span>
-            <span class="muted">${e.debit===current ? t('Debit','Debit') : t('Credit','Credit')}: ${e.debit===current?e.credit:e.debit}</span>
-          </div>
-          <div style="text-align:right;">
-            <div class="amt">${e.debit===current?'+':'-'}${money(e.amount)}</div>
-            <div class="muted" style="font-size:11px;">${t('Balance','Balance')}: ${money(e.runningBalance)}</div>
-          </div>
-        </div>
-      `).join("") : `<div class="empty">${t("Wax dhaqdhaqaaq ah lama helin.","No transactions found.")}</div>`}
+    <div class="ll-table-wrap">
+      <table class="ll-table ll-mono">
+        <thead><tr>
+          <th>${t("Taariikhda","Date")}</th><th>${t("Tixraac","Ref")}</th><th style="min-width:200px;">${t("Faahfaahin","Description")}</th>
+          <th>${t("Isla socda","Other account")}</th><th style="text-align:right">${t("Debit","Debit")}</th><th style="text-align:right">${t("Credit","Credit")}</th><th style="text-align:right">${t("Balance","Balance")}</th>
+        </tr></thead>
+        <tbody>
+          ${withBal.length ? withBal.map(e=>`<tr>
+            <td>${e.date}</td>
+            <td><span class="ll-badge ll-badge-${e.kind}">${e.ref}</span></td>
+            <td class="ll-desc" title="${e.desc.replace(/"/g,'&quot;')}">${e.desc}</td>
+            <td>${e.debit===current?e.credit:e.debit}</td>
+            <td class="ll-num ll-debit">${e.debit===current?money(e.amount):''}</td>
+            <td class="ll-num ll-credit">${e.credit===current?money(e.amount):''}</td>
+            <td class="ll-num" style="font-weight:600;">${money(e.runningBalance)}</td>
+          </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;padding:30px;color:#5B6A8A;">${t("Wax dhaqdhaqaaq ah lama helin.","No transactions found.")}</td></tr>`}
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -3186,18 +3242,18 @@ function renderLedgerTrialBalanceHtml(entries){
   const rowsHtml = accounts.map(a=>{
     const {debit,credit} = totals[a];
     totalDebit += debit; totalCredit += credit;
-    return `<tr><td>${a}</td><td style="text-align:right">${debit?money(debit):'—'}</td><td style="text-align:right">${credit?money(credit):'—'}</td><td style="text-align:right;font-weight:600;">${money(debit-credit)}</td></tr>`;
+    return `<tr><td>${a}</td><td class="ll-num ll-debit">${debit?money(debit):'—'}</td><td class="ll-num ll-credit">${credit?money(credit):'—'}</td><td class="ll-num" style="font-weight:600;">${money(debit-credit)}</td></tr>`;
   }).join("");
   const balanced = Math.abs(totalDebit-totalCredit) < 0.01;
   return `
-    <div style="overflow-x:auto;">
-      <table>
+    <div class="ll-table-wrap">
+      <table class="ll-table ll-mono">
         <thead><tr><th>${t("Account","Account")}</th><th style="text-align:right">${t("Debit","Debit")}</th><th style="text-align:right">${t("Credit","Credit")}</th><th style="text-align:right">${t("Net","Net")}</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
-        <tfoot><tr style="font-weight:700;border-top:2px solid var(--line);"><td>${t("Wadarta","Total")}</td><td style="text-align:right">${money(totalDebit)}</td><td style="text-align:right">${money(totalCredit)}</td><td style="text-align:right">${money(totalDebit-totalCredit)}</td></tr></tfoot>
+        <tfoot><tr style="font-weight:700;border-top:1px solid #2A3450;"><td>${t("Wadarta","Total")}</td><td class="ll-num">${money(totalDebit)}</td><td class="ll-num">${money(totalCredit)}</td><td class="ll-num">${money(totalDebit-totalCredit)}</td></tr></tfoot>
       </table>
     </div>
-    <div class="muted" style="margin-top:10px;color:${balanced?'var(--accent-ink)':'var(--danger-ink)'}">${balanced ? t('✓ Isku dheelitiran (debits = credits)','✓ Balanced (debits = credits)') : t('⚠ Ma isku dheelitirna','⚠ Not balanced')}</div>
+    <div class="ll-foot ${balanced?'ll-balanced':'ll-unbalanced'}">${balanced ? t('✓ Isku dheelitiran (debits = credits)','✓ Balanced (debits = credits)') : t('⚠ Ma isku dheelitirna','⚠ Not balanced')}</div>
   `;
 }
 

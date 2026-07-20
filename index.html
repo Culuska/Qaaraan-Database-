@@ -796,11 +796,25 @@ async function loadDb(){
     if(!m.accruedMonths) m.accruedMonths = [];
     if(!m.transactions) m.transactions = [];
   }
-  fixLegacyHistoryImport();
-  removeNonGroupLegacyMembers();
-  addMissingSeedMembers();
-  importCreditMemosAsDisbursements();
-  importJournalDisbursements();
+  // These five are one-time bootstrap/legacy migrations tied to the
+  // hardcoded seed constants (SEED_MEMBERS/HISTORY_REPORTS/
+  // JOURNAL_DISBURSEMENTS) — they must never run more than once total,
+  // or a hardcoded historical constant can silently reassert itself over
+  // real, live, later data (exactly what caused opening balances and
+  // disbursements to "come back" after a reset). Once seedComplete is
+  // set, none of them ever run again, for anyone.
+  if(!db.settings.seedComplete){
+    fixLegacyHistoryImport();
+    removeNonGroupLegacyMembers();
+    addMissingSeedMembers();
+    // Skip re-seeding disbursements specifically if a financial reset already
+    // ran (belt-and-suspenders — these two also self-guard on this flag).
+    if(!db.settings.financialDataReset){
+      importCreditMemosAsDisbursements();
+      importJournalDisbursements();
+    }
+    db.settings.seedComplete = true;
+  }
   backfillDisbursementAccounts();
   fixDanglingDisbursementAccounts();
   fixCreditMemoAccountTagging();

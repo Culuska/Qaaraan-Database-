@@ -13,6 +13,10 @@
 
 import { Pool } from '@neondatabase/serverless';
 
+// Extra headroom for larger saves/loads (real data now runs to thousands of
+// transaction rows) — actual cap depends on the Vercel plan.
+export const config = { maxDuration: 60 };
+
 let pool;
 function getPool() {
   if (!pool) pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -152,6 +156,28 @@ async function loadState(client) {
   };
 }
 
+// Inserts many rows in chunked multi-row statements instead of one
+// round-trip per row. At real data volumes (hundreds of members, thousands
+// of transactions), one-row-at-a-time awaited inserts add up to thousands
+// of sequential network round-trips per save — easily enough to exceed a
+// serverless function's execution time limit. A single multi-row INSERT
+// per chunk does the same work in a handful of round-trips.
+async function batchInsert(client, table, columns, rows, chunkSize = 500) {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const params = [];
+    const tuples = chunk.map((row) => {
+      const placeholders = row.map((_, j) => `$${params.length + j + 1}`);
+      params.push(...row);
+      return `(${placeholders.join(',')})`;
+    });
+    await client.query(
+      `INSERT INTO ${table} (${columns.join(',')}) VALUES ${tuples.join(',')}`,
+      params
+    );
+  }
+}
+
 async function saveState(client, state) {
   await client.query('BEGIN');
   try {
@@ -165,62 +191,54 @@ async function saveState(client, state) {
     await client.query('DELETE FROM pending_actions');
     await client.query('DELETE FROM app_settings');
 
+    await batchInsert(
+      client, 'members',
+      ['id', 'name', 'phone', 'monthly_due', 'opening_balance', 'status', 'accrued_months'],
+      (state.members || []).map(m => [m.id, m.name, m.phone || null, m.monthlyDue || 0, m.openingBalance || 0, m.status || 'active', JSON.stringify(m.accruedMonths || [])])
+    );
+    const allTx = [];
     for (const m of state.members || []) {
-      await client.query(
-        `INSERT INTO members (id,name,phone,monthly_due,opening_balance,status,accrued_months)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [m.id, m.name, m.phone || null, m.monthlyDue || 0, m.openingBalance || 0, m.status || 'active', JSON.stringify(m.accruedMonths || [])]
-      );
       for (const t of m.transactions || []) {
-        await client.query(
-          `INSERT INTO transactions (id,member_id,type,amount,date,note,account)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [t.id, m.id, t.type, t.amount, t.date, t.note || null, t.account || null]
-        );
+        allTx.push([t.id, m.id, t.type, t.amount, t.date, t.note || null, t.account || null]);
       }
     }
-    for (const d of state.disbursements || []) {
-      await client.query(
-        `INSERT INTO disbursements (id,category,amount,date,recipient,shared_with,memo,account)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [d.id, d.category, d.amount, d.date, d.recipient || null, d.sharedWith || null, d.memo || null, d.account || null]
-      );
-    }
-    for (const u of state.users || []) {
-      await client.query(
-        `INSERT INTO users (id,username,password,role,permissions) VALUES ($1,$2,$3,$4,$5)`,
-        [u.id, u.username, u.password, u.role || 'staff', JSON.stringify(u.permissions || {})]
-      );
-    }
-    for (const a of state.accounts || []) {
-      await client.query(
-        `INSERT INTO accounts (id,name,opening_balance) VALUES ($1,$2,$3)`,
-        [a.id, a.name, a.openingBalance || 0]
-      );
-    }
-    for (const p of state.payables || []) {
-      await client.query(
-        `INSERT INTO payables (id,vendor,amount,due_date,description,status,created_date,paid_date)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [p.id, p.vendor, p.amount, p.dueDate || null, p.description || null, p.status || 'unpaid', p.createdDate || null, p.paidDate || null]
-      );
-    }
-    for (const a of state.activityLog || []) {
-      await client.query(
-        `INSERT INTO activity_log (id,ts,actor,action,details,status) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [a.id, a.ts, a.actor || null, a.action || null, a.details || null, a.status || null]
-      );
-    }
-    for (const p of state.pendingActions || []) {
-      await client.query(
-        `INSERT INTO pending_actions (id,type,payload,label,requested_by,requested_at,status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [p.id, p.type, JSON.stringify(p.payload || {}), p.label || null, p.requestedBy || null, p.requestedAt || null, p.status || 'pending']
-      );
-    }
-    for (const [key, value] of Object.entries(state.settings || {})) {
-      await client.query(`INSERT INTO app_settings (key, value) VALUES ($1,$2)`, [key, String(value)]);
-    }
+    await batchInsert(client, 'transactions', ['id', 'member_id', 'type', 'amount', 'date', 'note', 'account'], allTx);
+
+    await batchInsert(
+      client, 'disbursements',
+      ['id', 'category', 'amount', 'date', 'recipient', 'shared_with', 'memo', 'account'],
+      (state.disbursements || []).map(d => [d.id, d.category, d.amount, d.date, d.recipient || null, d.sharedWith || null, d.memo || null, d.account || null])
+    );
+    await batchInsert(
+      client, 'users',
+      ['id', 'username', 'password', 'role', 'permissions'],
+      (state.users || []).map(u => [u.id, u.username, u.password, u.role || 'staff', JSON.stringify(u.permissions || {})])
+    );
+    await batchInsert(
+      client, 'accounts',
+      ['id', 'name', 'opening_balance'],
+      (state.accounts || []).map(a => [a.id, a.name, a.openingBalance || 0])
+    );
+    await batchInsert(
+      client, 'payables',
+      ['id', 'vendor', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date'],
+      (state.payables || []).map(p => [p.id, p.vendor, p.amount, p.dueDate || null, p.description || null, p.status || 'unpaid', p.createdDate || null, p.paidDate || null])
+    );
+    await batchInsert(
+      client, 'activity_log',
+      ['id', 'ts', 'actor', 'action', 'details', 'status'],
+      (state.activityLog || []).map(a => [a.id, a.ts, a.actor || null, a.action || null, a.details || null, a.status || null])
+    );
+    await batchInsert(
+      client, 'pending_actions',
+      ['id', 'type', 'payload', 'label', 'requested_by', 'requested_at', 'status'],
+      (state.pendingActions || []).map(p => [p.id, p.type, JSON.stringify(p.payload || {}), p.label || null, p.requestedBy || null, p.requestedAt || null, p.status || 'pending'])
+    );
+    await batchInsert(
+      client, 'app_settings',
+      ['key', 'value'],
+      Object.entries(state.settings || {}).map(([key, value]) => [key, String(value)])
+    );
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');

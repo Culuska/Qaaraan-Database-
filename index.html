@@ -775,6 +775,9 @@ async function loadDb(){
   fixCreditMemoAccountTagging();
   fixSalaamBankOpeningBalance();
   fixSalaamBankOpeningBalance730();
+  tagImportedPaymentsToSalaamBank();
+  fixSalaamBankOpeningBalance578();
+  addExternalCasesAccount();
   syncAccruals();
   await saveDb();
   return true;
@@ -867,6 +870,57 @@ function fixSalaamBankOpeningBalance730(){
     acc.openingBalance = 730;
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin)", details:`$${before} → $730 (sida uu xaqiijiyay admin-ka, taariikhda 30 June 2026)`, status:"direct"});
   }
+}
+
+// $730 (30 June 2026) was a snapshot at one point in time. The admin has
+// since provided the account's true opening balance from the very start of
+// real records: $578 on 10 Feb 2024 (matching the earliest transactions in
+// the imported QuickBooks history — see tagImportedPaymentsToSalaamBank()
+// below, which is what makes this figure reconcile against real deposit
+// history). Supersedes $730 the same way that superseded $20,621 — only
+// fires while the value is still exactly $730, so it won't clobber a later
+// manual Edit Account change.
+function fixSalaamBankOpeningBalance578(){
+  const acc = db.accounts.find(a=>a.id==="acc_salaam");
+  if(!acc || acc.openingBalance !== 730) return;
+  acc.openingBalance = 578;
+  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (xaqiijin admin - taariikh dhamaystiran)", details:"$730 → $578 (sida uu xaqiijiyay admin-ka, taariikhda 10 February 2024, marka ay ka bilaabmeen diiwaanka QuickBooks)", status:"direct"});
+}
+
+// Payments imported via the QuickBooks transactions importer are deliberately
+// left untagged to any bank account (see runTransactionsImport), so a bulk
+// import can't silently swing the account balance before an admin confirms
+// it should. The admin has now confirmed these should count toward Salaam
+// Bank, since that's the real account the money was deposited into.
+// Manually-recorded payments always carry an account (the payment form
+// requires picking one — see applyAction's "payment" case), so an untagged
+// "payment" transaction reliably means it came from the import. Idempotent:
+// once tagged, running again finds nothing left to do.
+function tagImportedPaymentsToSalaamBank(){
+  let tagged = 0;
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment" && !tx.account){
+        tx.account = "acc_salaam";
+        tagged++;
+      }
+    }
+  }
+  if(tagged){
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Diiwaan-gelinta lacagaha la soo dejiyay ee Salaam Bank", details:`${tagged} ${t("lacag oo la soo dejiyay ayaa loo diiwaan-geliyay Salaam Bank (sida uu xaqiijiyay admin-ka)","imported payments tagged to Salaam Bank (confirmed by admin)")}`, status:"direct"});
+  }
+}
+
+// One-time addition matching the admin's real QuickBooks Balance Sheet:
+// "EXTERNAL CASES" ($636, an Other Current Asset) — money owed to the fund
+// by outside parties/cases, distinct from regular member dues (Accounts
+// Receivable). Modeled as a plain account (like Salaam Bank) so it shows on
+// the Accounts tab and can be edited/adjusted the same way; nothing is
+// tagged to it automatically. Fixed id so this only ever runs once.
+function addExternalCasesAccount(){
+  if(db.accounts.some(a=>a.id==="acc_external_cases")) return;
+  db.accounts.push({id:"acc_external_cases", name:t("External Cases","External Cases"), openingBalance:636});
+  db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
 }
 
 function backfillDisbursementAccounts(){

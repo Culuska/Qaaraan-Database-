@@ -379,6 +379,34 @@ export (columns `Name`, `Type`, `Date`, `Num`, `Account`, `Amount`,
   (`account` unset) so a bulk history import doesn't unexpectedly swing
   account balances. This is destructive to existing history for matched
   members — the preview carries a bold warning to take a Backup first.
+- If an `Account` column is present, rows not tagged to something matching
+  `/receivable/i` are silently skipped rather than imported as a member
+  transaction — keeps rows for other ledgers (bank, expense categories) out
+  of member history if a future export ever mixes them in. All real data
+  seen so far has been `Accounts Receivable` only.
+- **Lessons from testing against a real QuickBooks "Customer Balance
+  Summary" export** (132 members, 2783 rows) — these were real bugs, not
+  hypothetical edge cases:
+  - The member name can sit in a **column with no header text at all** (a
+    leftover from an indented/grouped report layout — the name is a
+    group-header value, not a same-row field). `findKey` can't find it by
+    text, so `runTransactionsImport` falls back to
+    `findImportNameColumnFallback()`: the first column that holds text on
+    rows where `Type`/`Amount` are blank (group-header rows), excluding
+    `"Total ..."` subtotal lines.
+  - `"General Journal"` is a real QuickBooks `Type` value (manual
+    adjustments, often marked `BAD DEBT` in the `Num` column) with no fixed
+    due/payment/writeoff meaning. `mapImportTxType` infers it from the
+    amount's sign: negative → `writeoff`, positive → `due`, rather than
+    treating it as unknown and blocking the whole import.
+  - Currency-formatted cells are read as **display text**, not raw numbers
+    (`raw:false` is required so date cells come through as formatted text).
+    `parseImportAmount()` strips `$`/commas and reads `(200.00)` as `-200`.
+    Critically, **accounting number formats render an exact zero as a lone
+    dash** (`"$ - "`) instead of `"0.00"` — a non-empty, digit-less cell is
+    read as `0`, not treated as unparseable, so a member whose balance lands
+    on exactly $0 doesn't lose their final balance to a silent parse
+    failure.
 
 ## Admin email & WhatsApp notifications
 

@@ -40,7 +40,9 @@
   .sidebar-nav button:hover{background:#F4F2EC;color:var(--ink);}
   .sidebar-nav button.on{background:var(--accent-bg);color:var(--accent-ink);font-weight:600;}
   .sidebar-divider{height:1px;background:var(--line);margin:10px 6px;}
-  .sidebar-group-label{padding:12px 10px 4px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);}
+  .sidebar-group-label{display:flex;align-items:center;gap:6px;width:100%;margin-top:8px;padding:8px 10px 8px 6px;border:none;background:none;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);text-align:left;cursor:pointer;min-height:auto;border-radius:8px;}
+  .sidebar-group-label i{font-size:14px;}
+  .sidebar-group-label:hover{background:#F4F2EC;color:var(--ink-2);}
   .sidebar-footer{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;}
   .sidebar-user{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px;gap:8px;}
   .sidebar-user .nm{font-size:13px;font-weight:600;}
@@ -586,6 +588,7 @@ async function verifyPassword(password, stored){
 }
 let viewMode = "full";
 let currentTab = "members";
+let sidebarGroupsExpanded = {entry:false, report:false};
 let disbCatFilter = "all";
 let disbRecipientFilter = null;
 const PERM_KEYS = ["addCustomer","collectPayment","delete","deactivate","viewReports"];
@@ -2848,16 +2851,25 @@ function renderTabs(){
   }
 
   const navBtn = tab => `<button data-tab="${tab.action?'':tab.id}" ${tab.action?`data-action="${tab.action}"`:''} class="${!tab.action && currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
-  const groupLabel = txt => `<div class="sidebar-group-label">${txt}</div>`;
+  // Group headers are clickable toggles — click to expand/collapse the
+  // items under them, collapsed by default so Entry/Report don't crowd
+  // the sidebar until the admin actually wants them.
+  const groupHeader = (key, txt) => `<button class="sidebar-group-label" data-group="${key}"><i class="ti ${sidebarGroupsExpanded[key]?'ti-chevron-down':'ti-chevron-right'}"></i><span>${txt}</span></button>`;
   const navList = document.getElementById("sidebarNavList");
   navList.innerHTML = tabs.slice(0,2).map(navBtn).join("")
-    + (entryTabs.length ? groupLabel(t("GALINTA","ENTRY")) + entryTabs.map(navBtn).join("") : "")
-    + (reportTabs.length ? groupLabel(t("WARBIXINNO","REPORT")) + reportTabs.map(navBtn).join("") : "")
+    + (entryTabs.length ? groupHeader("entry", t("GALINTA","ENTRY")) + (sidebarGroupsExpanded.entry ? entryTabs.map(navBtn).join("") : "") : "")
+    + (reportTabs.length ? groupHeader("report", t("WARBIXINNO","REPORT")) + (sidebarGroupsExpanded.report ? reportTabs.map(navBtn).join("") : "") : "")
     + tabs.slice(2).map(navBtn).join("")
     + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
     + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : "");
   navList.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
     btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
+  });
+  navList.querySelectorAll("[data-group]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      sidebarGroupsExpanded[btn.dataset.group] = !sidebarGroupsExpanded[btn.dataset.group];
+      renderTabs();
+    });
   });
   const usersBtn = navList.querySelector("[data-action='users']");
   if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);

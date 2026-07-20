@@ -3759,8 +3759,11 @@ function parseImportAmount(v){
   if(!s) return NaN;
   let neg = false;
   if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
-  s = s.replace(/[^0-9.\-]/g,"");
-  const n = parseFloat(s);
+  const stripped = s.replace(/[^0-9.\-]/g,"");
+  // Accounting number formats render an exact zero as a lone dash (e.g. "$ - ")
+  // rather than "0.00" — a non-empty cell with no digits at all means zero.
+  if(!/\d/.test(stripped)) return 0;
+  const n = parseFloat(stripped);
   if(isNaN(n)) return NaN;
   return neg ? -Math.abs(n) : n;
 }
@@ -3792,11 +3795,16 @@ function runBalanceImport(rows, keys, findKey){
 
 // Maps a spreadsheet "Type" value to an internal transaction type.
 // Returns "due" | "payment" | "writeoff" | null (unknown).
-function mapImportTxType(raw){
+function mapImportTxType(raw, amt){
   const s = String(raw||"").toLowerCase();
   if(/invoice|due|qoondo|charge|bill|deyn/.test(s)) return "due";
   if(/payment|receipt|deposit|lacag|bixin|paid/.test(s)) return "payment";
   if(/credit|write|cafi|bad\s*debt|baddebt|discount|adjust/.test(s)) return "writeoff";
+  // QuickBooks "Journal"/"General Journal" entries are manual adjustments with
+  // no further category — infer from the amount's sign instead: a negative
+  // journal entry reduces the balance like a write-off (these are commonly
+  // bad-debt entries), a positive one increases it like a due.
+  if(/journal/.test(s)) return (amt<0) ? "writeoff" : "due";
   return null;
 }
 function normImportDate(v){
@@ -3813,17 +3821,39 @@ function normImportDate(v){
   return isNaN(d) ? s : d.toISOString().slice(0,10);
 }
 
+// QuickBooks "Transaction List/Detail by Customer" reports often have the
+// customer name as a group-header row with NO column heading of its own (the
+// name column is blank in row 1 — it's a leftover from an indented report
+// layout, not a real "Name" field). When no header literally says
+// Name/Customer, fall back to structural detection: the name column is
+// whichever one holds text on rows where Type (and Amount) are blank — i.e.
+// the group-header rows — excluding "Total ..." subtotal lines.
+function findImportNameColumnFallback(rows, keys, typeKey, amountKey){
+  for(const k of keys){
+    if(k===typeKey || k===amountKey) continue;
+    for(const r of rows){
+      const v = r[k];
+      if(v==null || String(v).trim()==="") continue;
+      const hasType = typeKey && r[typeKey]!=null && String(r[typeKey]).trim()!=="";
+      const hasAmt = amountKey && r[amountKey]!=null && String(r[amountKey]).trim()!=="";
+      if(!hasType && !hasAmt && !/^total\b/i.test(String(v).trim())) return k;
+    }
+  }
+  return null;
+}
+
 // Full-transactions import: rebuilds each matched member's transaction history
 // from the file. Uses the file's own running "Balance" column as a correctness
 // check — a member is only applied if the transactions we build reproduce the
 // file's final stated balance, so a wrong Type mapping can't silently corrupt data.
 function runTransactionsImport(rows, keys, findKey){
-  const nameKey = findKey(["name","customer","magac"]);
   const typeKey = findKey(["type","nooca"]);
   const dateKey = findKey(["date","taariikh"]);
   const numKey  = findKey(["num","number","lambar"]);
   const amountKey = findKey(["amount","lacagta","qadarka"]);
   const balKey  = findKey(["balance","hadhaaga"]);
+  const acctKey = findKey(["account","xisaab"]);
+  const nameKey = findKey(["name","customer","magac"]) || findImportNameColumnFallback(rows, keys, typeKey, amountKey);
   if(!nameKey || !typeKey || !amountKey){
     showToast(t("Faylku waa in uu leeyahay 'Name', 'Type', iyo 'Amount'.","The file must have 'Name', 'Type', and 'Amount' columns."));
     return;
@@ -3835,11 +3865,15 @@ function runTransactionsImport(rows, keys, findKey){
   let lastName = null;
   for(const r of rows){
     let rawName = r[nameKey];
+    // "Total <name>" subtotal rows aren't a new group — and have no Type, so
+    // they're dropped below anyway, but don't let them clobber lastName.
+    if(rawName!=null && /^total\b/i.test(String(rawName).trim())) rawName = null;
     if(rawName!=null && String(rawName).trim()!=="") lastName = rawName; else rawName = lastName; // QB groups by name, blank = same as above
     const rawType = r[typeKey];
     const amt = parseImportAmount(r[amountKey]);
     if(rawName==null || rawType==null || isNaN(amt)) { continue; } // header/subtotal/blank line
-    const type = mapImportTxType(rawType);
+    if(acctKey){ const acct = r[acctKey]; if(acct!=null && String(acct).trim()!=="" && !/receivable/i.test(String(acct))){ skippedRows++; continue; } } // not a member/AR row (e.g. bank or expense account) — out of scope here
+    const type = mapImportTxType(rawType, amt);
     if(!type){ unknownTypes.add(String(rawType)); skippedRows++; continue; }
     const hit = matchMemberForImport(rawName, null);
     if(!hit){ unmatchedNames.add(String(rawName)); continue; }

@@ -802,6 +802,7 @@ async function loadDb(){
   importCreditMemosAsDisbursements();
   importJournalDisbursements();
   backfillDisbursementAccounts();
+  fixDanglingDisbursementAccounts();
   fixCreditMemoAccountTagging();
   fixSalaamBankOpeningBalance();
   fixSalaamBankOpeningBalance730();
@@ -964,6 +965,28 @@ function backfillDisbursementAccounts(){
   }
   if(fixed){
     db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Cusboonaysiinta account-ka kharashaadka (Salaam Bank)", details:`${fixed} kharash oo la saxay`, status:"direct"});
+  }
+}
+
+// backfillDisbursementAccounts() above only catches a MISSING account
+// (null/undefined). A disbursement can also carry a non-empty account id
+// that no longer matches anything in db.accounts (e.g. left over from
+// before an account was renamed/replaced) — the Ledger renders that as
+// "Unspecified account" even though the row looks tagged. This catches
+// that dangling-reference case specifically and repoints it to the
+// default bank account, same as the missing-account case.
+function fixDanglingDisbursementAccounts(){
+  const validIds = new Set(db.accounts.map(a=>a.id));
+  const defaultAcct = db.accounts[0] ? db.accounts[0].id : "acc_salaam";
+  let fixed = 0;
+  for(const d of db.disbursements){
+    if(d.account && !validIds.has(d.account) && d.category !== "Cafinaad (Balance sheet)"){
+      d.account = defaultAcct;
+      fixed++;
+    }
+  }
+  if(fixed){
+    db.activityLog.unshift({id:"a"+Date.now(), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka account-yada kharash ee lama helin", details:`${fixed} kharash oo lahaa account aan jirin — waxaa loo beddelay ${db.accounts.find(a=>a.id===defaultAcct)?.name||defaultAcct}`, status:"direct"});
   }
 }
 

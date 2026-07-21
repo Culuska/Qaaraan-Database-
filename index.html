@@ -859,6 +859,7 @@ async function loadDb(){
   fixSalaamBankOpeningBalance578();
   addExternalCasesAccount();
   importQBCustomerReconciliation2026();
+  fixQBCustomerCorrections2026();
   syncAccruals();
   await saveDb();
   return true;
@@ -1010,32 +1011,12 @@ function addExternalCasesAccount(){
 }
 
 // One-time reconciliation against the July 2026 QuickBooks Customer
-// Balance export: (1) corrects a handful of existing members whose name
-// was recorded slightly differently in QuickBooks (confirmed by the
-// admin to be the same person, same phone), syncing their balance to the
-// QuickBooks figure, and (2) adds members who appear in QuickBooks but
-// were missing from this app entirely — added as "inactive" since they
-// weren't part of the active roster. Gated on its own flag (distinct
-// from seedComplete) so it only ever runs once, ever.
+// Balance export: adds members who appear in QuickBooks but were missing
+// from this app entirely — added as "inactive" since they weren't part
+// of the active roster. Gated on its own flag (distinct from
+// seedComplete) so it only ever runs once, ever.
 function importQBCustomerReconciliation2026(){
   if(db.settings.qbReconcile2026Done) return;
-  const CORRECTIONS = [
-    {id:"m111", name:"Abdiaziz Abdirahman Jilibey", openingBalance:5},
-    {id:"m20", name:"Abdirhahman Hussein Ahmednur", openingBalance:0},
-    {id:"m39", name:"Abdullahi Mohamed Xirsi", openingBalance:30},
-    {id:"m112", openingBalance:5},
-    {id:"m34", openingBalance:0},
-    {id:"m84", openingBalance:0},
-    {id:"m118", openingBalance:5},
-  ];
-  let correctedCount = 0;
-  for(const c of CORRECTIONS){
-    const m = db.members.find(x=>x.id===c.id);
-    if(!m) continue;
-    if(c.name) m.name = c.name;
-    m.openingBalance = c.openingBalance;
-    correctedCount++;
-  }
   const NEW_INACTIVE_MEMBERS = [
     {name:"Abdirahman Hussein Xirsi", phone:"615076525"},
     {name:"Abdirahman Qasim Abdulle", phone:"615094778"},
@@ -1063,7 +1044,45 @@ function importQBCustomerReconciliation2026(){
     });
   }
   db.settings.qbReconcile2026Done = true;
-  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Isku hubinta xubnaha QuickBooks (Julay 2026)", details:`${correctedCount} xubnood oo la saxay, ${NEW_INACTIVE_MEMBERS.length} xubnood oo cusub oo aan firfircoonayn la daray`, status:"direct"});
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Isku hubinta xubnaha QuickBooks (Julay 2026)", details:`${NEW_INACTIVE_MEMBERS.length} xubnood oo cusub oo aan firfircoonayn la daray`, status:"direct"});
+}
+
+// The name corrections/balance syncs from the reconciliation above matched
+// members by a hardcoded id (m111, m20, ...) taken from the SEED_MEMBERS
+// snapshot in this file — but the live database's real member ids didn't
+// match those (SEED_MEMBERS is only used once, on the very first-ever
+// load, and this app's history includes rebuilds where ids could have
+// shifted), so every correction silently no-op'd while the new-member
+// inserts above (which don't depend on matching an id) went through fine.
+// This redo matches by name instead, which is what was actually verified
+// against the live app. Separate flag so it can run once on its own,
+// independent of qbReconcile2026Done above (which already fired).
+function fixQBCustomerCorrections2026(){
+  if(db.settings.qbCorrections2026Done) return;
+  const norm = s => String(s||"").trim().toLowerCase();
+  const CORRECTIONS = [
+    {oldName:"Abdiaziz Abdirhaman Hassan", name:"Abdiaziz Abdirahman Jilibey", openingBalance:5},
+    {oldName:"Abdirahman Hussein Ahmed", name:"Abdirhahman Hussein Ahmednur", openingBalance:0},
+    {oldName:"Abdullahi Muxumed xirsi", name:"Abdullahi Mohamed Xirsi", openingBalance:30},
+    {oldName:"Abdi Wali Ahmed Abdi", openingBalance:5},
+    {oldName:"Abdullahi Ali ganey", openingBalance:0},
+    {oldName:"Mahad Garuun", openingBalance:0},
+    {oldName:"Abdullahi Jumbur", openingBalance:5},
+  ];
+  let correctedCount = 0;
+  const correctedNames = [];
+  for(const c of CORRECTIONS){
+    const m = db.members.find(x=>norm(x.name)===norm(c.oldName));
+    if(!m) continue;
+    if(c.name) m.name = c.name;
+    m.openingBalance = c.openingBalance;
+    correctedCount++;
+    correctedNames.push(c.name || c.oldName);
+  }
+  db.settings.qbCorrections2026Done = true;
+  if(correctedCount){
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka balance-yada xubnaha QuickBooks (retry — matched by name)", details:`${correctedCount}/${CORRECTIONS.length} la saxay: ${correctedNames.join(", ")}`, status:"direct"});
+  }
 }
 
 function backfillDisbursementAccounts(){

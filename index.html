@@ -4590,9 +4590,15 @@ function handleImportFile(file, onDone){
     const typeKey = findKey(["type","nooca"]);
     const amountKey = findKey(["amount","lacagta","qadarka"]);
     const balTotalKey = findKey(["balancetotal","balancehadda","hadhaaga"]);
-    // A transactions file has Type + Amount rows; a balance file has Balance Total.
+    const statusKey = findKey(["activestatus","status","xaalad"]);
+    // A transactions file has Type + Amount rows; a status file has an Active
+    // Status column (checked before Balance Total, since this file also
+    // carries a Balance Total column and would otherwise be misread as a
+    // balance-only import); anything else with a Balance Total is a balance file.
     if(typeKey && amountKey && !balTotalKey){
       runTransactionsImport(rows, keys, findKey, onDone);
+    } else if(statusKey){
+      runStatusImport(rows, keys, findKey, onDone);
     } else {
       runBalanceImport(rows, keys, findKey, onDone);
     }
@@ -4919,6 +4925,99 @@ function showImportBalancesPreview(matches, unmatched, onDone){
       closeModal();
       renderSummary(); renderList(); renderDetail(); renderAccounts();
       showToast(t(`${changing.length} balance oo la saxay.`,`${changing.length} balances corrected.`));
+      onDone();
+    });
+  }
+}
+
+// Maps a spreadsheet "Active Status" value to a member status. Anything
+// starting with "in"/"not" (Inactive, Not-active, Not Active) reads as
+// inactive; everything else (Active, Yes, ...) reads as active.
+function mapImportStatus(raw){
+  const s = String(raw||"").trim().toLowerCase();
+  if(!s) return null;
+  if(/^(in|not)/.test(s)) return "inactive";
+  return "active";
+}
+
+function runStatusImport(rows, keys, findKey, onDone){
+  onDone = onDone || (()=>{});
+  const nameKey = findKey(["customer","name","magac"]);
+  const phoneKey = findKey(["phone","telefoon","tel"]);
+  const statusKey = findKey(["activestatus","status","xaalad"]);
+  if(!nameKey || !statusKey){
+    showToast(t("Faylku waa in uu leeyahay tiirar 'Customer' iyo 'Active Status'.","The file must have 'Customer' and 'Active Status' columns."));
+    onDone();
+    return;
+  }
+  const matches = [];
+  const unmatched = [];
+  const usedMemberIds = new Set();
+  for(const r of rows){
+    const rawName = r[nameKey], rawPhone = phoneKey ? r[phoneKey] : null;
+    if(rawName==null || String(rawName).trim()==="") continue;
+    const newStatus = mapImportStatus(r[statusKey]);
+    if(!newStatus){ unmatched.push({name:rawName, phone:rawPhone, reason:t("xaalad khaldan","invalid status")}); continue; }
+    const hit = matchMemberForImport(rawName, rawPhone);
+    if(!hit){ unmatched.push({name:rawName, phone:rawPhone, reason:t("lama helin xubin","no member found")}); continue; }
+    if(usedMemberIds.has(hit.member.id)){ unmatched.push({name:rawName, phone:rawPhone, reason:t("xubin labo jeer","member matched twice")}); continue; }
+    usedMemberIds.add(hit.member.id);
+    matches.push({member:hit.member, oldStatus:hit.member.status, newStatus, via:hit.via});
+  }
+  showStatusImportPreview(matches, unmatched, onDone);
+}
+
+function showStatusImportPreview(matches, unmatched, onDone){
+  onDone = onDone || (()=>{});
+  const changing = matches.filter(x=>x.oldStatus !== x.newStatus);
+  const unchanged = matches.length - changing.length;
+  const statusLabel = s => s==="active" ? t("Firfircoon","Active") : t("Aan firfircoonayn","Inactive");
+  const rowsHtml = changing.length ? changing.sort((a,b)=>a.member.name.localeCompare(b.member.name)).map(x=>`
+    <div class="tx">
+      <div class="l">
+        <span>${x.member.name}</span>
+        <span class="muted">${statusLabel(x.oldStatus)} → ${statusLabel(x.newStatus)} <span style="opacity:.7;">(${x.via})</span></span>
+      </div>
+      <span class="amt" style="color:${x.newStatus==='active'?'var(--accent-ink)':'var(--danger-ink)'}">${statusLabel(x.newStatus)}</span>
+    </div>
+  `).join("") : `<div class="empty">${t("Ma jiraan wax isbeddel ah — dhammaan waafaqsan yihiin.","No changes — everything already matches.")}</div>`;
+
+  openModal(`
+    <h3>${t("Horudhaca soo dejinta xaaladda (Active/Inactive)","Active/Inactive import preview")}</h3>
+    <div class="bal-row" style="margin-bottom:12px;">
+      <div class="bal-box"><div class="lbl">${t("La waafajiyay","Matched")}</div><div class="val" style="font-size:15px;">${matches.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Wax isbeddelaya","Will change")}</div><div class="val" style="font-size:15px;color:var(--warn);">${changing.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Isku mid","Unchanged")}</div><div class="val" style="font-size:15px;">${unchanged}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Lama waafajin","Unmatched")}</div><div class="val" style="font-size:15px;color:var(--danger-ink);">${unmatched.length}</div></div>
+    </div>
+    <div class="muted" style="margin-bottom:6px;">${t("Xubnaha xaaladdoodu isbeddelayso","Members whose status will change")}:</div>
+    <div class="tx-list" style="max-height:260px;">${rowsHtml}</div>
+    ${unmatched.length ? `
+      <div class="muted" style="margin:12px 0 6px;color:var(--danger-ink);">${t("Lama waafajin (lama taaban doono)","Unmatched (will be left untouched)")}:</div>
+      <div class="tx-list" style="max-height:140px;">
+        ${unmatched.map(u=>`<div class="tx"><div class="l"><span>${u.name==null?'—':u.name}</span><span class="muted">${u.phone||''} · ${u.reason}</span></div></div>`).join("")}
+      </div>` : ''}
+    ${changing.length ? `<div class="frow"><label>${t('Si aad u xaqiijiso, qor','To confirm, type')} IMPORT</label><input type="text" id="statusImportConfirmInput" placeholder="IMPORT"></div>` : ''}
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      ${changing.length ? `<button class="primary" id="mConfirm">${t("Sameyso isbeddelka","Apply changes")}</button>` : ''}
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", ()=>{ closeModal(); onDone(); });
+  const confirmBtn = document.getElementById("mConfirm");
+  if(confirmBtn){
+    confirmBtn.addEventListener("click", async ()=>{
+      const entered = (document.getElementById("statusImportConfirmInput").value||"").trim();
+      if(entered !== "IMPORT"){ showToast(t('Qor "IMPORT" si sax ah.','Type "IMPORT" exactly.')); return; }
+      for(const x of changing){
+        x.member.status = x.newStatus;
+        logActivity("Saxitaanka xaaladda (Excel import)", `${x.member.name}: ${statusLabel(x.oldStatus)} → ${statusLabel(x.newStatus)}`, "direct");
+      }
+      db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Soo dejinta xaaladda (Excel)", details:`${changing.length} ${t("xubnood la saxay","members updated")}, ${unmatched.length} ${t("lama waafajin","unmatched")}`, status:"direct"});
+      await saveDb();
+      closeModal();
+      renderSummary(); renderList(); renderDetail(); renderAccounts();
+      showToast(t(`${changing.length} xubnood xaaladdoodii waa la saxay.`,`${changing.length} members' status updated.`));
       onDone();
     });
   }

@@ -869,6 +869,7 @@ async function loadDb(){
     }
     db.settings.seedComplete = true;
   }
+  restoreSalaamBankAccount2026();
   backfillDisbursementAccounts();
   fixDanglingDisbursementAccounts();
   fixMisassignedExternalCasesDisbursements();
@@ -1031,6 +1032,30 @@ function addExternalCasesAccount(){
   if(db.accounts.some(a=>a.id==="acc_external_cases")) return;
   db.accounts.push({id:"acc_external_cases", name:t("External Cases","External Cases"), openingBalance:636});
   db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
+}
+
+// Salaam Bank (acc_salaam) went missing from db.accounts entirely at some
+// point (likely a reset that touched accounts) — every payment transaction
+// tagged to it was untouched and still real, but with no account record
+// left to hold an opening balance, its reported balance was wrong. This
+// restores it with an opening balance computed so the CURRENT balance
+// lands on $1,205 (the real QuickBooks Checking/Savings figure) given the
+// payments already tagged to it — a placeholder for the community expense
+// transactions (Guno/Diya/Dhiig nool) that were never re-imported after
+// the roster was cleared, so this number will need revisiting once those
+// are brought in for real. Own flag, runs once.
+function restoreSalaamBankAccount2026(){
+  if(db.settings.salaamBankRestored2026Done) return;
+  if(!db.accounts.some(a=>a.id==="acc_salaam")){
+    let paidIn = 0;
+    for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account==="acc_salaam") paidIn += tx.amount;
+    let paidOut = 0;
+    for(const d of db.disbursements) if(d.account==="acc_salaam") paidOut += d.amount;
+    const openingBalance = Math.round((1205 - paidIn + paidOut)*100)/100;
+    db.accounts.unshift({id:"acc_salaam", name:"Salaam Bank", openingBalance});
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Dib u soo celinta account-ka Salaam Bank", details:`Salaam Bank ma jirin database-ka — dib ayaa loo daray si balance-ku hadda uu u noqdo $1,205 (Balance Sheet-ka QuickBooks); opening balance = ${money(openingBalance)} (waxaa ku jira lacago kharash oo aan weli la soo dejin)`, status:"direct"});
+  }
+  db.settings.salaamBankRestored2026Done = true;
 }
 
 // One-time reconciliation against the July 2026 QuickBooks Customer

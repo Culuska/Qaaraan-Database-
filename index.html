@@ -341,6 +341,23 @@
   .ll-drcr-box.debit .lbl,.ll-drcr-box.debit .val,.ll-drcr-box.debit select{color:#3DDC97;}
   .ll-drcr-box.credit .lbl,.ll-drcr-box.credit .val,.ll-drcr-box.credit select{color:#E8A94C;}
   .ll-drcr-arrow{color:#5B6A8A;font-size:16px;flex-shrink:0;}
+
+  /* Balance Sheet on-screen preview — print-style light layout, matching
+     the QuickBooks report look, shown before choosing PDF/Excel. */
+  .modal.bs-modal{max-width:560px;}
+  .bs-title{text-align:center;margin-bottom:16px;}
+  .bs-title .co{font-size:18px;font-weight:700;}
+  .bs-title .doc{font-size:15px;font-weight:700;margin-top:2px;}
+  .bs-title .asof{font-size:12px;color:var(--ink-2);margin-top:2px;}
+  .bs-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .bs-table td{padding:5px 4px;}
+  .bs-table td.amt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .bs-table tr.bs-section td{background:#EFEDE7;font-weight:700;text-transform:uppercase;font-size:11.5px;letter-spacing:.03em;padding:7px 4px;}
+  .bs-table tr.bs-l1 td:first-child{padding-left:4px;font-weight:600;}
+  .bs-table tr.bs-l2 td:first-child{padding-left:18px;}
+  .bs-table tr.bs-l3 td:first-child{padding-left:32px;color:var(--ink-2);}
+  .bs-table tr.bs-total td{font-weight:700;border-top:1px solid var(--line);}
+  .bs-table tr.bs-grandtotal td{font-weight:700;border-top:2px solid var(--ink);border-bottom:3px double var(--ink);}
 </style>
 </head>
 <body>
@@ -3247,7 +3264,57 @@ function openBalanceSheetReportModal(){
     showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
     return;
   }
-  openReportFormatChoice(t("Xaaladda Maaliyadeed (Balance Sheet)","Balance Sheet"), exportBalanceSheetPdf, exportBalanceSheetExcel);
+  const d = buildBalanceSheetData();
+  const line = (label, amount, cls)=>`<tr class="${cls||''}"><td>${label}</td><td class="amt">${amount===undefined?'':money(amount)}</td></tr>`;
+  const rowsHtml = `
+    <tr class="bs-section"><td colspan="2">${t("HANTIDA","ASSETS")}</td></tr>
+    ${line(t("Hantida Hadda","Current Assets"), undefined, "bs-l1")}
+    ${line(t("Jeegaga/Kaydka","Checking/Savings"), undefined, "bs-l2")}
+    ${d.checking.map(c=>line(c.name, c.amount, "bs-l3")).join("")}
+    ${line(t("Wadarta Jeegaga/Kaydka","Total Checking/Savings"), d.totalChecking, "bs-l2 bs-total")}
+    ${line(t("Xisaabaadka La Sugayo","Accounts Receivable"), undefined, "bs-l2")}
+    ${line(t("Xisaabaadka La Sugayo","Accounts Receivable"), d.arAmount, "bs-l3")}
+    ${line(t("Wadarta Xisaabaadka La Sugayo","Total Accounts Receivable"), d.arAmount, "bs-l2 bs-total")}
+    ${d.otherCurrentAssets.length ? `
+      ${line(t("Hantida Kale ee Hadda","Other Current Assets"), undefined, "bs-l2")}
+      ${d.otherCurrentAssets.map(o=>line(o.name, o.amount, "bs-l3")).join("")}
+      ${line(t("Wadarta Hantida Kale","Total Other Current Assets"), d.totalOtherCurrent, "bs-l2 bs-total")}
+    ` : ''}
+    ${line(t("Wadarta Hantida Hadda","Total Current Assets"), d.totalCurrentAssets, "bs-l1 bs-total")}
+    ${line(t("WADARTA HANTIDA","TOTAL ASSETS"), d.totalAssets, "bs-grandtotal")}
+    <tr><td colspan="2">&nbsp;</td></tr>
+    <tr class="bs-section"><td colspan="2">${t("DEYMAHA & HANTIDA LEEGYADA","LIABILITIES & EQUITY")}</td></tr>
+    ${Math.abs(d.totalLiabilities) > 0.004 ? `
+      ${line(t("Deymaha","Liabilities"), undefined, "bs-l1")}
+      ${line(t("Xisaabaadka La Bixin","Accounts Payable"), d.apAmount, "bs-l2")}
+      ${line(t("Wadarta Deymaha","Total Liabilities"), d.totalLiabilities, "bs-l1 bs-total")}
+    ` : ''}
+    ${line(t("Hantida Leegyada","Equity"), undefined, "bs-l1")}
+    ${line(t("Hantida Bilowga ah","Opening Balance Equity"), d.openingEquity, "bs-l2")}
+    ${line(t("Dakhliga Saafiga ah","Net Income"), d.netIncome, "bs-l2")}
+    ${line(t("Wadarta Hantida Leegyada","Total Equity"), d.totalEquity, "bs-l1 bs-total")}
+    ${line(t("WADARTA DEYMAHA & HANTIDA LEEGYADA","TOTAL LIABILITIES & EQUITY"), d.totalLiabEquity, "bs-grandtotal")}
+  `;
+  openModal(`
+    <div class="bs-title">
+      <div class="co">QAARAAN</div>
+      <div class="doc">${t("Xaaladda Maaliyadeed","Balance Sheet")}</div>
+      <div class="asof">${t("Ilaa","As of")} ${todayStr()}</div>
+    </div>
+    <table class="bs-table">${rowsHtml}</table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button id="bsXlsx">Excel</button>
+      <button class="primary" id="bsPdf">PDF</button>
+    </div>
+  `, "bs-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("bsPdf").addEventListener("click", ()=>{
+    try{ exportBalanceSheetPdf(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.getElementById("bsXlsx").addEventListener("click", ()=>{
+    try{ exportBalanceSheetExcel(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
 }
 
 function exportBalanceSheetPdf(){

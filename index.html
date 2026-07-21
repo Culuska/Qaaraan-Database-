@@ -4538,7 +4538,15 @@ function handleImportFile(file, onDone){
     }
     if(!rows.length){ showToast(t("Faylku waa madhan yahay.","The file is empty.")+` (${file.name})`); onDone(); return; }
     const keys = Object.keys(rows[0]);
-    const findKey = (subs)=> keys.find(k=>subs.some(s=>k.toLowerCase().replace(/\s/g,"").includes(s)));
+    // Exact match first, substring only as a fallback — QuickBooks' "Customer
+    // Balance Detail" export has BOTH an "Open Balance" and a "Balance"
+    // column, and "balance" is a substring of "openbalance" too, so a plain
+    // .includes() search for the running-balance column ("balance") was
+    // matching "Open Balance" instead (it comes first) — every matched
+    // member's computed total was then checked against the wrong number and
+    // wrongly flagged as a "mismatch", silently excluding them from the
+    // import even though their transactions were correct.
+    const findKey = (subs)=> keys.find(k=>subs.some(s=>k.toLowerCase().replace(/\s/g,"")===s)) || keys.find(k=>subs.some(s=>k.toLowerCase().replace(/\s/g,"").includes(s)));
     const typeKey = findKey(["type","nooca"]);
     const amountKey = findKey(["amount","lacagta","qadarka"]);
     const balTotalKey = findKey(["balancetotal","balancehadda","hadhaaga"]);

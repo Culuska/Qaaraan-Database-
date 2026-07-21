@@ -4383,6 +4383,11 @@ function openAppSettingsModal(){
       <p class="muted" style="margin:0 0 10px;">${t("Ka tirtir dhammaan dhaqdhaqaaqyada xubnaha (due/payment/writeoff) iyo dhammaan Kharashaadka Bulshada (Guno/Diya/Dhiig nool/Bad Debt) — xubnaha (magacyada, telefoonada, monthly due) iyo accounts-ka (Salaam Bank, iwm) waa la ilaalinayaa sidoodii. Waxaa loogu talagalay in dib loo bilaabo entries saxan oo laga soo dejiyo fayl QuickBooks ah oo cusub.","Deletes every member's transactions (due/payment/writeoff) and every Community Expense (Guno/Diya/Dhiig nool/Bad Debt) — members (names, phones, monthly due) and accounts (Salaam Bank, etc.) are left untouched. Meant for starting over with correct entries from a fresh QuickBooks import.")}</p>
       <button class="ghost-danger" id="btnResetFinancialData"><i class="ti ti-trash"></i> ${t("Nadiifi dhammaan entries-ka","Clear all entries")}</button>
     </div>
+    <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px;">
+      <h3 style="margin:0 0 6px;color:var(--danger-ink);">${t("Tirtir DHAMMAAN xubnaha","Clear ALL members")}</h3>
+      <p class="muted" style="margin:0 0 10px;">${t("Ka tirtir xubnaha OO DHAN (magacyada, telefoonada, monthly due) iyo dhaqdhaqaaqyadooda oo dhan — waxaa loogu talagalay in la bilaabo test/import cusub oo xubno kale ah oo ka duwan kuwa hadda jira. Accounts-ka (Salaam Bank, iwm), users-ka, iyo settings-ka waa la ilaalinayaa.","Deletes EVERY member entirely (names, phones, monthly due) and all their transactions — meant for starting over with a completely different set of members for testing/import. Accounts (Salaam Bank, etc.), users, and settings are left untouched.")}</p>
+      <button class="ghost-danger" id="btnClearAllMembers"><i class="ti ti-user-x"></i> ${t("Tirtir dhammaan xubnaha","Clear all members")}</button>
+    </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
@@ -4413,6 +4418,7 @@ function openAppSettingsModal(){
     }
   });
   document.getElementById("btnResetFinancialData").addEventListener("click", openResetFinancialDataConfirm);
+  document.getElementById("btnClearAllMembers").addEventListener("click", openClearAllMembersConfirm);
 }
 
 // Wipes every member's transaction history and all Community Expenses
@@ -4457,6 +4463,40 @@ function openResetFinancialDataConfirm(){
     closeModal();
     renderSummary(); renderList(); renderDetail(); renderAccounts();
     showToast(t("Xogta maaliyadeed waa la nadiifiyay.","Financial data cleared."));
+  });
+}
+
+// Deletes every member entirely (not just their transactions, like Reset
+// financial data above) — for wiping test data and importing a completely
+// different member roster. Accounts, users, and settings are left as-is.
+// Stronger typed confirmation than Reset financial data ("DELETE ALL
+// MEMBERS" vs "RESET") since this is the more destructive of the two.
+function openClearAllMembersConfirm(){
+  const memberCount = db.members.length;
+  const txCount = db.members.reduce((s,m)=>s+m.transactions.length,0);
+  openModal(`
+    <h3>${t("Xaqiiji tirtirida xubnaha","Confirm clearing members")}</h3>
+    <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;color:var(--ink-2);">
+      <li>${t("Xubnaha oo dhan la tirtirayo","Members to be deleted")}: ${memberCount}</li>
+      <li>${t("Dhaqdhaqaaqyadooda oo dhan la tirtirayo","Their transactions to be deleted")}: ${txCount}</li>
+    </ul>
+    <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo. Samee Backup ka hor haddii aadan hore u samayn.","This cannot be undone. Take a Backup first if you haven't already.")}</p>
+    <div class="frow"><label>${t('Si aad u xaqiijiso, qor','To confirm, type')} DELETE ALL MEMBERS</label><input type="text" id="clearMembersConfirmInput" placeholder="DELETE ALL MEMBERS"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="ghost-danger" id="mConfirm">${t("Tirtir dhammaan xubnaha","Clear all members")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const entered = (document.getElementById("clearMembersConfirmInput").value||"").trim();
+    if(entered !== "DELETE ALL MEMBERS"){ showToast(t('Qor "DELETE ALL MEMBERS" si sax ah.','Type "DELETE ALL MEMBERS" exactly.')); return; }
+    db.members = [];
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:currentUser||"Admin", action:"Tirtirida dhammaan xubnaha", details:`${memberCount} xubnood, ${txCount} ${t("dhaqdhaqaaq","transactions")} la tirtiray`, status:"direct"});
+    await saveDb();
+    closeModal();
+    renderSummary(); renderList(); renderDetail(); renderAccounts();
+    showToast(t("Xubnaha oo dhan waa la tirtiray.","All members cleared."));
   });
 }
 

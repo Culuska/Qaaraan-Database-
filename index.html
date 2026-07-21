@@ -858,6 +858,7 @@ async function loadDb(){
   tagImportedPaymentsToSalaamBank();
   fixSalaamBankOpeningBalance578();
   addExternalCasesAccount();
+  importQBCustomerReconciliation2026();
   syncAccruals();
   await saveDb();
   return true;
@@ -1006,6 +1007,63 @@ function addExternalCasesAccount(){
   if(db.accounts.some(a=>a.id==="acc_external_cases")) return;
   db.accounts.push({id:"acc_external_cases", name:t("External Cases","External Cases"), openingBalance:636});
   db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
+}
+
+// One-time reconciliation against the July 2026 QuickBooks Customer
+// Balance export: (1) corrects a handful of existing members whose name
+// was recorded slightly differently in QuickBooks (confirmed by the
+// admin to be the same person, same phone), syncing their balance to the
+// QuickBooks figure, and (2) adds members who appear in QuickBooks but
+// were missing from this app entirely — added as "inactive" since they
+// weren't part of the active roster. Gated on its own flag (distinct
+// from seedComplete) so it only ever runs once, ever.
+function importQBCustomerReconciliation2026(){
+  if(db.settings.qbReconcile2026Done) return;
+  const CORRECTIONS = [
+    {id:"m111", name:"Abdiaziz Abdirahman Jilibey", openingBalance:5},
+    {id:"m20", name:"Abdirhahman Hussein Ahmednur", openingBalance:0},
+    {id:"m39", name:"Abdullahi Mohamed Xirsi", openingBalance:30},
+    {id:"m112", openingBalance:5},
+    {id:"m34", openingBalance:0},
+    {id:"m84", openingBalance:0},
+    {id:"m118", openingBalance:5},
+  ];
+  let correctedCount = 0;
+  for(const c of CORRECTIONS){
+    const m = db.members.find(x=>x.id===c.id);
+    if(!m) continue;
+    if(c.name) m.name = c.name;
+    m.openingBalance = c.openingBalance;
+    correctedCount++;
+  }
+  const NEW_INACTIVE_MEMBERS = [
+    {name:"Abdirahman Hussein Xirsi", phone:"615076525"},
+    {name:"Abdirahman Qasim Abdulle", phone:"615094778"},
+    {name:"Abdirahman Yusuf Adan", phone:""},
+    {name:"Abdiwahid Ali Yusuf", phone:"615119047"},
+    {name:"Abdulkadir isse Dhere", phone:"61 6561412"},
+    {name:"Ahmed Mohamed Haruun", phone:""},
+    {name:"Ahmed Omar Imaan", phone:"619550577"},
+    {name:"Ayub Macalin Abdi Ahmed", phone:"619732264"},
+    {name:"Hassan Ali culusow", phone:"619122862"},
+    {name:"Mahad Xassan Cawaale", phone:"616329089"},
+    {name:"Mohamed Yuusuf Adam", phone:"615725110"},
+    {name:"Mustaf Abdi Gedi", phone:"618238441"},
+    {name:"Qaliif Hassan Culusow", phone:"615660999"},
+    {name:"Shuceyb Hussein Xirsi", phone:"616708357"},
+    {name:"Xaashi Showshabo", phone:"617546611"},
+    {name:"Zakarie Abdukadir Mohamud (Fatul)", phone:"612228117"},
+    {name:"Zakira Ali dheere", phone:"0612333151"},
+  ];
+  for(const nm of NEW_INACTIVE_MEMBERS){
+    db.members.push({
+      id:"m_qb_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+      name:nm.name, phone:nm.phone, monthlyDue:5, openingBalance:0,
+      status:"inactive", transactions:[], accruedMonths:[],
+    });
+  }
+  db.settings.qbReconcile2026Done = true;
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Isku hubinta xubnaha QuickBooks (Julay 2026)", details:`${correctedCount} xubnood oo la saxay, ${NEW_INACTIVE_MEMBERS.length} xubnood oo cusub oo aan firfircoonayn la daray`, status:"direct"});
 }
 
 function backfillDisbursementAccounts(){

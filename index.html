@@ -2873,6 +2873,7 @@ function renderTabs(){
   if(hasPerm("viewReports")){
     reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
     reportTabs.push({id:"acctreport-action", label:t("Warbixinta Accounts","Account Balance Report"), icon:"ti-building-bank", action:"acctreport"});
+    reportTabs.push({id:"balancesheet-action", label:t("Xaaladda Maaliyadeed","Balance Sheet"), icon:"ti-report-money", action:"balancesheet"});
   }
   if(hasPerm("viewReports")){
     tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});
@@ -2919,6 +2920,8 @@ function renderTabs(){
   if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
   const acctReportBtn = navList.querySelector("[data-action='acctreport']");
   if(acctReportBtn) acctReportBtn.addEventListener("click", openAccountBalanceReportModal);
+  const balanceSheetBtn = navList.querySelector("[data-action='balancesheet']");
+  if(balanceSheetBtn) balanceSheetBtn.addEventListener("click", openBalanceSheetReportModal);
   const forecastBtn = navList.querySelector("[data-action='forecast']");
   if(forecastBtn) forecastBtn.addEventListener("click", ()=>openForecastModal());
 
@@ -3084,6 +3087,112 @@ function exportAccountBalancesExcel(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Accounts");
   XLSX.writeFile(wb, "account_balance_report.xlsx");
+}
+
+function openBalanceSheetReportModal(){
+  if(!hasPerm("viewReports")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  openReportFormatChoice(t("Xaaladda Maaliyadeed (Balance Sheet)","Balance Sheet"), exportBalanceSheetPdf, exportBalanceSheetExcel);
+}
+
+function exportBalanceSheetPdf(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const d = buildBalanceSheetData();
+  let y = 16;
+  doc.setFontSize(16); doc.setFont(undefined,"bold");
+  doc.text("QAARAAN", 105, y, {align:"center"}); y += 8;
+  doc.setFontSize(14);
+  doc.text(t("Xaaladda Maaliyadeed","Balance Sheet"), 105, y, {align:"center"}); y += 7;
+  doc.setFontSize(10); doc.setFont(undefined,"normal");
+  doc.text(`${t("Ilaa","As of")} ${todayStr()}`, 105, y, {align:"center"}); y += 10;
+
+  const line = (label, amount, opts={})=>{
+    doc.setFont(undefined, opts.bold?"bold":"normal");
+    doc.setFontSize(opts.size||9.5);
+    doc.text(label, 14 + (opts.indent||0)*7, y);
+    if(amount !== undefined) doc.text(money(amount), 196, y, {align:"right"});
+    y += 6;
+  };
+  const section = (label)=>{ doc.setFillColor(230,230,230); doc.rect(14,y-5,182,6.5,"F"); line(label, undefined, {bold:true}); };
+
+  section(t("HANTIDA","ASSETS"));
+  line(t("Hantida Hadda","Current Assets"), undefined, {bold:true, indent:1});
+  line(t("Jeegaga/Kaydka","Checking/Savings"), undefined, {indent:2});
+  for(const c of d.checking) line(c.name, c.amount, {indent:3});
+  line(t("Wadarta Jeegaga/Kaydka","Total Checking/Savings"), d.totalChecking, {indent:2, bold:true});
+  line(t("Xisaabaadka La Sugayo","Accounts Receivable"), undefined, {indent:2});
+  line(t("Xisaabaadka La Sugayo","Accounts Receivable"), d.arAmount, {indent:3});
+  line(t("Wadarta Xisaabaadka La Sugayo","Total Accounts Receivable"), d.arAmount, {indent:2, bold:true});
+  if(d.otherCurrentAssets.length){
+    line(t("Hantida Kale ee Hadda","Other Current Assets"), undefined, {indent:2});
+    for(const o of d.otherCurrentAssets) line(o.name, o.amount, {indent:3});
+    line(t("Wadarta Hantida Kale","Total Other Current Assets"), d.totalOtherCurrent, {indent:2, bold:true});
+  }
+  line(t("Wadarta Hantida Hadda","Total Current Assets"), d.totalCurrentAssets, {indent:1, bold:true});
+  line(t("WADARTA HANTIDA","TOTAL ASSETS"), d.totalAssets, {bold:true});
+  y += 4;
+
+  section(t("DEYMAHA & HANTIDA LEEGYADA","LIABILITIES & EQUITY"));
+  if(Math.abs(d.totalLiabilities) > 0.004){
+    line(t("Deymaha","Liabilities"), undefined, {bold:true, indent:1});
+    line(t("Xisaabaadka La Bixin","Accounts Payable"), d.apAmount, {indent:2});
+    line(t("Wadarta Deymaha","Total Liabilities"), d.totalLiabilities, {indent:1, bold:true});
+  }
+  line(t("Hantida Leegyada","Equity"), undefined, {bold:true, indent:1});
+  line(t("Hantida Bilowga ah","Opening Balance Equity"), d.openingEquity, {indent:2});
+  line(t("Dakhliga Saafiga ah","Net Income"), d.netIncome, {indent:2});
+  line(t("Wadarta Hantida Leegyada","Total Equity"), d.totalEquity, {indent:1, bold:true});
+  line(t("WADARTA DEYMAHA & HANTIDA LEEGYADA","TOTAL LIABILITIES & EQUITY"), d.totalLiabEquity, {bold:true});
+
+  doc.save("balance_sheet.pdf");
+}
+
+function exportBalanceSheetExcel(){
+  const d = buildBalanceSheetData();
+  const rows = [
+    ["QAARAAN"], [t("Xaaladda Maaliyadeed","Balance Sheet")], [`${t("Ilaa","As of")} ${todayStr()}`], [],
+    [t("HANTIDA","ASSETS")],
+    [t("Hantida Hadda","Current Assets")],
+    [t("Jeegaga/Kaydka","Checking/Savings")],
+    ...d.checking.map(c=>["", c.name, c.amount]),
+    ["", t("Wadarta Jeegaga/Kaydka","Total Checking/Savings"), d.totalChecking],
+    [t("Xisaabaadka La Sugayo","Accounts Receivable")],
+    ["", t("Xisaabaadka La Sugayo","Accounts Receivable"), d.arAmount],
+    ["", t("Wadarta Xisaabaadka La Sugayo","Total Accounts Receivable"), d.arAmount],
+  ];
+  if(d.otherCurrentAssets.length){
+    rows.push([t("Hantida Kale ee Hadda","Other Current Assets")]);
+    for(const o of d.otherCurrentAssets) rows.push(["", o.name, o.amount]);
+    rows.push(["", t("Wadarta Hantida Kale","Total Other Current Assets"), d.totalOtherCurrent]);
+  }
+  rows.push(
+    [t("Wadarta Hantida Hadda","Total Current Assets"), "", d.totalCurrentAssets],
+    [t("WADARTA HANTIDA","TOTAL ASSETS"), "", d.totalAssets],
+    [],
+    [t("DEYMAHA & HANTIDA LEEGYADA","LIABILITIES & EQUITY")],
+  );
+  if(Math.abs(d.totalLiabilities) > 0.004){
+    rows.push(
+      [t("Deymaha","Liabilities")],
+      ["", t("Xisaabaadka La Bixin","Accounts Payable"), d.apAmount],
+      ["", t("Wadarta Deymaha","Total Liabilities"), d.totalLiabilities],
+    );
+  }
+  rows.push(
+    [t("Hantida Leegyada","Equity")],
+    ["", t("Hantida Bilowga ah","Opening Balance Equity"), d.openingEquity],
+    ["", t("Dakhliga Saafiga ah","Net Income"), d.netIncome],
+    ["", t("Wadarta Hantida Leegyada","Total Equity"), d.totalEquity],
+    [t("WADARTA DEYMAHA & HANTIDA LEEGYADA","TOTAL LIABILITIES & EQUITY"), "", d.totalLiabEquity],
+  );
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:34},{wch:26},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Balance Sheet");
+  XLSX.writeFile(wb, "balance_sheet.xlsx");
 }
 
 function computeAccountImpact(acc){
@@ -3461,6 +3570,56 @@ function buildJournalEntries(){
     e.num = `J${String(i+1).padStart(3,'0')}`;
   });
   return entries;
+}
+
+// Classic Assets / Liabilities & Equity balance sheet, derived from the
+// same buildJournalEntries() ledger the General Ledger tab uses — every
+// account's net balance here is debits minus credits (or the reverse for
+// credit-normal accounts), so Total Assets always ties to Total
+// Liabilities & Equity by construction (double-entry guarantees it).
+// Salaam Bank is shown under Checking/Savings; any other db.accounts
+// entry (e.g. External Cases) falls under Other Current Assets, matching
+// the QuickBooks Balance Sheet layout this mirrors.
+function buildBalanceSheetData(){
+  const entries = buildJournalEntries();
+  const totals = {};
+  for(const e of entries){
+    (totals[e.debit] ||= {debit:0,credit:0}).debit += e.amount;
+    (totals[e.credit] ||= {debit:0,credit:0}).credit += e.amount;
+  }
+  const netDr = (name)=>{ const x = totals[name]; return x ? x.debit - x.credit : 0; };
+  const netCr = (name)=>-netDr(name);
+
+  const AR = t("Xisaabaadka La Sugayo","Accounts Receivable");
+  const REVENUE = t("Dakhliga Qoondada","Due Revenue");
+  const EQUITY = t("Hantida Bilowga ah","Opening Equity");
+  const AP = t("Xisaabaadka La Bixin (Deymaha)","Accounts Payable");
+
+  const checking = db.accounts.filter(a=>a.id==="acc_salaam").map(a=>({name:a.name, amount:netDr(a.name)}));
+  const otherCurrentAssets = db.accounts.filter(a=>a.id!=="acc_salaam").map(a=>({name:a.name, amount:netDr(a.name)}));
+  const totalChecking = checking.reduce((s,x)=>s+x.amount,0);
+  const arAmount = netDr(AR);
+  const totalOtherCurrent = otherCurrentAssets.reduce((s,x)=>s+x.amount,0);
+  const totalCurrentAssets = totalChecking + arAmount + totalOtherCurrent;
+  const totalAssets = totalCurrentAssets;
+
+  const apAmount = netCr(AP);
+  const totalLiabilities = apAmount;
+
+  const openingEquity = netCr(EQUITY);
+  const bankAndArNames = new Set([AR, EQUITY, AP, REVENUE, ...db.accounts.map(a=>a.name)]);
+  const expenseNames = Object.keys(totals).filter(name=>!bankAndArNames.has(name));
+  const totalRevenue = netCr(REVENUE);
+  const totalExpenses = expenseNames.reduce((s,n)=>s+netDr(n),0);
+  const netIncome = totalRevenue - totalExpenses;
+  const totalEquity = openingEquity + netIncome;
+  const totalLiabEquity = totalLiabilities + totalEquity;
+
+  return {
+    checking, totalChecking, arAmount, otherCurrentAssets, totalOtherCurrent,
+    totalCurrentAssets, totalAssets, apAmount, totalLiabilities,
+    openingEquity, totalRevenue, totalExpenses, netIncome, totalEquity, totalLiabEquity,
+  };
 }
 
 let ledgerSubView = "journal";

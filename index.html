@@ -396,10 +396,6 @@
       <div class="page-sub" data-t-en="Opening balance: 30 June 2026 • Dues period: July–December 2026">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
     </div>
     <div class="cards" id="summaryCards"></div>
-    <div class="panel" style="margin-top:18px;">
-      <div class="panel-head"><h2 data-t-en="Recent Activity">Dhaqdhaqaaqii ugu dambeeyay</h2></div>
-      <div id="dashRecentActivity"></div>
-    </div>
   </div>
 
   <div id="membersView" style="display:none;">
@@ -1423,24 +1419,6 @@ function renderSummary(){
     ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: locked account(s) — ${lockedUsers.map(u=>u.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
     ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);"><div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div><div class="val" style="color:var(--warn);">${pendingResets.map(r=>r.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: password reset requested — ${pendingResets.map(r=>r.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
   `;
-}
-
-function renderDashboardActivity(){
-  const el = document.getElementById("dashRecentActivity");
-  if(!el) return;
-  if(!isAdmin()){
-    el.innerHTML = '';
-    return;
-  }
-  const recent = db.activityLog.slice(0,5);
-  el.innerHTML = recent.length ? recent.map(a=>`
-    <div class="activity-row">
-      <div>
-        <div>${a.action} <span class="status-tag ${a.status}">${a.status}</span></div>
-        <div class="meta2">${a.actor} &nbsp;•&nbsp; ${new Date(a.ts).toLocaleString()} ${a.details?(' — '+a.details):''}</div>
-      </div>
-    </div>
-  `).join("") : `<div class="empty">${t("Wax activity ah lama helin.","No activity found.")}</div>`;
 }
 
 function memberRowHtml(m, idx){
@@ -3156,7 +3134,6 @@ function switchTab(tab){
   document.getElementById("financialView").style.display = tab==="financial" ? "" : "none";
   document.getElementById("ledgerView").style.display = tab==="ledger" ? "" : "none";
   renderSummary();
-  if(tab==="dashboard") renderDashboardActivity();
   if(tab==="disb") renderDisbursements();
   if(tab==="pending") renderPending();
   if(tab==="activity") renderActivity();

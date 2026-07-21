@@ -2448,10 +2448,6 @@ function jeMemberPickerHtml(){
   `;
 }
 
-function jeExpenseFieldsHtml(){
-  return `<div class="frow"><label>${t("Cida loo bixiyay (ikhtiyaari)","Recipient (optional)")}</label><input type="text" id="jeRecipient" value="${jeState.recipient||''}" placeholder="${t('magaca / qoyska','name / family')}"></div>`;
-}
-
 function jeDrCrHtml(){
   const type = jeState.type;
   let debitInner, creditInner;
@@ -2482,7 +2478,7 @@ function renderJournalEntryModal(){
   const title = (JOURNAL_ENTRY_TYPES.find(jt=>jt.key===type) || JOURNAL_ENTRY_TYPES[0]).label;
   openModal(`
     <h3>${title}</h3>
-    ${needsMember ? jeMemberPickerHtml() : jeExpenseFieldsHtml()}
+    ${needsMember ? jeMemberPickerHtml() : ''}
     ${jeDrCrHtml()}
     <form id="jeForm">
       <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="jeDate" value="${jeState.date||todayStr()}"></div>
@@ -2535,8 +2531,6 @@ function wireJournalEntryModal(){
   if(acctSel) acctSel.addEventListener("change", ()=>{ jeState.account = acctSel.value; });
   const catSel = document.getElementById("jeCategory");
   if(catSel) catSel.addEventListener("change", ()=>{ jeState.category = catSel.value; });
-  const recipEl = document.getElementById("jeRecipient");
-  if(recipEl) recipEl.addEventListener("input", ()=>{ jeState.recipient = recipEl.value; });
 
   ["jeDate","jeAmount","jeDesc","jeRef"].forEach(id=>{
     const el = document.getElementById(id);
@@ -2568,8 +2562,7 @@ function wireJournalEntryModal(){
     } else if(type==="expense"){
       const category = document.getElementById("jeCategory").value;
       const account = document.getElementById("jeAccount").value;
-      const recipient = (document.getElementById("jeRecipient")||{value:""}).value.trim();
-      r = await attemptAction("disbursement", {category, amount, date, recipient, memo: note || category, account}, "collectPayment", `Kharash (${category}): $${amount}`);
+      r = await attemptAction("disbursement", {category, amount, date, recipient:"", memo: note || category, account}, "collectPayment", `Kharash (${category}): $${amount}`);
     }
     if(!r || r.status === "denied") return;
     renderSummary(); renderList(); renderDetail();
@@ -2918,7 +2911,7 @@ function renderTabs(){
   const receiptBtn = navList.querySelector("[data-action='receipt']");
   if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
   const paymentBtn = navList.querySelector("[data-action='payment']");
-  if(paymentBtn) paymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("payment"));
+  if(paymentBtn) paymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
   const membersReportBtn = navList.querySelector("[data-action='membersreport']");
   if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
   const acctReportBtn = navList.querySelector("[data-action='acctreport']");
@@ -2956,7 +2949,7 @@ function renderTabs(){
   const mobReceiptBtn = nav.querySelector("[data-action='receipt']");
   if(mobReceiptBtn) mobReceiptBtn.addEventListener("click", openQuickReceiptModal);
   const mobPaymentBtn = nav.querySelector("[data-action='payment']");
-  if(mobPaymentBtn) mobPaymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("payment"));
+  if(mobPaymentBtn) mobPaymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
   const mobForecastBtn = nav.querySelector("[data-action='forecast']");
   if(mobForecastBtn) mobForecastBtn.addEventListener("click", ()=>openForecastModal());
 }

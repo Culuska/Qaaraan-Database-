@@ -2404,7 +2404,7 @@ const JOURNAL_ENTRY_TYPES = [
 ];
 const JE_EXPENSE_CATEGORIES = ["Guno","Xalane / Diya","Diya wadaag","Dhiig nool"];
 const JE_AR_LABEL = t("Xisaabaadka La Sugayo","Accounts Receivable");
-const JE_REVENUE_LABEL = t("Dakhliga","Revenue");
+const JE_REVENUE_LABEL = t("Dakhliga Qoondada","Due Revenue");
 const JE_BADDEBT_LABEL = t("Kharashka Deynta la Cafiyay","Bad Debt Expense");
 
 let jeState = {};
@@ -2460,20 +2460,19 @@ function jeExpenseFieldsHtml(){
 
 function jeDrCrHtml(){
   const type = jeState.type;
-  const memberLabel = jeState.member ? `${JE_AR_LABEL} — ${jeState.member.name}` : JE_AR_LABEL;
   let debitInner, creditInner;
   if(type==="invoice"){
-    debitInner = `<div class="val">${memberLabel}</div>`;
+    debitInner = `<div class="val">${JE_AR_LABEL}</div>`;
     creditInner = `<div class="val">${JE_REVENUE_LABEL}</div>`;
   } else if(type==="payment"){
     debitInner = `<select id="jeAccount">${jeAccountOptionsHtml(jeState.account)}</select>`;
-    creditInner = `<div class="val">${memberLabel}</div>`;
+    creditInner = `<div class="val">${JE_AR_LABEL}</div>`;
   } else if(type==="expense"){
     debitInner = `<select id="jeCategory">${jeCategoryOptionsHtml(jeState.category)}</select>`;
     creditInner = `<select id="jeAccount">${jeAccountOptionsHtml(jeState.account)}</select>`;
   } else {
     debitInner = `<div class="val">${JE_BADDEBT_LABEL}</div>`;
-    creditInner = `<div class="val">${memberLabel}</div>`;
+    creditInner = `<div class="val">${JE_AR_LABEL}</div>`;
   }
   return `<div class="ll-drcr-row">
     <div class="ll-drcr-box debit"><div class="lbl">${t("DEBIT (DR)","DEBIT (DR)")}</div>${debitInner}</div>
@@ -2485,20 +2484,7 @@ function jeDrCrHtml(){
 function renderJournalEntryModal(){
   const type = jeState.type;
   const needsMember = type==="invoice" || type==="payment" || type==="writeoff";
-  const ready = !needsMember || !!jeState.member;
-  if(!ready){
-    // Before a member is picked, keep the modal to just TYPE + search — the
-    // DR/CR boxes and Date/Amount/Description/Reference fields only appear
-    // once there's actually a member to post the entry against.
-    openModal(`
-      <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
-      ${jeTypeGridHtml()}
-      ${jeMemberPickerHtml()}
-      <div class="actions"><button type="button" id="jeCancel">${t("Jooji","Cancel")}</button></div>
-    `, "ll-modal");
-    wireJournalEntryModal();
-    return;
-  }
+  const canPost = needsMember ? !!jeState.member : true;
   openModal(`
     <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
     ${jeTypeGridHtml()}
@@ -2511,7 +2497,7 @@ function renderJournalEntryModal(){
       <div class="frow"><label>${t("Tixraac (ikhtiyaari)","Reference (optional)")}</label><input type="text" id="jeRef" value="${jeState.ref||''}" placeholder="${t('tusaale: #1234','e.g. #1234')}"></div>
       <div class="actions">
         <button type="button" id="jeCancel">${t("Jooji","Cancel")}</button>
-        <button type="submit" class="primary" id="jePost">${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
+        <button type="submit" class="primary" id="jePost" ${canPost?'':'disabled'}>${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
       </div>
     </form>
   `, "ll-modal");
@@ -2568,7 +2554,6 @@ function wireJournalEntryModal(){
   });
 
   const form = document.getElementById("jeForm");
-  if(!form) return;
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
     const type = jeState.type;
@@ -3418,7 +3403,7 @@ function openEditAccountModal(acc){
 // shows as a debit/credit pair across two accounts, QuickBooks-style.
 function buildJournalEntries(){
   const AR = t("Xisaabaadka La Sugayo","Accounts Receivable");
-  const REVENUE = t("Dakhliga","Revenue");
+  const REVENUE = t("Dakhliga Qoondada","Due Revenue");
   const BADDEBT = t("Kharashka Deynta la Cafiyay","Bad Debt Expense");
   const EQUITY = t("Hantida Bilowga ah","Opening Equity");
   const AP = t("Xisaabaadka La Bixin (Deymaha)","Accounts Payable");

@@ -2485,7 +2485,20 @@ function jeDrCrHtml(){
 function renderJournalEntryModal(){
   const type = jeState.type;
   const needsMember = type==="invoice" || type==="payment" || type==="writeoff";
-  const canPost = needsMember ? !!jeState.member : true;
+  const ready = !needsMember || !!jeState.member;
+  if(!ready){
+    // Before a member is picked, keep the modal to just TYPE + search — the
+    // DR/CR boxes and Date/Amount/Description/Reference fields only appear
+    // once there's actually a member to post the entry against.
+    openModal(`
+      <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
+      ${jeTypeGridHtml()}
+      ${jeMemberPickerHtml()}
+      <div class="actions"><button type="button" id="jeCancel">${t("Jooji","Cancel")}</button></div>
+    `, "ll-modal");
+    wireJournalEntryModal();
+    return;
+  }
   openModal(`
     <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
     ${jeTypeGridHtml()}
@@ -2498,7 +2511,7 @@ function renderJournalEntryModal(){
       <div class="frow"><label>${t("Tixraac (ikhtiyaari)","Reference (optional)")}</label><input type="text" id="jeRef" value="${jeState.ref||''}" placeholder="${t('tusaale: #1234','e.g. #1234')}"></div>
       <div class="actions">
         <button type="button" id="jeCancel">${t("Jooji","Cancel")}</button>
-        <button type="submit" class="primary" id="jePost" ${canPost?'':'disabled'}>${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
+        <button type="submit" class="primary" id="jePost">${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
       </div>
     </form>
   `, "ll-modal");
@@ -2555,6 +2568,7 @@ function wireJournalEntryModal(){
   });
 
   const form = document.getElementById("jeForm");
+  if(!form) return;
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
     const type = jeState.type;

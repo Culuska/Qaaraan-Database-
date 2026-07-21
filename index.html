@@ -868,6 +868,7 @@ async function loadDb(){
   importQBCustomerReconciliation2026();
   fixQBCustomerCorrections2026();
   importQBTransactionHistory2026();
+  fixDuplicateStatusAndAddMissingMembers2026();
   syncAccruals();
   await saveDb();
   return true;
@@ -1120,6 +1121,48 @@ function importQBTransactionHistory2026(){
   }
   db.settings.qbTxnHistory2026Done = true;
   db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Soo dejinta taariikhda dhaqdhaqaaqyada QuickBooks (2026)", details:`${matchedCount}/${Object.keys(QB_TXN_HISTORY_2026).length} xubnood oo dhaqdhaqaaqyadoodii la soo dejiyay${unmatched.length?(' — lama helin: '+unmatched.join(', ')):''}`, status:"direct"});
+}
+
+// Follow-up to the Active/Inactive status import: 3 pairs of members share a
+// phone number under two different QuickBooks name spellings but were
+// confirmed by the admin to be genuinely different people (not duplicates
+// to merge) — each just needed its own correct status. Also adds 3 people
+// who were in the Active Status file but missing from this app entirely
+// (they have no transactions in the QuickBooks export, so the transactions
+// re-import never recreated them), and explicitly skips 3 others the admin
+// asked not to add. Own flag so this one-off correction only ever runs once.
+function fixDuplicateStatusAndAddMissingMembers2026(){
+  if(db.settings.statusFix2026Done) return;
+  const STATUS_FIXES = [
+    {name:"Abdullahi Muxumed xirsi", status:"inactive"},
+    {name:"Ali Abdi (Ganey)", status:"inactive"},
+  ];
+  let fixedCount = 0;
+  for(const f of STATUS_FIXES){
+    const m = db.members.find(x=>x.name===f.name);
+    if(!m || m.status===f.status) continue;
+    m.status = f.status;
+    fixedCount++;
+  }
+  const NEW_MEMBERS = [
+    {name:"Abdiqadar Abdullahi Jumbur", phone:"0771260814", monthlyDue:5, status:"active"},
+    {name:"Zakaria Hussein Xirsi", phone:"616701727", monthlyDue:5, status:"active"},
+    {name:"Daahir Adan", phone:"", monthlyDue:5, status:"inactive"},
+  ];
+  let addedCount = 0;
+  for(const nm of NEW_MEMBERS){
+    if(db.members.some(x=>x.name===nm.name)) continue;
+    db.members.push({
+      id:"m_qb2_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+      name:nm.name, phone:nm.phone, monthlyDue:nm.monthlyDue, openingBalance:0,
+      status:nm.status, transactions:[], accruedMonths:[],
+    });
+    addedCount++;
+  }
+  db.settings.statusFix2026Done = true;
+  if(fixedCount || addedCount){
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka xaaladda + xubno cusub (retry)", details:`${fixedCount} xubnood oo xaaladdooda la saxay, ${addedCount} xubnood oo cusub oo la daray`, status:"direct"});
+  }
 }
 
 function backfillDisbursementAccounts(){

@@ -314,6 +314,33 @@
   .ll-panel select{background:#0E1420;color:#C9D3E0;border-color:#2A3450;}
   .ll-panel .ll-balanced{color:#3DDC97;}
   .ll-panel .ll-unbalanced{color:#E8635E;}
+
+  /* New Journal Entry modal — dark unified double-entry form */
+  .modal.ll-modal{background:#0A0E17;color:#C9D3E0;border:1px solid #1B2233;max-width:460px;}
+  .modal.ll-modal h3{color:#fff;margin-top:0;}
+  .modal.ll-modal .frow label{color:#7C8AA5;}
+  .modal.ll-modal input[type=text],.modal.ll-modal input[type=number],.modal.ll-modal input[type=date],.modal.ll-modal select{background:#0E1420;color:#C9D3E0;border:1px solid #2A3450;}
+  .modal.ll-modal .muted{color:#5B6A8A;}
+  .modal.ll-modal .empty{color:#5B6A8A;}
+  .modal.ll-modal .tx-list .tx{background:#0E1420;border:1px solid #1B2233;}
+  .modal.ll-modal .tx-list .tx:hover{background:#131A2A;}
+  .modal.ll-modal .actions button{background:#151C2E;border:1px solid #2A3450;color:#C9D3E0;}
+  .modal.ll-modal .actions button.primary{background:#3DDC97;border-color:#3DDC97;color:#0A0E17;font-weight:600;}
+  .modal.ll-modal .actions button.primary:hover{background:#33C787;}
+  .modal.ll-modal .actions button.primary:disabled{opacity:.4;cursor:not-allowed;}
+  .ll-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px;}
+  .ll-type-btn{display:flex;align-items:center;gap:8px;padding:12px;border-radius:8px;border:1px solid #2A3450;background:#0E1420;color:#7C8AA5;font-size:12.5px;font-family:var(--font);cursor:pointer;text-align:left;}
+  .ll-type-btn i{font-size:16px;}
+  .ll-type-btn:hover{background:#131A2A;color:#C9D3E0;}
+  .ll-type-btn.on{border-color:#3DDC97;background:#0F2E22;color:#3DDC97;font-weight:600;}
+  .ll-drcr-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .ll-drcr-box{flex:1;min-width:0;border-radius:8px;padding:10px 12px;border:1px solid #2A3450;background:#0E1420;}
+  .ll-drcr-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#5B6A8A;margin-bottom:6px;}
+  .ll-drcr-box .val{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ll-drcr-box select{width:100%;border:none;background:none;padding:0;font-size:13px;font-weight:600;}
+  .ll-drcr-box.debit .lbl,.ll-drcr-box.debit .val,.ll-drcr-box.debit select{color:#3DDC97;}
+  .ll-drcr-box.credit .lbl,.ll-drcr-box.credit .val,.ll-drcr-box.credit select{color:#E8A94C;}
+  .ll-drcr-arrow{color:#5B6A8A;font-size:16px;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -2083,8 +2110,8 @@ function exportMemberHistoryPdf(m, report){
   }
   doc.save(m.name.replace(/[^a-z0-9]+/gi,"_")+"_report.pdf");
 }
-function openModal(innerHtml){
-  document.getElementById("modalRoot").innerHTML = `<div class="overlay" id="ovl"><div class="modal">${innerHtml}</div></div>`;
+function openModal(innerHtml, extraClass){
+  document.getElementById("modalRoot").innerHTML = `<div class="overlay" id="ovl"><div class="modal${extraClass?' '+extraClass:''}">${innerHtml}</div></div>`;
   document.getElementById("ovl").addEventListener("click", (e)=>{ if(e.target.id==="ovl") closeModal(); });
 }
 function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
@@ -2453,84 +2480,202 @@ function renderReceiptConfirmStep(m){
   });
 }
 
-// Manual one-off due/charge entry — distinct from the automatic monthly
-// accrual (syncAccruals()); for a one-time charge outside the normal
-// dues cycle. Same search -> confirm two-step pattern as the Payment
-// Receipt flow above.
-function openInvoiceEntryModal(){
+// Unified double-entry "New Journal Entry" modal — one form for all four
+// manual entry types (Create Invoice / Receive Payment / Pay Expense /
+// Write Off Bad Debt), each posting through the same attemptAction() path
+// as the rest of the app (admin applies immediately, staff go to
+// pendingActions). The DEBIT/CREDIT boxes mirror how buildJournalEntries()
+// actually posts each type, so what the user sees here matches what shows
+// up in the General Ledger afterwards.
+const JOURNAL_ENTRY_TYPES = [
+  {key:"invoice", label:t("Samee Invoice","Create Invoice"), icon:"ti-file-invoice"},
+  {key:"payment", label:t("Aqbal Lacag-bixin","Receive Payment"), icon:"ti-cash"},
+  {key:"expense", label:t("Bixi Kharash","Pay Expense"), icon:"ti-receipt-refund"},
+  {key:"writeoff", label:t("Cafi Deyn Xun","Write Off Bad Debt"), icon:"ti-file-off"},
+];
+const JE_EXPENSE_CATEGORIES = ["Guno","Xalane / Diya","Diya wadaag","Dhiig nool"];
+const JE_AR_LABEL = t("Xisaabaadka La Sugayo","Accounts Receivable");
+const JE_REVENUE_LABEL = t("Dakhliga","Revenue");
+const JE_BADDEBT_LABEL = t("Kharashka Deynta la Cafiyay","Bad Debt Expense");
+
+let jeState = {};
+
+function openNewJournalEntryModal(initialType){
   if(!hasPerm("collectPayment")){
     showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
     return;
   }
-  renderInvoiceSearchStep();
+  jeState = { type: initialType || "invoice", member: null };
+  renderJournalEntryModal();
+}
+// Kept as the sidebar/mobile-nav entry point name; opens the unified modal
+// defaulting to the "Create Invoice" type.
+function openInvoiceEntryModal(){ openNewJournalEntryModal("invoice"); }
+
+function jeAccountOptionsHtml(selectedId){
+  const defaultId = db.accounts.some(a=>a.id==="acc_salaam") ? "acc_salaam" : (db.accounts[0] ? db.accounts[0].id : "");
+  const sel = selectedId || defaultId;
+  return db.accounts.map(a=>`<option value="${a.id}" ${a.id===sel?'selected':''}>${a.name}</option>`).join("");
+}
+function jeCategoryOptionsHtml(selected){
+  const sel = selected || JE_EXPENSE_CATEGORIES[0];
+  return JE_EXPENSE_CATEGORIES.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}</option>`).join("");
 }
 
-function renderInvoiceSearchStep(){
-  openModal(`
-    <h3>${t("Invoice cusub","New Invoice")}</h3>
-    <div class="frow">
-      <label>${t("Raadi xubin (magaca)","Search member (name)")}</label>
-      <input type="text" id="invSearch" placeholder="${t('Qor magaca...','Type a name...')}">
-    </div>
-    <div id="invResults" class="tx-list" style="max-height:320px;"></div>
-    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
-  `);
-  document.getElementById("mCancel").addEventListener("click", closeModal);
-  const searchEl = document.getElementById("invSearch");
-  const renderResults = ()=>{
-    const q = searchEl.value.trim().toLowerCase();
-    const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
-    const results = document.getElementById("invResults");
-    results.innerHTML = matches.length ? matches.map(m=>`
-      <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
-        <div class="l">
-          <span>${m.name}</span>
-          <span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span>
-        </div>
-        <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+function jeTypeGridHtml(){
+  return `<div class="ll-type-grid">
+    ${JOURNAL_ENTRY_TYPES.map(jt=>`<button type="button" class="ll-type-btn ${jeState.type===jt.key?'on':''}" data-jetype="${jt.key}"><i class="ti ${jt.icon}"></i><span>${jt.label}</span></button>`).join("")}
+  </div>`;
+}
+
+function jeMemberPickerHtml(){
+  if(jeState.member){
+    const bal = computeBalance(jeState.member);
+    return `<div class="tx" style="margin-bottom:14px;">
+      <div class="l"><span>${jeState.member.name}</span><span class="muted">${jeState.member.phone || t('telefoon lama helin','no phone on file')}</span></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="amt" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</span>
+        <button type="button" id="jeChangeMember">${t("Beddel","Change")}</button>
       </div>
-    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
-    results.querySelectorAll("[data-mid]").forEach(row=>{
-      row.addEventListener("click", ()=>{
-        const m = db.members.find(x=>x.id===row.dataset.mid);
-        if(m) renderInvoiceConfirmStep(m);
-      });
-    });
-  };
-  searchEl.addEventListener("input", renderResults);
-  searchEl.focus();
+    </div>`;
+  }
+  return `
+    <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="jeMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+    <div id="jeMemberResults" class="tx-list" style="max-height:220px;margin-bottom:14px;"></div>
+  `;
 }
 
-function renderInvoiceConfirmStep(m){
-  const bal = computeBalance(m);
+function jeExpenseFieldsHtml(){
+  return `<div class="frow"><label>${t("Cida loo bixiyay (ikhtiyaari)","Recipient (optional)")}</label><input type="text" id="jeRecipient" value="${jeState.recipient||''}" placeholder="${t('magaca / qoyska','name / family')}"></div>`;
+}
+
+function jeDrCrHtml(){
+  const type = jeState.type;
+  const memberLabel = jeState.member ? `${JE_AR_LABEL} — ${jeState.member.name}` : JE_AR_LABEL;
+  let debitInner, creditInner;
+  if(type==="invoice"){
+    debitInner = `<div class="val">${memberLabel}</div>`;
+    creditInner = `<div class="val">${JE_REVENUE_LABEL}</div>`;
+  } else if(type==="payment"){
+    debitInner = `<select id="jeAccount">${jeAccountOptionsHtml(jeState.account)}</select>`;
+    creditInner = `<div class="val">${memberLabel}</div>`;
+  } else if(type==="expense"){
+    debitInner = `<select id="jeCategory">${jeCategoryOptionsHtml(jeState.category)}</select>`;
+    creditInner = `<select id="jeAccount">${jeAccountOptionsHtml(jeState.account)}</select>`;
+  } else {
+    debitInner = `<div class="val">${JE_BADDEBT_LABEL}</div>`;
+    creditInner = `<div class="val">${memberLabel}</div>`;
+  }
+  return `<div class="ll-drcr-row">
+    <div class="ll-drcr-box debit"><div class="lbl">${t("DEBIT (DR)","DEBIT (DR)")}</div>${debitInner}</div>
+    <div class="ll-drcr-arrow"><i class="ti ti-arrow-right"></i></div>
+    <div class="ll-drcr-box credit"><div class="lbl">${t("CREDIT (CR)","CREDIT (CR)")}</div>${creditInner}</div>
+  </div>`;
+}
+
+function renderJournalEntryModal(){
+  const type = jeState.type;
+  const needsMember = type==="invoice" || type==="payment" || type==="writeoff";
+  const canPost = needsMember ? !!jeState.member : true;
   openModal(`
-    <h3>${t("Invoice cusub","New Invoice")}</h3>
-    <div class="bal-row" style="margin-bottom:14px;">
-      <div class="bal-box"><div class="lbl">${t("Magaca","Full name")}</div><div class="val" style="font-size:14px;">${m.name}</div></div>
-      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-    </div>
-    <form id="invForm">
-      <div class="frow"><label>${t("Lacagta (invoice)","Invoice amount")}</label><input required type="number" step="0.01" min="0.01" id="invAmount" value="${m.monthlyDue||''}"></div>
-      <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="invDate" value="${todayStr()}"></div>
-      <div class="frow"><label>${t("Faahfaahin (ikhtiyaari)","Note (optional)")}</label><input type="text" id="invNote" placeholder="${t('tusaale: qoondo dheeraad ah','e.g. extra charge')}"></div>
+    <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
+    ${jeTypeGridHtml()}
+    ${needsMember ? jeMemberPickerHtml() : jeExpenseFieldsHtml()}
+    ${jeDrCrHtml()}
+    <form id="jeForm">
+      <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="jeDate" value="${jeState.date||todayStr()}"></div>
+      <div class="frow"><label>${t("Lacagta","Amount")}</label><input required type="number" step="0.01" min="0.01" id="jeAmount" value="${jeState.amount||''}"></div>
+      <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="jeDesc" value="${jeState.desc||''}" placeholder="${t('faahfaahin ikhtiyaari ah','optional description')}"></div>
+      <div class="frow"><label>${t("Tixraac (ikhtiyaari)","Reference (optional)")}</label><input type="text" id="jeRef" value="${jeState.ref||''}" placeholder="${t('tusaale: #1234','e.g. #1234')}"></div>
       <div class="actions">
-        <button type="button" id="invBack">${t("Dib u noqo","Back")}</button>
-        <button type="submit" class="primary" id="invSubmit">${t("Diiwaangeli Invoice","Record Invoice")}</button>
+        <button type="button" id="jeCancel">${t("Jooji","Cancel")}</button>
+        <button type="submit" class="primary" id="jePost" ${canPost?'':'disabled'}>${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
       </div>
     </form>
-  `);
-  document.getElementById("invBack").addEventListener("click", renderInvoiceSearchStep);
-  document.getElementById("invForm").addEventListener("submit", async (e)=>{
+  `, "ll-modal");
+  wireJournalEntryModal();
+}
+
+function wireJournalEntryModal(){
+  document.querySelectorAll("[data-jetype]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ jeState.type = btn.dataset.jetype; renderJournalEntryModal(); });
+  });
+  const cancelBtn = document.getElementById("jeCancel");
+  if(cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+  const searchEl = document.getElementById("jeMemberSearch");
+  if(searchEl){
+    const renderResults = ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const results = document.getElementById("jeMemberResults");
+      results.innerHTML = matches.length ? matches.map(m=>`
+        <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+          <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+          <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+        </div>
+      `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+      results.querySelectorAll("[data-mid]").forEach(row=>{
+        row.addEventListener("click", ()=>{
+          const m = db.members.find(x=>x.id===row.dataset.mid);
+          if(m){
+            jeState.member = m;
+            if((jeState.type==="invoice"||jeState.type==="payment") && !jeState.amount) jeState.amount = m.monthlyDue || '';
+            renderJournalEntryModal();
+          }
+        });
+      });
+    };
+    searchEl.addEventListener("input", renderResults);
+    searchEl.focus();
+  }
+  const changeBtn = document.getElementById("jeChangeMember");
+  if(changeBtn) changeBtn.addEventListener("click", ()=>{ jeState.member = null; renderJournalEntryModal(); });
+
+  const acctSel = document.getElementById("jeAccount");
+  if(acctSel) acctSel.addEventListener("change", ()=>{ jeState.account = acctSel.value; });
+  const catSel = document.getElementById("jeCategory");
+  if(catSel) catSel.addEventListener("change", ()=>{ jeState.category = catSel.value; });
+  const recipEl = document.getElementById("jeRecipient");
+  if(recipEl) recipEl.addEventListener("input", ()=>{ jeState.recipient = recipEl.value; });
+
+  ["jeDate","jeAmount","jeDesc","jeRef"].forEach(id=>{
+    const el = document.getElementById(id);
+    const key = id.slice(2).charAt(0).toLowerCase() + id.slice(3);
+    if(el) el.addEventListener("input", ()=>{ jeState[key] = el.value; });
+  });
+
+  const form = document.getElementById("jeForm");
+  form.addEventListener("submit", async (e)=>{
     e.preventDefault();
-    const amount = parseFloat(document.getElementById("invAmount").value);
-    const date = document.getElementById("invDate").value;
-    const note = document.getElementById("invNote").value.trim();
+    const type = jeState.type;
+    const amount = parseFloat(document.getElementById("jeAmount").value);
+    const date = document.getElementById("jeDate").value;
+    const desc = document.getElementById("jeDesc").value.trim();
+    const ref = document.getElementById("jeRef").value.trim();
+    const note = desc + (ref ? ` (Ref: ${ref})` : "");
     if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
-    const r = await attemptAction("invoice", {memberId:m.id, amount, date, note}, "collectPayment", `Invoice: ${m.name}`);
-    if(r.status === "denied") return;
+    if((type==="invoice"||type==="payment"||type==="writeoff") && !jeState.member){
+      showToast(t("Fadlan dooro xubin","Please select a member")); return;
+    }
+    let r;
+    if(type==="invoice"){
+      r = await attemptAction("invoice", {memberId:jeState.member.id, amount, date, note}, "collectPayment", `Invoice: ${jeState.member.name}`);
+    } else if(type==="payment"){
+      const account = document.getElementById("jeAccount").value;
+      r = await attemptAction("payment", {memberId:jeState.member.id, amount, date, note, account}, "collectPayment", `Payment: ${jeState.member.name}`);
+    } else if(type==="writeoff"){
+      r = await attemptAction("writeoff", {memberId:jeState.member.id, amount, memo: note || t("Cafinaad","Written off")}, "collectPayment", `Write-off: ${jeState.member.name}`);
+    } else if(type==="expense"){
+      const category = document.getElementById("jeCategory").value;
+      const account = document.getElementById("jeAccount").value;
+      const recipient = (document.getElementById("jeRecipient")||{value:""}).value.trim();
+      r = await attemptAction("disbursement", {category, amount, date, recipient, memo: note || category, account}, "collectPayment", `Kharash (${category}): $${amount}`);
+    }
+    if(!r || r.status === "denied") return;
     renderSummary(); renderList(); renderDetail();
     closeModal();
-    showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka","Your request is awaiting admin approval") : t("Invoice-ka waa la diiwaangeliyay","Invoice recorded"));
+    showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka","Your request is awaiting admin approval") : t("Diiwaanka waa la geliyay","Entry posted"));
   });
 }
 

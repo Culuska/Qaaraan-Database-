@@ -2431,12 +2431,6 @@ function jeCategoryOptionsHtml(selected){
   return JE_EXPENSE_CATEGORIES.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}</option>`).join("");
 }
 
-function jeTypeGridHtml(){
-  return `<div class="ll-type-grid">
-    ${JOURNAL_ENTRY_TYPES.map(jt=>`<button type="button" class="ll-type-btn ${jeState.type===jt.key?'on':''}" data-jetype="${jt.key}"><i class="ti ${jt.icon}"></i><span>${jt.label}</span></button>`).join("")}
-  </div>`;
-}
-
 function jeMemberPickerHtml(){
   if(jeState.member){
     const bal = computeBalance(jeState.member);
@@ -2485,9 +2479,9 @@ function renderJournalEntryModal(){
   const type = jeState.type;
   const needsMember = type==="invoice" || type==="payment" || type==="writeoff";
   const canPost = needsMember ? !!jeState.member : true;
+  const title = (JOURNAL_ENTRY_TYPES.find(jt=>jt.key===type) || JOURNAL_ENTRY_TYPES[0]).label;
   openModal(`
-    <h3>${t("Diiwaan Cusub (Journal Entry)","New Journal Entry")}</h3>
-    ${jeTypeGridHtml()}
+    <h3>${title}</h3>
     ${needsMember ? jeMemberPickerHtml() : jeExpenseFieldsHtml()}
     ${jeDrCrHtml()}
     <form id="jeForm">
@@ -2505,9 +2499,6 @@ function renderJournalEntryModal(){
 }
 
 function wireJournalEntryModal(){
-  document.querySelectorAll("[data-jetype]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ jeState.type = btn.dataset.jetype; renderJournalEntryModal(); });
-  });
   const cancelBtn = document.getElementById("jeCancel");
   if(cancelBtn) cancelBtn.addEventListener("click", closeModal);
 

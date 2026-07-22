@@ -884,6 +884,7 @@ async function loadDb(){
   importQBTransactionHistory2026();
   fixDuplicateStatusAndAddMissingMembers2026();
   fixAbdiWaliNameAgain2026();
+  importSalaamBankLedger2026();
   syncAccruals();
   await saveDb();
   return true;
@@ -1220,6 +1221,144 @@ function fixAbdiWaliNameAgain2026(){
     db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka magaca xubinta (retry)", details:`Abdi Wali Ahmed Abd → Abdi Wali Ahmed Abdi`, status:"direct"});
   }
   db.settings.abdiWaliNameFix2026Done = true;
+}
+
+// Real Salaam Bank transaction history, extracted from the admin's full
+// QuickBooks Adjusting Journal Entries export (2024-04-17 through
+// 2026-07-11) — every entry that has a "SALAM SOMALI BANK" line. Category
+// is taken from the bookkeeper's own account tag on the other side of the
+// entry when it's one of the 3 known categories (Guno(Dahir Cawale) →
+// Guno, Dhiig nool, or the literal "Diyo" account → Xalane / Diya, per the
+// admin's instruction to record generic Diyo entries under the existing
+// bucket rather than split them); a handful were miscoded under "Account
+// receivable" and are recovered from their memo text instead. Amount is
+// negative for the few entries where money moved INTO the account (cash
+// handling reversals, one settlement) rather than out as a community
+// expense — accountBalance() already subtracts disbursement amounts, so a
+// negative one correctly adds back. See importSalaamBankLedger2026() below.
+const SALAAM_LEDGER_2026 = [
+  {date:"2024-04-17", amount:300, category:"Guno", memo:"Guno March iyo repayment"},
+  {date:"2024-04-17", amount:150, category:"Guno", memo:"April"},
+  {date:"2024-04-30", amount:300, category:"Dhiig nool", memo:"Hormaris dhiig nool Cisman xirsi"},
+  {date:"2024-05-02", amount:150, category:"Guno", memo:"Guno may 2024"},
+  {date:"2024-05-13", amount:2000, category:"Xalane / Diya", memo:"Hormaris Diyo Abgaal"},
+  {date:"2024-06-01", amount:150, category:"Guno", memo:"Guno June"},
+  {date:"2024-06-05", amount:100, category:"Guno", memo:"Guno hormaris"},
+  {date:"2024-07-01", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2024-07-31", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2024-08-27", amount:50, category:"Guno", memo:"Dahir Adan"},
+  {date:"2024-09-01", amount:50, category:"Guno", memo:"Guno"},
+  {date:"2024-09-02", amount:50, category:"Guno", memo:"Guno"},
+  {date:"2024-10-01", amount:150, category:"Guno", memo:"Guno October"},
+  {date:"2024-10-06", amount:200, category:"Guno", memo:"Diyo Nool Qoobdher"},
+  {date:"2024-10-16", amount:10, category:"Other", memo:"SMS"},
+  {date:"2024-10-30", amount:150, category:"Guno", memo:"Guno November"},
+  {date:"2024-11-08", amount:300, category:"Dhiig nool", memo:"diyo nool ina abdi siyaad"},
+  {date:"2024-11-08", amount:800, category:"Dhiig nool", memo:"Dhiig nool Osman Hirsi filfil"},
+  {date:"2024-11-12", amount:200, category:"Dhiig nool", memo:"Diyo nool cali qoobdher"},
+  {date:"2024-11-17", amount:3603, category:"Dhiig nool", memo:""},
+  {date:"2024-11-19", amount:2362, category:"Dhiig nool / Diyo", memo:"Dhiig nool iyo Diyo"},
+  {date:"2024-11-25", amount:150, category:"Guno", memo:"December"},
+  {date:"2024-12-26", amount:-35, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2024-12-26", amount:-10, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2024-12-27", amount:-150, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2024-12-27", amount:-5, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2024-12-27", amount:-35, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2024-12-27", amount:150, category:"Guno", memo:"GUNADA BISHA JAN HORUMARIS"},
+  {date:"2025-01-01", amount:-10, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2025-01-01", amount:-10, category:"Other", memo:"LACAG QABASHI"},
+  {date:"2025-01-01", amount:-10, category:"Other", memo:"LACAG QABASHO"},
+  {date:"2025-02-03", amount:150, category:"Guno", memo:"guno"},
+  {date:"2025-02-18", amount:170, category:"Other", memo:"Cabdi S Cagdher"},
+  {date:"2025-03-01", amount:150, category:"Guno", memo:"Guno March"},
+  {date:"2025-03-01", amount:150, category:"Guno", memo:"Guno April"},
+  {date:"2025-04-03", amount:10, category:"Other", memo:"My SMS"},
+  {date:"2025-04-30", amount:150, category:"Guno", memo:"Guno may"},
+  {date:"2025-06-01", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2025-06-12", amount:2000, category:"Xalane / Diya", memo:"Diyo Rer Shuriye"},
+  {date:"2025-07-01", amount:150, category:"Guno", memo:"Guno July"},
+  {date:"2025-08-02", amount:150, category:"Guno", memo:"Guno Augusto"},
+  {date:"2025-08-30", amount:150, category:"Guno", memo:"Guno September"},
+  {date:"2025-09-30", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2025-09-30", amount:10, category:"Other", memo:"SMS"},
+  {date:"2025-10-15", amount:10, category:"Other", memo:"SMS"},
+  {date:"2025-11-01", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2025-11-01", amount:100, category:"Other", memo:"ina Dahir cawale"},
+  {date:"2025-11-17", amount:1227, category:"Xalane / Diya", memo:"Diyo Jibril cadow"},
+  {date:"2025-12-01", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-01-02", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-01-14", amount:200, category:"Dhiig nool", memo:" dhiig nool Gesey Mire"},
+  {date:"2026-01-14", amount:1000, category:"Xalane / Diya", memo:"Diyo Rage Adan"},
+  {date:"2026-02-04", amount:300, category:"Dhiig nool", memo:"Guhaad Dhiig nool"},
+  {date:"2026-02-04", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-02-05", amount:800, category:"Dhiig nool", memo:"Guhad Dhiig nool"},
+  {date:"2026-03-02", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-03-31", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-04-04", amount:10, category:"Other", memo:"SMS"},
+  {date:"2026-04-15", amount:548, category:"Xalane / Diya", memo:"Hassan gedef"},
+  {date:"2026-05-02", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-05-19", amount:300, category:"Dhiig nool", memo:"Suheyb ah X bacar"},
+  {date:"2026-06-01", amount:150, category:"Guno", memo:"Guno"},
+  {date:"2026-06-03", amount:200, category:"Dhiig nool", memo:"Suheyb Ali Bacar dhig nol"},
+  {date:"2026-06-03", amount:200, category:"Dhiig nool", memo:"Suheyb"},
+  {date:"2026-06-03", amount:100, category:"Dhiig nool", memo:"Suheyb"},
+  {date:"2026-06-05", amount:150, category:"Dhiig nool", memo:"Suheyb"},
+  {date:"2026-06-14", amount:200, category:"Dhiig nool", memo:"GEESEY Mire Dhig nool Jijile"},
+  {date:"2026-06-14", amount:40, category:"Dhiig nool", memo:"Suheyb Ali Bacar"},
+  {date:"2026-06-23", amount:50, category:"Dhiig nool", memo:"Xirsi Abdi Iman-Dhiig Nool"},
+  {date:"2026-06-24", amount:50, category:"Other", memo:"Deyn Dalabey"},
+  {date:"2026-02-25", amount:-636, category:"Other", memo:"QAARAA MUSTAF XALIN"},
+  {date:"2026-07-01", amount:200, category:"Guno", memo:"Guno July"},
+  {date:"2026-07-01", amount:145, category:"Dhiig nool", memo:"Suheyb Bacar Abgaal"},
+  {date:"2026-07-11", amount:50, category:"Dhiig nool", memo:"Suheyb Bacar Waceysle"},
+  {date:"2026-06-02", amount:200, category:"Dhiig nool", memo:"Suheyb Bacar"},
+];
+
+// 3 more per-member BAD DEBT write-offs found in the same QuickBooks export
+// that hadn't already been captured by importQBTransactionHistory2026 (that
+// import covered 24 people; these 3 weren't among them). Verified against
+// the real backup that no matching write-off already existed for each.
+const SALAAM_BAD_DEBT_GAPS_2026 = [
+  {name:"Abdi Ali dan", amount:105, date:"2026-06-02", note:"BAD DEBT"},
+  {name:"Deqa Mire Mohamed Shuuriye", amount:15, date:"2026-06-12", note:"BAD DEBT"},
+  {name:"Abdullahi  Mohamed Xirsi", amount:10, date:"2026-06-27", note:"BAD DEBT"},
+];
+
+// Replaces the placeholder Salaam Bank opening balance from
+// restoreSalaamBankAccount2026() (-$21,016, a plug figure with no real
+// transactions behind it) with the real one: $578 as of the account's
+// earliest QuickBooks record — the same figure the admin already confirmed
+// once before in fixSalaamBankOpeningBalance578() for an earlier snapshot of
+// this account, now independently re-derived from the full Adjusting
+// Journal Entries export and cross-checked to land on the same number.
+// Also imports the 75 real Guno/Diya/Dhiig nool/other transactions from
+// SALAAM_LEDGER_2026 as real disbursements (replacing the gap the
+// placeholder was standing in for) and the 3 missing member write-offs.
+// Own flag, runs once; only touches openingBalance if it's still the
+// placeholder so a deliberate later Edit Account isn't clobbered.
+function importSalaamBankLedger2026(){
+  if(db.settings.salaamLedger2026Done) return;
+  const acc = db.accounts.find(a=>a.id==="acc_salaam");
+  if(acc && acc.openingBalance !== 578){
+    const before = acc.openingBalance;
+    acc.openingBalance = 578;
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Balance bilowga ah ee Salaam Bank waa la saxay (taariikh dhamaystiran)", details:`$${before} → $578 — la soo saaray taariikhda dhaqdhaqaaqyada dhabta ah (Adjusting Journal Entries), ma aha mid la qiyaasay`, status:"direct"});
+  }
+  for(const e of SALAAM_LEDGER_2026){
+    db.disbursements.push({id:"d"+Date.now()+"_"+Math.random().toString(36).slice(2,7), category:e.category, amount:e.amount, date:e.date, recipient:"", memo:e.memo, account:"acc_salaam"});
+  }
+  const norm = s => String(s||"").trim().toLowerCase();
+  let writeoffsAdded = 0;
+  for(const w of SALAAM_BAD_DEBT_GAPS_2026){
+    const m = db.members.find(x=>norm(x.name)===norm(w.name));
+    if(!m) continue;
+    const already = m.transactions.some(tx=>tx.type==="writeoff" && Math.abs(tx.amount-w.amount)<0.01 && tx.date===w.date);
+    if(already) continue;
+    m.transactions.push({id:newTxId(), type:"writeoff", amount:w.amount, date:w.date, note:w.note});
+    writeoffsAdded++;
+  }
+  db.settings.salaamLedger2026Done = true;
+  db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Soo dejinta taariikhda dhabta ah ee Salaam Bank (2024-2026)", details:`${SALAAM_LEDGER_2026.length} dhaqdhaqaaq oo kharash/dakhli dhab ah oo la soo dejiyay, ${writeoffsAdded} deyn oo la cafiyay oo lagu daray`, status:"direct"});
 }
 
 function backfillDisbursementAccounts(){

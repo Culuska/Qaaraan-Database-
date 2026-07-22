@@ -712,6 +712,24 @@ function computeBalance(member){
 function totalPaid(member){ return member.transactions.filter(t=>t.type==="payment").reduce((s,t)=>s+t.amount,0); }
 function totalWrittenOff(member){ return member.transactions.filter(t=>t.type==="writeoff").reduce((s,t)=>s+t.amount,0); }
 function totalDue(member){ return member.transactions.filter(t=>t.type==="due").reduce((s,t)=>s+t.amount,0); }
+
+// A member's full transaction history with a running balance, in the same
+// {date, type, amount, num, runbal} shape the Balance Summary "Full
+// history" tab, its PDF/Excel export, and the public member view all
+// expect. Used to live on the hardcoded HISTORY_REPORTS constant (seed-era
+// data keyed by the original SEED_MEMBERS ids), which silently returns
+// nothing for any member whose real history was instead imported straight
+// into m.transactions (every QuickBooks reimport since) — this reads from
+// the real, live source instead.
+function memberHistoryReport(m){
+  const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+  let running = m.openingBalance;
+  return sorted.map(tx=>{
+    running += (tx.type==="due" ? tx.amount : -tx.amount);
+    return {date:tx.date, type:tx.type, amount:tx.amount, num:tx.note||"", runbal:running};
+  });
+}
+
 function historicalSettledAmount(member){
   const report = HISTORY_REPORTS[member.id] || [];
   return report.filter(t=>t.type==="payment" || t.type==="writeoff").reduce((s,t)=>s+t.amount,0);
@@ -2347,7 +2365,7 @@ function renderMonthAgingTab(m){
 }
 
 function openBalanceSummaryModal(m){
-  const report = HISTORY_REPORTS[m.id] || [];
+  const report = memberHistoryReport(m);
   const bal = computeBalance(m);
   const allDates = report.map(t=>t.date).sort();
   const minDate = allDates.length ? allDates[0] : "2024-02-01";
@@ -5664,7 +5682,7 @@ function renderPublicMemberView(memberId){
     return;
   }
   const bal = computeBalance(m);
-  const report = HISTORY_REPORTS[m.id] || [];
+  const report = memberHistoryReport(m);
   const recentTx = [...m.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
   root.innerHTML = `
     <div class="auth-wrap" style="max-width:480px;position:relative;">

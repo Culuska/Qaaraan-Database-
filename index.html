@@ -885,6 +885,7 @@ async function loadDb(){
   fixDuplicateStatusAndAddMissingMembers2026();
   fixAbdiWaliNameAgain2026();
   importSalaamBankLedger2026();
+  deleteExternalCasesAccount2026();
   syncAccruals();
   await saveDb();
   return true;
@@ -1030,6 +1031,7 @@ function tagImportedPaymentsToSalaamBank(){
 // the Accounts tab and can be edited/adjusted the same way; nothing is
 // tagged to it automatically. Fixed id so this only ever runs once.
 function addExternalCasesAccount(){
+  if(db.settings.externalCasesDeleted2026) return; // admin deleted this account — don't resurrect it
   if(db.accounts.some(a=>a.id==="acc_external_cases")) return;
   db.accounts.push({id:"acc_external_cases", name:t("External Cases","External Cases"), openingBalance:636});
   db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid account (External Cases)", details:t("$636 — lacagaha ay bulshada leedahay dib (kiisas ka baxsan xubnaha caadiga ah), sida ku qoran Balance Sheet-ka QuickBooks.","$636 — money owed to the fund from outside cases (not regular members), per the QuickBooks Balance Sheet."), status:"direct"});
@@ -1359,6 +1361,25 @@ function importSalaamBankLedger2026(){
   }
   db.settings.salaamLedger2026Done = true;
   db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Soo dejinta taariikhda dhabta ah ee Salaam Bank (2024-2026)", details:`${SALAAM_LEDGER_2026.length} dhaqdhaqaaq oo kharash/dakhli dhab ah oo la soo dejiyay, ${writeoffsAdded} deyn oo la cafiyay oo lagu daray`, status:"direct"});
+}
+
+// Admin asked to fully remove the "External Cases" account (added earlier
+// to mirror a QuickBooks Balance Sheet line) — nothing was ever tagged to
+// it (verified against the real backup), so this is a clean delete with no
+// orphaned transactions. Removing it from db.accounts also automatically
+// drops it from the Balance Sheet's Other Current Assets (which just maps
+// over db.accounts) and the Account Balance Details list — no other code
+// needs to change. addExternalCasesAccount() checks the same flag this
+// sets, so it won't add the account back on a later load. Own flag, runs
+// once.
+function deleteExternalCasesAccount2026(){
+  if(db.settings.externalCasesDeleted2026) return;
+  const before = db.accounts.length;
+  db.accounts = db.accounts.filter(a=>a.id!=="acc_external_cases");
+  db.settings.externalCasesDeleted2026 = true;
+  if(db.accounts.length < before){
+    db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ka saarista account-ka External Cases", details:t("Account-kan waxaa la saaray sida uu rabay admin-ka ($636, waxba lama xirin).","This account was removed as requested by the admin ($636, nothing was tagged to it)."), status:"direct"});
+  }
 }
 
 function backfillDisbursementAccounts(){
@@ -3425,8 +3446,30 @@ function openAccountBalanceReportModal(){
 }
 
 function renderAcctBalanceModal(){
-  if(acctBalModalState.view==="detail") renderAcctBalanceDetail();
-  else renderAcctBalanceList();
+  if(acctBalModalState.view==="detail"){
+    if(acctBalModalState.kind==="expense") renderExpenseCategoryDetail();
+    else renderAcctBalanceDetail();
+  } else {
+    renderAcctBalanceList();
+  }
+}
+
+// Total ever spent in a given expense category, across all disbursements
+// regardless of which account paid it (mirrors the 4 categories offered in
+// the New Journal Entry expense picker — JE_EXPENSE_CATEGORIES).
+function expenseCategoryTotal(category){
+  return db.disbursements.filter(d=>d.category===category).reduce((s,d)=>s+d.amount,0);
+}
+
+// Same shape as accountLedgerFor, but for an expense category instead of a
+// bank account — no opening balance to carry forward, so "running" here is
+// just a cumulative total spent, not a true balance.
+function expenseCategoryLedger(category){
+  const rows = db.disbursements.filter(d=>d.category===category).map(d=>({date:d.date, desc:d.recipient||d.memo||"", amount:d.amount}));
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  let running = 0;
+  for(const r of rows){ running += r.amount; r.running = running; }
+  return rows;
 }
 
 function renderAcctBalanceList(){
@@ -3436,12 +3479,14 @@ function renderAcctBalanceList(){
     <div class="bs-title">
       <div class="co">QAARAAN</div>
       <div class="doc">${t("Faahfaahinta Balance-ka Accounts","Account Balance Details")}</div>
-      <div class="asof">${t("Riix account si aad u aragto dhaqdhaqaaqyadiisa","Click an account to see its transactions")}</div>
+      <div class="asof">${t("Riix account ama kharash si aad u aragto dhaqdhaqaaqyadiisa","Click an account or expense category to see its transactions")}</div>
     </div>
     <table class="bs-table">
-      <tr class="bs-section"><td>${t("Account","Account")}</td><td class="amt">${t("Balance hadda","Current balance")}</td></tr>
+      <tr class="bs-section"><td colspan="2">${t("Accounts","Accounts")}</td></tr>
       ${rows.map(r=>`<tr class="ab-row" data-id="${r.id}" style="cursor:pointer;"><td>${r.name}</td><td class="amt" style="color:${r.balance<0?'var(--danger-ink)':'var(--accent-ink)'}">${money(r.balance)}</td></tr>`).join("")}
-      <tr class="bs-grandtotal"><td>${t("Wadarta guud","Grand total")}</td><td class="amt">${money(grandTotal)}</td></tr>
+      <tr class="bs-total"><td>${t("Wadarta accounts","Accounts total")}</td><td class="amt">${money(grandTotal)}</td></tr>
+      <tr class="bs-section"><td colspan="2">${t("Kharashka (Categories)","Expense Categories")}</td></tr>
+      ${JE_EXPENSE_CATEGORIES.map(cat=>`<tr class="ab-exp-row" data-cat="${cat}" style="cursor:pointer;"><td>${cat}</td><td class="amt" style="color:var(--danger-ink);">${money(expenseCategoryTotal(cat))}</td></tr>`).join("")}
     </table>
     <div class="actions" style="margin-top:16px;">
       <button id="mCancel">${t("Xir","Close")}</button>
@@ -3458,9 +3503,37 @@ function renderAcctBalanceList(){
   });
   document.querySelectorAll(".ab-row").forEach(row=>{
     row.addEventListener("click", ()=>{
-      acctBalModalState = {view:"detail", accountId:row.dataset.id, from:"", to:""};
+      acctBalModalState = {view:"detail", kind:"account", accountId:row.dataset.id, from:"", to:""};
       renderAcctBalanceModal();
     });
+  });
+  document.querySelectorAll(".ab-exp-row").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      acctBalModalState = {view:"detail", kind:"expense", category:row.dataset.cat, from:"", to:""};
+      renderAcctBalanceModal();
+    });
+  });
+}
+
+// Shared Back/Close/date-filter wiring for both detail views below — same
+// state shape (acctBalModalState.from/to), just a different data source.
+function wireAcctBalanceDetailControls(){
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("abBack").addEventListener("click", ()=>{
+    acctBalModalState = {view:"list"};
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abFrom").addEventListener("change", (e)=>{
+    acctBalModalState.from = e.target.value;
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abTo").addEventListener("change", (e)=>{
+    acctBalModalState.to = e.target.value;
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abClearFilter").addEventListener("click", ()=>{
+    acctBalModalState.from = ""; acctBalModalState.to = "";
+    renderAcctBalanceModal();
   });
 }
 
@@ -3490,23 +3563,36 @@ function renderAcctBalanceDetail(){
       <button id="mCancel">${t("Xir","Close")}</button>
     </div>
   `, "bs-modal");
-  document.getElementById("mCancel").addEventListener("click", closeModal);
-  document.getElementById("abBack").addEventListener("click", ()=>{
-    acctBalModalState = {view:"list"};
-    renderAcctBalanceModal();
-  });
-  document.getElementById("abFrom").addEventListener("change", (e)=>{
-    acctBalModalState.from = e.target.value;
-    renderAcctBalanceModal();
-  });
-  document.getElementById("abTo").addEventListener("change", (e)=>{
-    acctBalModalState.to = e.target.value;
-    renderAcctBalanceModal();
-  });
-  document.getElementById("abClearFilter").addEventListener("click", ()=>{
-    acctBalModalState.from = ""; acctBalModalState.to = "";
-    renderAcctBalanceModal();
-  });
+  wireAcctBalanceDetailControls();
+}
+
+function renderExpenseCategoryDetail(){
+  const category = acctBalModalState.category;
+  const {from, to} = acctBalModalState;
+  const ledger = expenseCategoryLedger(category);
+  const filtered = ledger.filter(r=>(!from || r.date>=from) && (!to || r.date<=to));
+  const total = ledger.length ? ledger[ledger.length-1].running : 0;
+  openModal(`
+    <div class="bs-title">
+      <div class="co">QAARAAN</div>
+      <div class="doc">${category}</div>
+      <div class="asof">${t("Wadarta la bixiyay","Total spent")}: ${money(total)}</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--ink-2);">${t("Laga bilaabo","From")}<br><input type="date" id="abFrom" value="${from||''}"></label>
+      <label style="font-size:12px;color:var(--ink-2);">${t("Ilaa","To")}<br><input type="date" id="abTo" value="${to||''}"></label>
+      <button id="abClearFilter">${t("Nadiifi","Clear")}</button>
+    </div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>${t("Taariikh","Date")}</td><td>${t("Faahfaahin","Description")}</td><td class="amt">${t("Qadarka","Amount")}</td><td class="amt">${t("Wadarta socota","Running total")}</td></tr>
+      ${filtered.length ? filtered.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td class="amt" style="color:var(--danger-ink);">${money(r.amount)}</td><td class="amt">${money(r.running)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--ink-2);">${t("Wax dhaqdhaqaaq ah lama helin","No transactions found")}</td></tr>`}
+    </table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="abBack">${t("Dib u noqo","Back")}</button>
+      <button id="mCancel">${t("Xir","Close")}</button>
+    </div>
+  `, "bs-modal");
+  wireAcctBalanceDetailControls();
 }
 
 function exportAccountBalancesPdf(){

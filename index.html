@@ -3209,7 +3209,7 @@ function renderTabs(){
   const reportTabs = [];
   if(hasPerm("viewReports")){
     reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
-    reportTabs.push({id:"acctreport-action", label:t("Warbixinta Accounts","Account Balance Report"), icon:"ti-building-bank", action:"acctreport"});
+    reportTabs.push({id:"acctreport-action", label:t("Faahfaahinta Balance-ka Accounts","Account Balance Details"), icon:"ti-building-bank", action:"acctreport"});
     reportTabs.push({id:"balancesheet-action", label:t("Xaaladda Maaliyadeed","Balance Sheet"), icon:"ti-report-money", action:"balancesheet"});
   }
   if(hasPerm("viewReports")){
@@ -3375,16 +3375,138 @@ function accountBalanceReportRows(){
     let deposited = 0, withdrawn = 0;
     for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
-    return {name:acc.name, opening:acc.openingBalance, deposited, withdrawn, balance:accountBalance(acc)};
+    return {id:acc.id, name:acc.name, opening:acc.openingBalance, deposited, withdrawn, balance:accountBalance(acc)};
   });
 }
+
+// Every transaction that has ever touched a given account — member due
+// payments deposited into it, and disbursements withdrawn from it — merged
+// into one dated ledger with a running balance computed from the account's
+// full history (so filtering the displayed date range below never changes
+// the running-balance figures, only which rows are shown, same as a real
+// bank statement).
+function accountLedgerFor(accId){
+  const acc = db.accounts.find(a=>a.id===accId);
+  const rows = [];
+  for(const m of db.members){
+    for(const tx of m.transactions){
+      if(tx.type==="payment" && tx.account===accId){
+        rows.push({date:tx.date, desc:`${t("Lacag-bixin","Payment")}: ${m.name}${tx.note?(' — '+tx.note):''}`, effect:tx.amount});
+      }
+    }
+  }
+  for(const d of db.disbursements){
+    if(d.account===accId){
+      const label = d.recipient || d.memo || "";
+      rows.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${label?(' — '+label):''}`, effect:-d.amount});
+    }
+  }
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  let running = acc ? acc.openingBalance : 0;
+  for(const r of rows){ running += r.effect; r.running = running; }
+  return rows;
+}
+
+// Two-view modal: a clickable list of every account and its current
+// balance, and (once an account is clicked) a full transaction ledger for
+// just that account with a from/to calendar filter. State lives in
+// acctBalModalState and each interaction re-renders the modal in place
+// (openModal() fully replaces its contents, so this is safe to call
+// repeatedly) rather than opening a new modal each time.
+let acctBalModalState = {view:"list"};
 
 function openAccountBalanceReportModal(){
   if(!hasPerm("viewReports")){
     showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
     return;
   }
-  openReportFormatChoice(t("Warbixinta Balance-ka Accounts","Account Balance Report"), exportAccountBalancesPdf, exportAccountBalancesExcel);
+  acctBalModalState = {view:"list"};
+  renderAcctBalanceModal();
+}
+
+function renderAcctBalanceModal(){
+  if(acctBalModalState.view==="detail") renderAcctBalanceDetail();
+  else renderAcctBalanceList();
+}
+
+function renderAcctBalanceList(){
+  const rows = accountBalanceReportRows();
+  const grandTotal = rows.reduce((s,r)=>s+r.balance,0);
+  openModal(`
+    <div class="bs-title">
+      <div class="co">QAARAAN</div>
+      <div class="doc">${t("Faahfaahinta Balance-ka Accounts","Account Balance Details")}</div>
+      <div class="asof">${t("Riix account si aad u aragto dhaqdhaqaaqyadiisa","Click an account to see its transactions")}</div>
+    </div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>${t("Account","Account")}</td><td class="amt">${t("Balance hadda","Current balance")}</td></tr>
+      ${rows.map(r=>`<tr class="ab-row" data-id="${r.id}" style="cursor:pointer;"><td>${r.name}</td><td class="amt" style="color:${r.balance<0?'var(--danger-ink)':'var(--accent-ink)'}">${money(r.balance)}</td></tr>`).join("")}
+      <tr class="bs-grandtotal"><td>${t("Wadarta guud","Grand total")}</td><td class="amt">${money(grandTotal)}</td></tr>
+    </table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button id="abXlsx">Excel</button>
+      <button class="primary" id="abPdf">PDF</button>
+    </div>
+  `, "bs-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("abPdf").addEventListener("click", ()=>{
+    try{ exportAccountBalancesPdf(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.getElementById("abXlsx").addEventListener("click", ()=>{
+    try{ exportAccountBalancesExcel(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.querySelectorAll(".ab-row").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      acctBalModalState = {view:"detail", accountId:row.dataset.id, from:"", to:""};
+      renderAcctBalanceModal();
+    });
+  });
+}
+
+function renderAcctBalanceDetail(){
+  const acc = db.accounts.find(a=>a.id===acctBalModalState.accountId);
+  if(!acc){ acctBalModalState = {view:"list"}; renderAcctBalanceList(); return; }
+  const {from, to} = acctBalModalState;
+  const ledger = accountLedgerFor(acc.id);
+  const filtered = ledger.filter(r=>(!from || r.date>=from) && (!to || r.date<=to));
+  openModal(`
+    <div class="bs-title">
+      <div class="co">QAARAAN</div>
+      <div class="doc">${acc.name}</div>
+      <div class="asof">${t("Balance hadda","Current balance")}: ${money(accountBalance(acc))}</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--ink-2);">${t("Laga bilaabo","From")}<br><input type="date" id="abFrom" value="${from||''}"></label>
+      <label style="font-size:12px;color:var(--ink-2);">${t("Ilaa","To")}<br><input type="date" id="abTo" value="${to||''}"></label>
+      <button id="abClearFilter">${t("Nadiifi","Clear")}</button>
+    </div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>${t("Taariikh","Date")}</td><td>${t("Faahfaahin","Description")}</td><td class="amt">${t("Qadarka","Amount")}</td><td class="amt">${t("Balance","Balance")}</td></tr>
+      ${filtered.length ? filtered.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td class="amt" style="color:${r.effect<0?'var(--danger-ink)':'var(--accent-ink)'}">${money(r.effect)}</td><td class="amt">${money(r.running)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--ink-2);">${t("Wax dhaqdhaqaaq ah lama helin","No transactions found")}</td></tr>`}
+    </table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="abBack">${t("Dib u noqo","Back")}</button>
+      <button id="mCancel">${t("Xir","Close")}</button>
+    </div>
+  `, "bs-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("abBack").addEventListener("click", ()=>{
+    acctBalModalState = {view:"list"};
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abFrom").addEventListener("change", (e)=>{
+    acctBalModalState.from = e.target.value;
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abTo").addEventListener("change", (e)=>{
+    acctBalModalState.to = e.target.value;
+    renderAcctBalanceModal();
+  });
+  document.getElementById("abClearFilter").addEventListener("click", ()=>{
+    acctBalModalState.from = ""; acctBalModalState.to = "";
+    renderAcctBalanceModal();
+  });
 }
 
 function exportAccountBalancesPdf(){

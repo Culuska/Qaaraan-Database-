@@ -2471,11 +2471,32 @@ function exportMemberHistoryPdf(m, report){
   }
   doc.save(m.name.replace(/[^a-z0-9]+/gi,"_")+"_report.pdf");
 }
+// A modal never changes the URL, so on mobile the browser/OS back
+// gesture has nothing of ours to land on — it falls through to the
+// browser's own history and can navigate away from the app entirely while
+// a modal (or a drill-down view inside one, like Account Balance Details)
+// is open. Pushing one history entry the moment a modal opens gives the
+// back gesture something to "consume" first: popstate below just closes
+// whatever's open instead of leaving the page. Re-renders of an
+// already-open modal (switching between the account list and a detail
+// view, changing a date filter, etc.) reuse that same entry — only the
+// closed→open transition pushes a new one — so one back-press always
+// returns to the dashboard/sidebar, regardless of which nested view was
+// showing.
 function openModal(innerHtml, extraClass){
-  document.getElementById("modalRoot").innerHTML = `<div class="overlay" id="ovl"><div class="modal${extraClass?' '+extraClass:''}">${innerHtml}</div></div>`;
+  const root = document.getElementById("modalRoot");
+  const alreadyOpen = root.innerHTML.trim() !== "";
+  root.innerHTML = `<div class="overlay" id="ovl"><div class="modal${extraClass?' '+extraClass:''}">${innerHtml}</div></div>`;
   document.getElementById("ovl").addEventListener("click", (e)=>{ if(e.target.id==="ovl") closeModal(); });
+  if(!alreadyOpen){
+    history.pushState({qaaraanModal:true}, "", location.href);
+  }
 }
 function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
+window.addEventListener("popstate", ()=>{
+  const root = document.getElementById("modalRoot");
+  if(root && root.innerHTML.trim() !== "") root.innerHTML = "";
+});
 
 function openAddCustomerModal(){
   openModal(`

@@ -1909,6 +1909,100 @@ function memberDisbursementBreakdown(m){
   return {total, byCat, items};
 }
 
+// Shared two-step typed-serial delete confirmation for a single member
+// transaction — used by the main member detail panel and the Members
+// Report preview modal alike, so both paths get the same destructive-
+// action safeguard rather than each rolling its own.
+function confirmDeleteTransaction(m, tx, onDone){
+  const serial = getMemberSerial(m);
+  const txLabel = tx.type==='due'?t('Qoondo bille','Monthly due'):(tx.type==='writeoff'?'Bad debt':'Payment');
+  const showStep1 = ()=>{
+    openModal(`
+      <h3>${t("Ma hubtaa inaad tirtirto transaction-kan?","Are you sure you want to delete this transaction?")}</h3>
+      <p class="muted">${txLabel} — ${tx.date} — ${money(tx.amount)} — ${m.name}</p>
+      <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo.","This action cannot be undone.")}</p>
+      <div class="actions">
+        <button id="mNo">${t("Maya","No")}</button>
+        <button class="ghost-danger" id="mYes">${t("Haa, tirtir","Yes, delete")}</button>
+      </div>
+    `);
+    document.getElementById("mNo").addEventListener("click", closeModal);
+    document.getElementById("mYes").addEventListener("click", showStep2);
+  };
+  const showStep2 = ()=>{
+    openModal(`
+      <h3>${t("Xaqiijinta u dambeysa","Final confirmation")}</h3>
+      <p class="muted">${t("Si aad u xaqiijiso, geli serial number-ka","To confirm, enter")} ${m.name} — <b>${t("serial","serial")} ${serial}</b></p>
+      <div class="frow"><input type="number" id="delSerialInput" placeholder="${t('Geli lambarka #','Enter the # number')}"></div>
+      <div class="actions">
+        <button id="mCancel">${t("Maya","No")}</button>
+        <button class="ghost-danger" id="mConfirm">${t("Xaqiiji tirtirka","Confirm delete")}</button>
+      </div>
+    `);
+    document.getElementById("mCancel").addEventListener("click", closeModal);
+    document.getElementById("mConfirm").addEventListener("click", async ()=>{
+      const entered = parseInt(document.getElementById("delSerialInput").value, 10);
+      if(entered !== serial){
+        showToast(t(`Khalad: geli sax ahaan serial ${serial}`,`Error: enter serial ${serial} exactly`));
+        return;
+      }
+      m.transactions = m.transactions.filter(t=>t.id!==tx.id);
+      if(tx.type==="due"){
+        const mk = tx.date.slice(0,7);
+        m.accruedMonths = m.accruedMonths.filter(x=>x!==mk);
+      }
+      logActivity("Tirtirid transaction", `${m.name} (serial ${serial}): ${tx.type} $${tx.amount}`, "direct");
+      await saveDb();
+      closeModal();
+      showToast(t("Waa la tirtiray","Deleted"));
+      if(onDone) onDone();
+    });
+  };
+  showStep1();
+}
+
+// Lower-friction than delete (values can simply be corrected again), so a
+// single Save step is enough — no typed serial confirmation. Only touches
+// date/amount/note; changing a transaction's type is intentionally not
+// supported here (it would have knock-on effects on accruedMonths/balance
+// sign best handled by deleting and re-recording instead).
+function openEditTransactionModal(m, tx, onDone){
+  const typeLabel = tx.type==='due'?t('Qoondo bille','Monthly due'):(tx.type==='writeoff'?'Bad debt':'Payment');
+  openModal(`
+    <h3>${t("Wax ka beddel dhaqdhaqaaq","Edit transaction")}</h3>
+    <p class="muted">${m.name} — ${typeLabel}</p>
+    <div class="frow"><label>${t("Taariikhda","Date")}</label><input type="date" id="etxDate" value="${tx.date}"></div>
+    <div class="frow"><label>${t("Lacagta","Amount")}</label><input type="number" step="0.01" min="0.01" id="etxAmount" value="${tx.amount}"></div>
+    <div class="frow"><label>${t("Faahfaahin (ikhtiyaari)","Note (optional)")}</label><input type="text" id="etxNote" value="${(tx.note||'').replace(/"/g,'&quot;')}"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mSave">${t("Kaydi","Save")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mSave").addEventListener("click", async ()=>{
+    const date = document.getElementById("etxDate").value;
+    const amount = parseFloat(document.getElementById("etxAmount").value);
+    const note = document.getElementById("etxNote").value.trim();
+    if(!date || !amount || amount<=0){ showToast(t("Fadlan buuxi dhammaan xogta si sax ah","Please fill in valid values")); return; }
+    const before = `${tx.type} ${money(tx.amount)} (${tx.date})`;
+    if(tx.type==="due"){
+      const oldMonthKey = tx.date.slice(0,7);
+      const newMonthKey = date.slice(0,7);
+      if(oldMonthKey !== newMonthKey){
+        m.accruedMonths = m.accruedMonths.filter(x=>x!==oldMonthKey);
+        if(!m.accruedMonths.includes(newMonthKey)) m.accruedMonths.push(newMonthKey);
+      }
+    }
+    tx.date = date; tx.amount = amount; tx.note = note;
+    logActivity("Wax ka beddel transaction", `${m.name}: ${before} → ${tx.type} ${money(amount)} (${date})`, "direct");
+    await saveDb();
+    closeModal();
+    showToast(t("Waa la kaydiyay","Saved"));
+    if(onDone) onDone();
+  });
+}
+
 function renderDetail(){
   const panel = document.getElementById("detailPanel");
   const m = db.members.find(x=>x.id===selectedId);
@@ -1997,6 +2091,7 @@ function renderDetail(){
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <span class="amt">${tx.type==='due'?'+':'-'}${money(tx.amount)}</span>
+              ${canDel ? `<button class="edit" data-edittxid="${tx.id}" title="${t('Wax ka beddel','Edit')}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''}
               ${canDel ? `<button class="del" data-txid="${tx.id}" title="${t('Tirtir','Delete')}">✕</button>` : ''}
             </div>
           </div>
@@ -2024,57 +2119,16 @@ function renderDetail(){
   if(canDel){
     panel.querySelectorAll(".del").forEach(btn=>{
       btn.addEventListener("click", ()=>{
-        const txid = btn.dataset.txid;
-        const tx = m.transactions.find(t=>t.id===txid);
+        const tx = m.transactions.find(t=>t.id===btn.dataset.txid);
         if(!tx) return;
-        const serial = getMemberSerial(m);
-        const txLabel = tx.type==='due'?t('Qoondo bille','Monthly due'):(tx.type==='writeoff'?'Bad debt':'Payment');
-
-        const showStep1 = ()=>{
-          openModal(`
-            <h3>${t("Ma hubtaa inaad tirtirto transaction-kan?","Are you sure you want to delete this transaction?")}</h3>
-            <p class="muted">${txLabel} — ${tx.date} — ${money(tx.amount)} — ${m.name}</p>
-            <p class="muted" style="color:var(--danger-ink);">${t("Falkan lama soo celin karo.","This action cannot be undone.")}</p>
-            <div class="actions">
-              <button id="mNo">${t("Maya","No")}</button>
-              <button class="ghost-danger" id="mYes">${t("Haa, tirtir","Yes, delete")}</button>
-            </div>
-          `);
-          document.getElementById("mNo").addEventListener("click", closeModal);
-          document.getElementById("mYes").addEventListener("click", showStep2);
-        };
-
-        const showStep2 = ()=>{
-          openModal(`
-            <h3>${t("Xaqiijinta u dambeysa","Final confirmation")}</h3>
-            <p class="muted">${t("Si aad u xaqiijiso, geli serial number-ka","To confirm, enter")} ${m.name} — <b>${t("serial","serial")} ${serial}</b></p>
-            <div class="frow"><input type="number" id="delSerialInput" placeholder="${t('Geli lambarka #','Enter the # number')}"></div>
-            <div class="actions">
-              <button id="mCancel">${t("Maya","No")}</button>
-              <button class="ghost-danger" id="mConfirm">${t("Xaqiiji tirtirka","Confirm delete")}</button>
-            </div>
-          `);
-          document.getElementById("mCancel").addEventListener("click", closeModal);
-          document.getElementById("mConfirm").addEventListener("click", async ()=>{
-            const entered = parseInt(document.getElementById("delSerialInput").value, 10);
-            if(entered !== serial){
-              showToast(t(`Khalad: geli sax ahaan serial ${serial}`,`Error: enter serial ${serial} exactly`));
-              return;
-            }
-            m.transactions = m.transactions.filter(t=>t.id!==txid);
-            if(tx.type==="due"){
-              const mk = tx.date.slice(0,7);
-              m.accruedMonths = m.accruedMonths.filter(x=>x!==mk);
-            }
-            logActivity("Tirtirid transaction", `${m.name} (serial ${serial}): ${tx.type} $${tx.amount}`, "direct");
-            await saveDb();
-            closeModal();
-            showToast(t("Waa la tirtiray","Deleted"));
-            renderSummary(); renderList(); renderDetail();
-          });
-        };
-
-        showStep1();
+        confirmDeleteTransaction(m, tx, ()=>{ renderSummary(); renderList(); renderDetail(); });
+      });
+    });
+    panel.querySelectorAll("[data-edittxid]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const tx = m.transactions.find(t=>t.id===btn.dataset.edittxid);
+        if(!tx) return;
+        openEditTransactionModal(m, tx, ()=>{ renderSummary(); renderList(); renderDetail(); });
       });
     });
   }
@@ -2621,12 +2675,84 @@ function openReportPersonPicker(){
     results.querySelectorAll("[data-mid]").forEach(row=>{
       row.addEventListener("click", ()=>{
         const m = db.members.find(x=>x.id===row.dataset.mid);
-        if(m) openReportFormatChoice(m.name, ()=>exportMemberLiveReportPdf(m), ()=>exportMemberLiveReportExcel(m));
+        if(m) openMemberReportPreview(m);
       });
     });
   };
   searchEl.addEventListener("input", renderResults);
   searchEl.focus();
+}
+
+// Reports → Personal → [pick a member] used to jump straight to the
+// PDF/Excel choice with no way to catch or fix a wrong entry first. This
+// shows the member's balances and full transaction list on screen —
+// reusing the same Edit/Delete flow as the main Members tab (gated on the
+// same "delete" permission) — so a mistake can be corrected right here
+// before printing, instead of only after generating a PDF and re-checking
+// against the app separately. PDF/Excel export stays available at the
+// bottom, unchanged.
+function openMemberReportPreview(m){
+  const canEditDel = hasPerm("delete");
+  const render = ()=>{
+    const bal = computeBalance(m);
+    const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+    let running = m.openingBalance;
+    const rows = sorted.map(tx=>{
+      running += (tx.type==="due" ? tx.amount : -tx.amount);
+      const label = tx.type==='due' ? t('Qoondo bille','Monthly due') : (tx.type==='writeoff' ? t('Bad debt — Cafinaad','Bad debt — written off') : 'Payment');
+      return `<div class="tx ${tx.type}">
+        <div class="l">
+          <span>${label} — ${tx.date}</span>
+          <span class="muted">${tx.note||''} ${t('Balance ka dib','Balance after')}: ${money(running)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="amt">${tx.type==='due'?'+':'-'}${money(tx.amount)}</span>
+          ${canEditDel ? `<button class="edit" data-edittxid="${tx.id}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''}
+          ${canEditDel ? `<button class="del" data-txid="${tx.id}" title="${t('Tirtir','Delete')}">✕</button>` : ''}
+        </div>
+      </div>`;
+    }).join("");
+    openModal(`
+      <h3>${m.name}</h3>
+      <p class="muted">${m.phone || t('telefoon lama helin','no phone on file')} ${m.monthlyDue ? ' · '+t('Qoondo/bil','Due/month')+': '+money(m.monthlyDue) : ''}</p>
+      <div class="bal-row" style="margin-bottom:14px;">
+        <div class="bal-box"><div class="lbl">${t("Balance bilowga ah","Opening balance")}</div><div class="val">${money(m.openingBalance)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+      </div>
+      <div class="muted" style="margin-bottom:8px;">${t("Taariikhda dhaqdhaqaaqyada (transactions)","Transaction history")}</div>
+      <div class="tx-list" style="max-height:340px;">
+        ${rows || `<div class="muted">${t("Wali ma jiraan dhaqdhaqaaq.","No transactions yet.")}</div>`}
+      </div>
+      <div class="actions" style="margin-top:16px;">
+        <button id="mCancel">${t("Xir","Close")}</button>
+        <button id="rptXlsx">Excel</button>
+        <button class="primary" id="rptPdf">PDF</button>
+      </div>
+    `);
+    document.getElementById("mCancel").addEventListener("click", closeModal);
+    document.getElementById("rptPdf").addEventListener("click", ()=>{
+      try{ exportMemberLiveReportPdf(m); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+    });
+    document.getElementById("rptXlsx").addEventListener("click", ()=>{
+      try{ exportMemberLiveReportExcel(m); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+    });
+    if(canEditDel){
+      document.querySelectorAll("[data-edittxid]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const tx = m.transactions.find(t=>t.id===btn.dataset.edittxid);
+          if(tx) openEditTransactionModal(m, tx, render);
+        });
+      });
+      document.querySelectorAll(".del[data-txid]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const tx = m.transactions.find(t=>t.id===btn.dataset.txid);
+          if(tx) confirmDeleteTransaction(m, tx, render);
+        });
+      });
+    }
+  };
+  render();
 }
 
 function openReportFormatChoice(title, onPdf, onXlsx){

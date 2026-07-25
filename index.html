@@ -3725,6 +3725,12 @@ function renderAcctBalanceList(){
 function wireAcctBalanceDetailControls(){
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("abBack").addEventListener("click", ()=>{
+    // Reached from the Balance Sheet (clicking Salaam Bank etc.) instead of
+    // the Account Balance Details list — go back to where we came from.
+    if(acctBalModalState.backTo === "balancesheet"){
+      openBalanceSheetReportModal();
+      return;
+    }
     acctBalModalState = {view:"list"};
     renderAcctBalanceModal();
   });
@@ -3959,18 +3965,24 @@ function openBalanceSheetReportModal(){
   }
   const d = buildBalanceSheetData();
   const line = (label, amount, cls)=>`<tr class="${cls||''}"><td>${label}</td><td class="amt">${amount===undefined?'':money(amount)}</td></tr>`;
+  // Checking/Savings and Other Current Assets rows map 1:1 to a real
+  // db.accounts entry (unlike AR/AP/Equity, which are derived totals with
+  // nothing to drill into) — clicking one opens the same account ledger
+  // drill-down as Account Balance Details, so "Salaam Bank" on the
+  // Balance Sheet leads to its actual transaction history.
+  const acctLine = (c)=>`<tr class="bs-l3" data-drill-account="${c.id}" style="cursor:pointer;"><td>${c.name}</td><td class="amt">${money(c.amount)}</td></tr>`;
   const rowsHtml = `
     <tr class="bs-section"><td colspan="2">${t("HANTIDA","ASSETS")}</td></tr>
     ${line(t("Hantida Hadda","Current Assets"), undefined, "bs-l1")}
     ${line(t("Jeegaga/Kaydka","Checking/Savings"), undefined, "bs-l2")}
-    ${d.checking.map(c=>line(c.name, c.amount, "bs-l3")).join("")}
+    ${d.checking.map(acctLine).join("")}
     ${line(t("Wadarta Jeegaga/Kaydka","Total Checking/Savings"), d.totalChecking, "bs-l2 bs-total")}
     ${line(t("Xisaabaadka La Sugayo","Accounts Receivable"), undefined, "bs-l2")}
     ${line(t("Xisaabaadka La Sugayo","Accounts Receivable"), d.arAmount, "bs-l3")}
     ${line(t("Wadarta Xisaabaadka La Sugayo","Total Accounts Receivable"), d.arAmount, "bs-l2 bs-total")}
     ${d.otherCurrentAssets.length ? `
       ${line(t("Hantida Kale ee Hadda","Other Current Assets"), undefined, "bs-l2")}
-      ${d.otherCurrentAssets.map(o=>line(o.name, o.amount, "bs-l3")).join("")}
+      ${d.otherCurrentAssets.map(acctLine).join("")}
       ${line(t("Wadarta Hantida Kale","Total Other Current Assets"), d.totalOtherCurrent, "bs-l2 bs-total")}
     ` : ''}
     ${line(t("Wadarta Hantida Hadda","Total Current Assets"), d.totalCurrentAssets, "bs-l1 bs-total")}
@@ -4004,6 +4016,12 @@ function openBalanceSheetReportModal(){
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("bsPdf").addEventListener("click", ()=>{
     try{ exportBalanceSheetPdf(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.querySelectorAll("[data-drill-account]").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      acctBalModalState = {view:"detail", kind:"account", accountId:row.dataset.drillAccount, from:"", to:"", backTo:"balancesheet"};
+      renderAcctBalanceDetail();
+    });
   });
   document.getElementById("bsXlsx").addEventListener("click", ()=>{
     try{ exportBalanceSheetExcel(); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
@@ -4508,8 +4526,8 @@ function buildBalanceSheetData(){
   const EQUITY = t("Hantida Bilowga ah","Opening Equity");
   const AP = t("Xisaabaadka La Bixin (Deymaha)","Accounts Payable");
 
-  const checking = db.accounts.filter(a=>a.id==="acc_salaam").map(a=>({name:a.name, amount:netDr(a.name)}));
-  const otherCurrentAssets = db.accounts.filter(a=>a.id!=="acc_salaam").map(a=>({name:a.name, amount:netDr(a.name)}));
+  const checking = db.accounts.filter(a=>a.id==="acc_salaam").map(a=>({id:a.id, name:a.name, amount:netDr(a.name)}));
+  const otherCurrentAssets = db.accounts.filter(a=>a.id!=="acc_salaam").map(a=>({id:a.id, name:a.name, amount:netDr(a.name)}));
   const totalChecking = checking.reduce((s,x)=>s+x.amount,0);
   const arAmount = netDr(AR);
   const totalOtherCurrent = otherCurrentAssets.reduce((s,x)=>s+x.amount,0);

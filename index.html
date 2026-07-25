@@ -2677,7 +2677,10 @@ function openReportsModal(){
       const choice = btn.dataset.choice;
       if(choice === "personal") openReportPersonPicker();
       else if(choice === "group") openReportGroupPicker();
-      else openReportFormatChoice(t("Warbixinta oo dhan","Full report"), ()=>exportFullListPdf(db.members), ()=>exportFullListExcel(db.members));
+      else {
+        const activeMembers = db.members.filter(m=>m.status==="active");
+        openReportFormatChoice(t("Warbixinta oo dhan","Full report"), ()=>exportFullListPdf(activeMembers), ()=>exportFullListExcel(activeMembers));
+      }
     });
   });
 }

@@ -1602,8 +1602,10 @@ function renderSummary(){
     return;
   }
   const active = db.members.filter(m=>m.status==="active");
+  const inactive = db.members.filter(m=>m.status!=="active");
   const totalBal = db.members.reduce((s,m)=>s+computeBalance(m),0);
   const activeBal = active.reduce((s,m)=>s+computeBalance(m),0);
+  const inactiveBal = inactive.reduce((s,m)=>s+computeBalance(m),0);
   const totalCollected = db.members.reduce((s,m)=>s+totalPaid(m),0);
   const owingCount = db.members.filter(m=>computeBalance(m) > 0).length;
   const totalDisb = db.disbursements.reduce((s,d)=>s+d.amount,0);
@@ -1615,6 +1617,7 @@ function renderSummary(){
     <div class="card"><div class="lbl">${t("Balance-ka Salaam Bank","Salaam Bank balance")}</div><div class="val ${salaamBal>=0?'pos':'neg'}">${money(salaamBal)}</div></div>
     <div class="card"><div class="lbl">${t("Wadarta balance-ka hadda","Total current balance")}</div><div class="val ${totalBal>=0?'pos':'neg'}">${money(totalBal)}</div></div>
     <div class="card"><div class="lbl">${t("Balance-ka xubnaha active","Active members balance")}</div><div class="val ${activeBal>=0?'pos':'neg'}">${money(activeBal)}</div></div>
+    <div class="card"><div class="lbl">${t("Balance-ka xubnaha inactive","Inactive members balance")}</div><div class="val ${inactiveBal>=0?'pos':'neg'}">${money(inactiveBal)}</div></div>
     <div class="card"><div class="lbl">${t("Xubnaha (active)","Members (active)")}</div><div class="val">${active.length} / ${db.members.length}</div></div>
     <div class="card"><div class="lbl">${t("Xubno lacag laga rabo","Members owing")}</div><div class="val">${owingCount}</div></div>
     <div class="card"><div class="lbl">${t("Lacagta la ururiyay","Total collected")}</div><div class="val pos">${money(totalCollected)}</div></div>

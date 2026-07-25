@@ -3460,6 +3460,7 @@ function renderTabs(){
     reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
     reportTabs.push({id:"acctreport-action", label:t("Faahfaahinta Balance-ka Accounts","Account Balance Details"), icon:"ti-building-bank", action:"acctreport"});
     reportTabs.push({id:"balancesheet-action", label:t("Xaaladda Maaliyadeed","Balance Sheet"), icon:"ti-report-money", action:"balancesheet"});
+    reportTabs.push({id:"batchinvoice-action", label:t("Invoice Wadajir ah","Batch Invoicing"), icon:"ti-files", action:"batchinvoice"});
   }
   if(hasPerm("viewReports")){
     tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});
@@ -3508,6 +3509,8 @@ function renderTabs(){
   if(acctReportBtn) acctReportBtn.addEventListener("click", openAccountBalanceReportModal);
   const balanceSheetBtn = navList.querySelector("[data-action='balancesheet']");
   if(balanceSheetBtn) balanceSheetBtn.addEventListener("click", openBalanceSheetReportModal);
+  const batchInvoiceBtn = navList.querySelector("[data-action='batchinvoice']");
+  if(batchInvoiceBtn) batchInvoiceBtn.addEventListener("click", openBatchInvoicingModal);
   const forecastBtn = navList.querySelector("[data-action='forecast']");
   if(forecastBtn) forecastBtn.addEventListener("click", ()=>openForecastModal());
 
@@ -3859,6 +3862,120 @@ function exportAccountBalancesExcel(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Accounts");
   XLSX.writeFile(wb, "account_balance_report.xlsx");
+}
+
+// Dues already accrue automatically every month for every active member
+// (syncAccruals) — this doesn't create anything new. It's purely a
+// printable batch of the invoices for a chosen month, grouped by amount
+// tier ($5/$10/$20/... — whatever monthlyDue values actually exist among
+// active members, not a hardcoded list) so the admin can hand out or send
+// a whole tier's invoices at once instead of one member at a time.
+function batchInvoicingTiers(){
+  const byAmount = {};
+  for(const m of db.members){
+    if(m.status !== "active" || !m.monthlyDue || m.monthlyDue<=0) continue;
+    (byAmount[m.monthlyDue] ||= []).push(m);
+  }
+  return Object.keys(byAmount).map(Number).sort((a,b)=>a-b)
+    .map(amount=>({amount, members:byAmount[amount].sort((a,b)=>a.name.localeCompare(b.name))}));
+}
+
+function openBatchInvoicingModal(){
+  if(!hasPerm("viewReports")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  let selectedMonth = MONTHS_2026.includes(currentMonthKey()) ? currentMonthKey() : MONTHS_2026[0];
+  const render = ()=>{
+    const tiers = batchInvoicingTiers();
+    openModal(`
+      <h3>${t("Invoice Wadajir ah","Batch Invoicing")}</h3>
+      <p class="muted">${t("Dooro bisha, kadibna soo deji invoice-yada kooxda qadar kasta.","Pick a month, then download the invoices for each amount tier.")}</p>
+      <div class="frow"><label>${t("Bisha","Month")}</label>
+        <select id="biMonth">${MONTHS_2026.map(mo=>`<option value="${mo}" ${mo===selectedMonth?'selected':''}>${MONTH_LABEL[mo]}</option>`).join("")}</select>
+      </div>
+      <div class="tx-list" style="max-height:300px;">
+        ${tiers.length ? tiers.map(tr=>`
+          <div class="tx">
+            <div class="l"><span>$${tr.amount} / ${t("bil","month")}</span><span class="muted">${tr.members.length} ${t("xubnood","members")}</span></div>
+            <button type="button" data-tierpdf="${tr.amount}">PDF</button>
+          </div>
+        `).join("") : `<div class="empty">${t("Wax xubno ah lama helin.","No active members with a monthly due found.")}</div>`}
+      </div>
+      <div class="actions">
+        <button id="mCancel">${t("Xir","Close")}</button>
+        ${tiers.length ? `<button class="primary" id="biAllPdf">${t("Dhammaan (hal PDF)","All tiers (one PDF)")}</button>` : ''}
+      </div>
+    `);
+    document.getElementById("mCancel").addEventListener("click", closeModal);
+    document.getElementById("biMonth").addEventListener("change", (e)=>{ selectedMonth = e.target.value; render(); });
+    document.querySelectorAll("[data-tierpdf]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const amount = parseFloat(btn.dataset.tierpdf);
+        const tier = tiers.find(x=>x.amount===amount);
+        if(tier) exportBatchInvoiceTierPdf(tier, selectedMonth);
+      });
+    });
+    const allBtn = document.getElementById("biAllPdf");
+    if(allBtn) allBtn.addEventListener("click", ()=>exportBatchInvoiceAllPdf(tiers, selectedMonth));
+  };
+  render();
+}
+
+function exportBatchInvoiceTierPdf(tier, monthKey){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 18;
+  doc.setFontSize(14); doc.text(`${t("Invoice Wadajir ah","Invoice Batch")} — $${tier.amount}/${t("bil","month")} — ${MONTH_LABEL[monthKey]}`, 14, y); y += 10;
+  doc.setFontSize(9); doc.setFont(undefined, "bold");
+  doc.text("#", 14, y); doc.text(t("Magaca","Name"), 22, y); doc.text(t("Telefoon","Phone"), 110, y); doc.text(t("Qadarka","Amount"), 155, y); doc.text(t("Taariikhda","Date"), 178, y);
+  y += 4; doc.line(14, y, 196, y); y += 5;
+  doc.setFont(undefined, "normal");
+  tier.members.forEach((m,i)=>{
+    if(y > 280){ doc.addPage(); y = 18; }
+    doc.text(String(i+1), 14, y);
+    doc.text(String(m.name).slice(0,42), 22, y);
+    doc.text(String(m.phone||"-"), 110, y);
+    doc.text("$"+tier.amount, 155, y);
+    doc.text(monthKey+"-01", 178, y);
+    y += 6;
+  });
+  y += 4; doc.setFont(undefined, "bold");
+  doc.text(`${t("Wadarta","Total")}: $${(tier.amount*tier.members.length).toFixed(2)} (${tier.members.length})`, 14, y);
+  doc.save(`invoice_batch_$${tier.amount}_${monthKey}.pdf`);
+}
+
+function exportBatchInvoiceAllPdf(tiers, monthKey){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 18;
+  doc.setFontSize(14); doc.text(`${t("Invoice Wadajir ah — Dhammaan","Invoice Batch — All Tiers")} — ${MONTH_LABEL[monthKey]}`, 14, y); y += 10;
+  let grandTotal = 0, grandCount = 0;
+  for(const tier of tiers){
+    if(y > 260){ doc.addPage(); y = 18; }
+    doc.setFontSize(11); doc.setFont(undefined, "bold");
+    doc.text(`$${tier.amount}/${t("bil","month")} — ${tier.members.length} ${t("xubnood","members")}`, 14, y); y += 6;
+    doc.setFont(undefined, "normal"); doc.setFontSize(8);
+    doc.text("#", 14, y); doc.text(t("Magaca","Name"), 22, y); doc.text(t("Telefoon","Phone"), 110, y); doc.text(t("Qadarka","Amount"), 155, y);
+    y += 4; doc.line(14, y, 196, y); y += 4.5;
+    tier.members.forEach((m,i)=>{
+      if(y > 280){ doc.addPage(); y = 18; }
+      doc.text(String(i+1), 14, y);
+      doc.text(String(m.name).slice(0,44), 22, y);
+      doc.text(String(m.phone||"-"), 110, y);
+      doc.text("$"+tier.amount, 155, y);
+      y += 5;
+    });
+    const subtotal = tier.amount * tier.members.length;
+    grandTotal += subtotal; grandCount += tier.members.length;
+    doc.setFont(undefined, "bold");
+    doc.text(`${t("Wadarta","Subtotal")}: $${subtotal.toFixed(2)}`, 14, y);
+    y += 9;
+  }
+  if(y > 270){ doc.addPage(); y = 18; }
+  doc.setFontSize(12); doc.setFont(undefined, "bold");
+  doc.text(`${t("WADARTA GUUD","GRAND TOTAL")}: $${grandTotal.toFixed(2)} (${grandCount} ${t("xubnood","members")})`, 14, y);
+  doc.save(`invoice_batch_all_${monthKey}.pdf`);
 }
 
 function openBalanceSheetReportModal(){

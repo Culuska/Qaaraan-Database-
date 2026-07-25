@@ -3452,6 +3452,7 @@ function renderTabs(){
     entryTabs.push({id:"invoice-action", label:t("Invoice","Invoice"), icon:"ti-file-invoice", action:"invoice"});
     entryTabs.push({id:"receipt-action", label:t("Rasiid","Receipt"), icon:"ti-receipt", action:"receipt"});
     entryTabs.push({id:"payment-action", label:t("Lacag-bixin","Payment"), icon:"ti-cash", action:"payment"});
+    entryTabs.push({id:"baddebt-action", label:t("Deyn Xun (Bad Debt)","Bad Debt"), icon:"ti-file-off", action:"baddebt"});
   }
   // "Report" group: read-only exports/lookups, separate from the Entry
   // actions above.
@@ -3503,6 +3504,8 @@ function renderTabs(){
   if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
   const paymentBtn = navList.querySelector("[data-action='payment']");
   if(paymentBtn) paymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
+  const badDebtBtn = navList.querySelector("[data-action='baddebt']");
+  if(badDebtBtn) badDebtBtn.addEventListener("click", ()=>openNewJournalEntryModal("writeoff"));
   const membersReportBtn = navList.querySelector("[data-action='membersreport']");
   if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
   const acctReportBtn = navList.querySelector("[data-action='acctreport']");

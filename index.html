@@ -832,6 +832,13 @@ async function loadDb(){
   if(db.settings.adminPhone === undefined) db.settings.adminPhone = "+252615200615";
   if(!db.payables) db.payables = [];
   if(!db.passwordResetRequests) db.passwordResetRequests = [];
+  // GROUPS used to be a hardcoded, read-only constant — fine while nobody
+  // could edit membership, but now that Add/Remove buttons let an admin
+  // change who's in a group, that has to live in the saved db instead.
+  // One-time copy into db.groups (deep-copied so nothing here can mutate
+  // the original GROUPS const); every group-related read below switches
+  // from GROUPS to db.groups.
+  if(!db.groups) db.groups = GROUPS.map(g=>({group:g.group, wakiil:g.wakiil, memberNames:[...g.memberNames]}));
   for(const u of db.users){
     if(!u.role) u.role = "admin";
     if(!u.permissions) u.permissions = {addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true};
@@ -1618,13 +1625,14 @@ function renderSummary(){
   `;
 }
 
-function memberRowHtml(m, idx){
+function memberRowHtml(m, idx, groupName){
   const bal = computeBalance(m);
   const inactive = m.status !== "active";
   const letter = (m.name||"?").trim().charAt(0).toUpperCase();
+  const removeBtn = (groupName && hasPerm("addCustomer")) ? `<button type="button" class="grp-remove" data-remove-group="${groupName.replace(/"/g,'&quot;')}" data-remove-member="${m.id}" title="${t('Ka saar kooxda','Remove from group')}" style="margin-left:6px;font-size:11px;color:var(--ink-3);">✕</button>` : '';
   return `<tr data-id="${m.id}" data-letter="${letter}" class="${m.id===selectedId?'active':''} ${inactive?'inactive-row':''}">
     <td class="muted" style="text-align:center;">${idx!=null?idx:''}</td>
-    <td>${m.name}${inactive?'<span class="badge inactive">Inactive</span>':''}</td>
+    <td>${m.name}${inactive?'<span class="badge inactive">Inactive</span>':''}${removeBtn}</td>
     <td class="muted">${m.monthlyDue?money(m.monthlyDue):'—'}</td>
     <td style="text-align:right" class="bal ${bal<0?'neg':'pos'}">${money(bal)}</td>
   </tr>`;
@@ -1638,6 +1646,73 @@ function statusPasses(m, filter){
   if(filter==="all") return true;
   return m.status === filter;
 }
+
+// Add/remove are purely organizational (which rep's group a member is
+// filed under) — no money or transactions involved — so these use a
+// single lightweight confirm rather than the heavier typed-serial flow
+// reserved for destructive financial actions like deleting a payment.
+function openAddToGroupModal(groupName){
+  const g = db.groups.find(x=>x.group===groupName);
+  if(!g) return;
+  openModal(`
+    <h3>${t("Ku dar xubin","Add member")} — ${g.group}</h3>
+    <div class="frow"><input type="text" id="grpAddSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+    <div id="grpAddResults" class="tx-list" style="max-height:320px;"></div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  const searchEl = document.getElementById("grpAddSearch");
+  const renderResults = ()=>{
+    const q = searchEl.value.trim().toLowerCase();
+    const already = new Set(g.memberNames);
+    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const results = document.getElementById("grpAddResults");
+    results.innerHTML = matches.length ? matches.map(m=>`
+      <div class="tx" data-addmid="${m.id}" style="cursor:pointer;">
+        <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        <i class="ti ti-plus"></i>
+      </div>
+    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.querySelectorAll("[data-addmid]").forEach(row=>{
+      row.addEventListener("click", async ()=>{
+        const m = db.members.find(x=>x.id===row.dataset.addmid);
+        if(!m || g.memberNames.includes(m.name)) return;
+        g.memberNames.push(m.name);
+        logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
+        await saveDb();
+        showToast(t("Waa lagu daray kooxda","Added to group"));
+        closeModal();
+        renderList();
+      });
+    });
+  };
+  searchEl.addEventListener("input", renderResults);
+  searchEl.focus();
+}
+
+function removeMemberFromGroup(groupName, memberId){
+  const g = db.groups.find(x=>x.group===groupName);
+  const m = db.members.find(x=>x.id===memberId);
+  if(!g || !m) return;
+  openModal(`
+    <h3>${t("Ka saar kooxda?","Remove from group?")}</h3>
+    <p class="muted">${m.name} — ${g.group}</p>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","No")}</button>
+      <button class="ghost-danger" id="mConfirm">${t("Haa, ka saar","Yes, remove")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    g.memberNames = g.memberNames.filter(n=>n!==m.name);
+    logActivity("Ka saarid xubin kooxda", `${m.name} ← ${g.group}`, "direct");
+    await saveDb();
+    closeModal();
+    showToast(t("Waa laga saaray kooxda","Removed from group"));
+    renderList();
+  });
+}
+
 function renderList(){
   updateMobileLayoutClass();
   const q = document.getElementById("searchBox").value.trim().toLowerCase();
@@ -1667,7 +1742,7 @@ function renderList(){
 
   let html = "";
   let shownCount = 0;
-  for(const g of GROUPS){
+  for(const g of db.groups){
     const members = g.memberNames.map(name=>membersByName[name]).filter(Boolean)
       .filter(m=>m.name.toLowerCase().includes(q) && statusPasses(m,sf))
       .sort((a,b)=>a.name.localeCompare(b.name));
@@ -1677,13 +1752,14 @@ function renderList(){
     html += `<tr><td colspan="4" style="padding:0;border:none;">
       <div class="grp-head">
         <div>${g.group}<div class="wk">${t("Wakiil","Rep")}: ${g.wakiil}</div></div>
-        ${hasPerm("viewReports") ? `<div class="exp">
-          <button type="button" data-exp="pdf" data-group="${g.group}">PDF</button>
-          <button type="button" data-exp="xlsx" data-group="${g.group}">Excel</button>
-        </div>` : ''}
+        <div class="exp">
+          ${hasPerm("addCustomer") ? `<button type="button" data-addmember-group="${g.group}">+ ${t("Xubin","Member")}</button>` : ''}
+          ${hasPerm("viewReports") ? `<button type="button" data-exp="pdf" data-group="${g.group}">PDF</button>
+          <button type="button" data-exp="xlsx" data-group="${g.group}">Excel</button>` : ''}
+        </div>
       </div>
     </td></tr>`;
-    html += members.map((m,i)=>memberRowHtml(m,i+1)).join("");
+    html += members.map((m,i)=>memberRowHtml(m,i+1,g.group)).join("");
     html += `<tr><td colspan="4" style="padding:0;border:none;">
       <div class="grp-sub"><span>${t("Wadarta","Total")} ${g.group} (${members.length})</span><span>${money(groupTotal)}</span></div>
     </td></tr>`;
@@ -1691,11 +1767,23 @@ function renderList(){
   rows.innerHTML = html || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">${t("Wax natiijo ah lama helin.","No results found.")}</td></tr>`;
   document.getElementById("listFoot").textContent = `${shownCount} ${t("xubnood oo koox ku jira","members in groups")}`;
   attachRowClicks(rows);
+  rows.querySelectorAll("[data-addmember-group]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      openAddToGroupModal(btn.dataset.addmemberGroup);
+    });
+  });
+  rows.querySelectorAll("[data-remove-group]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      removeMemberFromGroup(btn.dataset.removeGroup, btn.dataset.removeMember);
+    });
+  });
   rows.querySelectorAll("[data-exp]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
       const gname = btn.dataset.group;
-      const g = GROUPS.find(x=>x.group===gname);
+      const g = db.groups.find(x=>x.group===gname);
       const members = g.memberNames.map(name=>membersByName[name]).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
       if(btn.dataset.exp === "pdf") exportGroupPdf(g, members);
       else exportGroupExcel(g, members);
@@ -1821,7 +1909,7 @@ function groupMembersForExport(members){
   const byName = Object.fromEntries(members.map(m=>[m.name,m]));
   const used = new Set();
   const sections = [];
-  for(const g of GROUPS){
+  for(const g of db.groups){
     const groupMembers = g.memberNames.filter(name=>memberNames.has(name)).map(name=>byName[name]).sort((a,b)=>a.name.localeCompare(b.name));
     if(groupMembers.length){
       sections.push({group:g.group, wakiil:g.wakiil, members:groupMembers});
@@ -2627,7 +2715,7 @@ function openReportGroupPicker(){
   openModal(`
     <h3>${t("Dooro Koox","Choose a group")}</h3>
     <div class="tx-list" style="max-height:360px;">
-      ${GROUPS.map(g=>`
+      ${db.groups.map(g=>`
         <div class="tx" data-group="${g.group.replace(/"/g,'&quot;')}" style="cursor:pointer;">
           <div class="l">
             <span>${g.group}</span>
@@ -2642,7 +2730,7 @@ function openReportGroupPicker(){
   document.getElementById("mCancel").addEventListener("click", openReportsModal);
   document.querySelectorAll("[data-group]").forEach(row=>{
     row.addEventListener("click", ()=>{
-      const g = GROUPS.find(x=>x.group===row.dataset.group);
+      const g = db.groups.find(x=>x.group===row.dataset.group);
       const membersByName = Object.fromEntries(db.members.map(m=>[m.name,m]));
       const members = g.memberNames.map(name=>membersByName[name]).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
       openReportFormatChoice(g.group, ()=>exportGroupPdf(g, members), ()=>exportGroupExcel(g, members));

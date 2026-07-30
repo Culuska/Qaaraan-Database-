@@ -2745,9 +2745,56 @@ function openReportsModal(){
       else if(choice === "group") openReportGroupPicker();
       else {
         const activeMembers = db.members.filter(m=>m.status==="active");
-        openReportFormatChoice(t("Warbixinta oo dhan","Full report"), ()=>exportFullListPdf(activeMembers), ()=>exportFullListExcel(activeMembers));
+        openFullReportPreview(activeMembers);
       }
     });
+  });
+}
+
+// Same on-screen-preview-before-export pattern as Personal and Group
+// reports: shows every active member, grouped and subtotaled exactly like
+// the PDF/Excel will be, with a grand total, before offering the export
+// buttons — instead of jumping straight to a PDF/Excel choice.
+function openFullReportPreview(members){
+  const sections = groupMembersForExport(members);
+  const grand = members.reduce((s,m)=>s+computeBalance(m),0);
+  const sectionsHtml = sections.map(s=>{
+    const subtotal = s.members.reduce((s2,m)=>s2+computeBalance(m),0);
+    return `
+      <div class="grp-head" style="margin-top:10px;">
+        <div>${s.group}${s.wakiil?`<div class="wk">${t("Wakiil","Rep")}: ${s.wakiil}</div>`:''}</div>
+      </div>
+      <div class="tx-list">
+        ${s.members.map(m=>{
+          const bal = computeBalance(m);
+          return `<div class="tx">
+            <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+            <span class="amt" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</span>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="grp-sub"><span>${t("Wadarta","Total")} ${s.group} (${s.members.length})</span><span>${money(subtotal)}</span></div>
+    `;
+  }).join("");
+  openModal(`
+    <h3>${t("Warbixinta oo dhan","Full Member Report")}</h3>
+    <p class="muted">${members.length} ${t("xubnood","members")}</p>
+    <div style="max-height:400px;overflow-y:auto;">${sectionsHtml}</div>
+    <div class="grp-sub" style="margin-top:6px;font-weight:700;"><span>${t("Wadarta guud","Grand total")}</span><span>${money(grand)}</span></div>
+    <div class="actions" style="margin-top:16px;">
+      <button id="abBack">${t("Dib u noqo","Back")}</button>
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button id="rptXlsx">Excel</button>
+      <button class="primary" id="rptPdf">PDF</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("abBack").addEventListener("click", openReportsModal);
+  document.getElementById("rptPdf").addEventListener("click", ()=>{
+    try{ exportFullListPdf(members); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.getElementById("rptXlsx").addEventListener("click", ()=>{
+    try{ exportFullListExcel(members); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
   });
 }
 

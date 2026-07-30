@@ -1660,20 +1660,103 @@ function statusPasses(m, filter){
   return m.status === filter;
 }
 
-function openEditGroupNameModal(groupName){
+// Same "which OTHER group is this member already in" lookup used by the
+// Add-to-group search, reused here so the Edit modal can flag any member
+// who's part of two groups at once, not just warn about it before adding.
+function otherGroupOf(name, currentGroupName){
+  const other = db.groups.find(x=>x.group!==currentGroupName && x.memberNames.includes(name));
+  return other ? other.group : null;
+}
+
+// One-stop group editor: rename/change rep, remove members, and add new
+// ones, all from a single modal instead of separate buttons in the Groups
+// view (those still work too — this is an additional, consolidated way to
+// manage a group). Flags any member already filed under a second group,
+// both as a summary banner and inline per member, so it's impossible to
+// miss while editing.
+function openEditGroupModal(groupName){
   const g = db.groups.find(x=>x.group===groupName);
   if(!g) return;
+  const membersByName = Object.fromEntries(db.members.map(m=>[m.name,m]));
+  const renderMembersSection = ()=>{
+    const list = document.getElementById("grpEditMembers");
+    if(!list) return;
+    const overlaps = g.memberNames.map(n=>otherGroupOf(n, g.group)).filter(Boolean);
+    const banner = document.getElementById("grpEditOverlapBanner");
+    if(banner){
+      banner.style.display = overlaps.length ? "" : "none";
+      banner.textContent = overlaps.length
+        ? `⚠ ${overlaps.length} ${t("xubnood ayaa sidoo kale ku jira koox kale","member(s) here are also in another group")}`
+        : "";
+    }
+    list.innerHTML = g.memberNames.length ? g.memberNames.map(name=>{
+      const m = membersByName[name];
+      const other = otherGroupOf(name, g.group);
+      return `<div class="tx">
+        <div class="l">
+          <span>${name}${!m ? ` <span class="badge inactive">${t('lama helin','not found')}</span>` : ''}</span>
+          <span class="muted" ${other?'style="color:var(--warn);"':''}>${other ? '⚠ '+t('Sidoo kale ku jira','Also in')+': '+other : (m ? (m.phone||t('telefoon lama helin','no phone on file')) : '')}</span>
+        </div>
+        <button type="button" class="del" data-editremove="${name.replace(/"/g,'&quot;')}" title="${t('Ka saar','Remove')}">✕</button>
+      </div>`;
+    }).join("") : `<div class="empty">${t("Wax xubno ah lama helin.","No members yet.")}</div>`;
+    list.querySelectorAll("[data-editremove]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const targetMember = membersByName[btn.dataset.editremove];
+        if(!targetMember) return;
+        removeMemberFromGroup(g.group, targetMember.id, ()=>{ renderList(); openEditGroupModal(g.group); });
+      });
+    });
+  };
+  const renderAddResults = ()=>{
+    const searchEl = document.getElementById("grpEditAddSearch");
+    const results = document.getElementById("grpEditAddResults");
+    if(!searchEl || !results) return;
+    const q = searchEl.value.trim().toLowerCase();
+    const already = new Set(g.memberNames);
+    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    results.innerHTML = matches.length ? matches.map(m=>{
+      const other = otherGroupOf(m.name, g.group);
+      return `<div class="tx" data-editaddmid="${m.id}" style="cursor:pointer;">
+        <div class="l">
+          <span>${m.name}</span>
+          <span class="muted" ${other?'style="color:var(--warn);"':''}>${other ? '⚠ '+t('Horeba wuxuu ku jiraa','Already in')+': '+other : (m.phone || t('telefoon lama helin','no phone on file'))}</span>
+        </div>
+        <i class="ti ti-plus" data-editaddicon></i>
+      </div>`;
+    }).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.querySelectorAll("[data-editaddmid]").forEach(row=>{
+      row.addEventListener("click", async ()=>{
+        const m = db.members.find(x=>x.id===row.dataset.editaddmid);
+        if(!m || g.memberNames.includes(m.name) || row.dataset.added) return;
+        row.dataset.added = "1";
+        const icon = row.querySelector("[data-editaddicon]");
+        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--accent-ink)"; }
+        row.style.pointerEvents = "none";
+        g.memberNames.push(m.name);
+        logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
+        await saveDb();
+        showToast(t("Waa lagu daray kooxda","Added to group"));
+        renderList();
+        renderMembersSection();
+        setTimeout(renderAddResults, 500);
+      });
+    });
+  };
   openModal(`
     <h3>${t("Wax ka beddel kooxda","Edit group")}</h3>
     <div class="frow"><label>${t("Magaca kooxda","Group name")}</label><input type="text" id="grpNameInput" value="${g.group.replace(/"/g,'&quot;')}"></div>
     <div class="frow"><label>${t("Wakiil","Rep")}</label><input type="text" id="grpWakiilInput" value="${(g.wakiil||'').replace(/"/g,'&quot;')}"></div>
-    <div class="actions">
-      <button id="mCancel">${t("Jooji","Cancel")}</button>
-      <button class="primary" id="mSave">${t("Kaydi","Save")}</button>
-    </div>
+    <div class="actions" style="margin-bottom:14px;"><button class="primary" id="mSaveNameRep">${t("Kaydi magaca/wakiilka","Save name/rep")}</button></div>
+    <div id="grpEditOverlapBanner" style="display:none;color:var(--warn);font-size:12px;margin-bottom:8px;"></div>
+    <div class="muted" style="margin-bottom:6px;">${t("Xubnaha kooxda","Members")} (${g.memberNames.length})</div>
+    <div id="grpEditMembers" class="tx-list" style="max-height:220px;margin-bottom:14px;"></div>
+    <div class="frow"><label>${t("Ku dar xubin cusub","Add member")}</label><input type="text" id="grpEditAddSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+    <div id="grpEditAddResults" class="tx-list" style="max-height:180px;"></div>
+    <div class="actions" style="margin-top:16px;"><button id="mCancel">${t("Xir","Close")}</button></div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
-  document.getElementById("mSave").addEventListener("click", async ()=>{
+  document.getElementById("mSaveNameRep").addEventListener("click", async ()=>{
     const newName = document.getElementById("grpNameInput").value.trim();
     const newWakiil = document.getElementById("grpWakiilInput").value.trim();
     if(!newName){ showToast(t("Geli magac sax ah","Enter a valid name")); return; }
@@ -1686,10 +1769,12 @@ function openEditGroupNameModal(groupName){
     g.wakiil = newWakiil;
     logActivity("Wax ka beddel magaca kooxda", `${oldName} → ${newName}`, "direct");
     await saveDb();
-    closeModal();
     showToast(t("Waa la kaydiyay","Saved"));
     renderList();
+    renderMembersSection();
   });
+  document.getElementById("grpEditAddSearch").addEventListener("input", renderAddResults);
+  renderMembersSection();
 }
 
 // Add/remove are purely organizational (which rep's group a member is
@@ -1707,20 +1792,13 @@ function openAddToGroupModal(groupName){
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   const searchEl = document.getElementById("grpAddSearch");
-  // Which OTHER group (if any) each member name is already filed under —
-  // so the admin is warned before adding someone who's already elsewhere,
-  // rather than silently ending up in two groups at once.
-  const otherGroupOf = (name)=>{
-    const other = db.groups.find(x=>x.group!==g.group && x.memberNames.includes(name));
-    return other ? other.group : null;
-  };
   const renderResults = ()=>{
     const q = searchEl.value.trim().toLowerCase();
     const already = new Set(g.memberNames);
     const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
     const results = document.getElementById("grpAddResults");
     results.innerHTML = matches.length ? matches.map(m=>{
-      const otherGroup = otherGroupOf(m.name);
+      const otherGroup = otherGroupOf(m.name, g.group);
       return `<div class="tx" data-addmid="${m.id}" style="cursor:pointer;">
         <div class="l">
           <span>${m.name}</span>
@@ -1750,7 +1828,7 @@ function openAddToGroupModal(groupName){
   searchEl.focus();
 }
 
-function removeMemberFromGroup(groupName, memberId){
+function removeMemberFromGroup(groupName, memberId, onDone){
   const g = db.groups.find(x=>x.group===groupName);
   const m = db.members.find(x=>x.id===memberId);
   if(!g || !m) return;
@@ -1769,7 +1847,7 @@ function removeMemberFromGroup(groupName, memberId){
     await saveDb();
     closeModal();
     showToast(t("Waa laga saaray kooxda","Removed from group"));
-    renderList();
+    if(onDone) onDone(); else renderList();
   });
 }
 
@@ -1836,7 +1914,7 @@ function renderList(){
   rows.querySelectorAll("[data-editgroup]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
-      openEditGroupNameModal(btn.dataset.editgroup);
+      openEditGroupModal(btn.dataset.editgroup);
     });
   });
   rows.querySelectorAll("[data-remove-group]").forEach(btn=>{

@@ -1777,6 +1777,39 @@ function openEditGroupModal(groupName){
   renderMembersSection();
 }
 
+// Quick assign for a member found in the Ungrouped section — pick which
+// existing group they belong to, rather than going the other way around
+// (open that group, then search for this exact person).
+function openAssignToGroupModal(memberId){
+  const m = db.members.find(x=>x.id===memberId);
+  if(!m) return;
+  openModal(`
+    <h3>${t("Ku dar koox","Add to a group")} — ${m.name}</h3>
+    <div class="tx-list" style="max-height:360px;">
+      ${db.groups.length ? db.groups.map(g=>`
+        <div class="tx" data-assigngroup="${g.group.replace(/"/g,'&quot;')}" style="cursor:pointer;">
+          <div class="l"><span>${g.group}</span><span class="muted">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${g.memberNames.length} ${t("xubnood","members")}</span></div>
+          <i class="ti ti-plus"></i>
+        </div>
+      `).join("") : `<div class="empty">${t("Wax koox ah lama helin.","No groups found.")}</div>`}
+    </div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.querySelectorAll("[data-assigngroup]").forEach(row=>{
+    row.addEventListener("click", async ()=>{
+      const g = db.groups.find(x=>x.group===row.dataset.assigngroup);
+      if(!g || g.memberNames.includes(m.name)) return;
+      g.memberNames.push(m.name);
+      logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
+      await saveDb();
+      closeModal();
+      showToast(t("Waa lagu daray kooxda","Added to group"));
+      renderList();
+    });
+  });
+}
+
 // Add/remove are purely organizational (which rep's group a member is
 // filed under) — no money or transactions involved — so these use a
 // single lightweight confirm rather than the heavier typed-serial flow
@@ -1902,8 +1935,34 @@ function renderList(){
       <div class="grp-sub"><span>${t("Wadarta","Total")} ${g.group} (${members.length})</span><span>${money(groupTotal)}</span></div>
     </td></tr>`;
   }
+  // Anyone not filed under any group at all — the flip side of the group
+  // sections above, so it's easy to spot who still needs assigning instead
+  // of having to diff the full roster against every group by hand.
+  const groupedNames = new Set(db.groups.flatMap(gr=>gr.memberNames));
+  const ungrouped = db.members.filter(m=>!groupedNames.has(m.name))
+    .filter(m=>m.name.toLowerCase().includes(q) && statusPasses(m,sf))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  let ungroupedCount = 0;
+  if(ungrouped.length){
+    ungroupedCount = ungrouped.length;
+    const ungroupedTotal = ungrouped.reduce((s,m)=>s+computeBalance(m),0);
+    html += `<tr><td colspan="4" style="padding:0;border:none;">
+      <div class="grp-head">
+        <div>${t("Aan koox lahayn","Ungrouped")}</div>
+      </div>
+    </td></tr>`;
+    html += ungrouped.map((m,i)=>`<tr data-id="${m.id}" class="${m.id===selectedId?'active':''} ${m.status!=='active'?'inactive-row':''}">
+      <td class="muted" style="text-align:center;">${i+1}</td>
+      <td>${m.name}${m.status!=='active'?'<span class="badge inactive">Inactive</span>':''}${hasPerm("addCustomer") ? ` <button type="button" class="edit" data-assignmid="${m.id}" style="font-size:11px;">+ ${t("Koox","Group")}</button>` : ''}</td>
+      <td class="muted">${m.monthlyDue?money(m.monthlyDue):'—'}</td>
+      <td style="text-align:right" class="bal ${computeBalance(m)<0?'neg':'pos'}">${money(computeBalance(m))}</td>
+    </tr>`).join("");
+    html += `<tr><td colspan="4" style="padding:0;border:none;">
+      <div class="grp-sub"><span>${t("Wadarta","Total")} ${t("Aan koox lahayn","Ungrouped")} (${ungrouped.length})</span><span>${money(ungroupedTotal)}</span></div>
+    </td></tr>`;
+  }
   rows.innerHTML = html || `<tr><td colspan="4" class="muted" style="padding:20px;text-align:center;">${t("Wax natiijo ah lama helin.","No results found.")}</td></tr>`;
-  document.getElementById("listFoot").textContent = `${shownCount} ${t("xubnood oo koox ku jira","members in groups")}`;
+  document.getElementById("listFoot").textContent = `${shownCount} ${t("xubnood oo koox ku jira","members in groups")}${ungroupedCount ? `, ${ungroupedCount} ${t("aan koox lahayn","ungrouped")}` : ''}`;
   attachRowClicks(rows);
   rows.querySelectorAll("[data-addmember-group]").forEach(btn=>{
     btn.addEventListener("click", (e)=>{
@@ -1915,6 +1974,12 @@ function renderList(){
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
       openEditGroupModal(btn.dataset.editgroup);
+    });
+  });
+  rows.querySelectorAll("[data-assignmid]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      openAssignToGroupModal(btn.dataset.assignmid);
     });
   });
   rows.querySelectorAll("[data-remove-group]").forEach(btn=>{

@@ -757,7 +757,19 @@ function applyAction(type, payload){
     db.members = db.members.filter(x=>x.id!==payload.memberId);
   } else if(type === "statusChange"){
     const m = db.members.find(x=>x.id===payload.memberId);
-    if(m){ m.status = payload.newStatus; desc = `${payload.newStatus==="active"?"Activate":"De-activate"}: ${m.name}`; }
+    if(m){
+      m.status = payload.newStatus;
+      desc = `${payload.newStatus==="active"?"Activate":"De-activate"}: ${m.name}`;
+      // Inactive members can't be part of any group — deactivating pulls
+      // them out of whatever group(s) they were in. Reactivating doesn't
+      // put them back automatically; they're just eligible to be added
+      // again, same as any other active member.
+      if(payload.newStatus === "inactive"){
+        for(const g of db.groups){
+          g.memberNames = g.memberNames.filter(n=>n!==m.name);
+        }
+      }
+    }
   } else if(type === "editMember"){
     const m = db.members.find(x=>x.id===payload.memberId);
     if(m){
@@ -848,6 +860,19 @@ async function loadDb(){
     const g = db.groups.find(x=>x.group==="Reer Ahmednur & aden Nur");
     if(g) g.group = "Reer Ahmednur";
     db.settings.ahmednurGroupRenamed2026Done = true;
+  }
+  // Inactive members can't be part of any group (new rule) — one-time
+  // cleanup for anyone already inactive but still listed in a group from
+  // before this rule existed (deactivating a member now removes them from
+  // their group(s) automatically going forward; this catches the
+  // pre-existing cases). Reactivating doesn't restore group membership —
+  // they're just eligible to be added again like any other active member.
+  if(!db.settings.inactiveMembersRemovedFromGroups2026Done){
+    const inactiveNames = new Set(db.members.filter(m=>m.status!=="active").map(m=>m.name));
+    for(const g of db.groups){
+      g.memberNames = g.memberNames.filter(n=>!inactiveNames.has(n));
+    }
+    db.settings.inactiveMembersRemovedFromGroups2026Done = true;
   }
   for(const u of db.users){
     if(!u.role) u.role = "admin";
@@ -1714,7 +1739,7 @@ function openEditGroupModal(groupName){
     if(!searchEl || !results) return;
     const q = searchEl.value.trim().toLowerCase();
     const already = new Set(g.memberNames);
-    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
     results.innerHTML = matches.length ? matches.map(m=>{
       const other = otherGroupOf(m.name, g.group);
       return `<div class="tx" data-editaddmid="${m.id}" style="cursor:pointer;">
@@ -1783,6 +1808,10 @@ function openEditGroupModal(groupName){
 function openAssignToGroupModal(memberId){
   const m = db.members.find(x=>x.id===memberId);
   if(!m) return;
+  if(m.status !== "active"){
+    showToast(t("Xubin aan active ahayn koox looma dari karo — marka hore dib u activate garee.","Inactive members can't be added to a group — reactivate them first."));
+    return;
+  }
   openModal(`
     <h3>${t("Ku dar koox","Add to a group")} — ${m.name}</h3>
     <div class="tx-list" style="max-height:360px;">
@@ -1828,7 +1857,7 @@ function openAddToGroupModal(groupName){
   const renderResults = ()=>{
     const q = searchEl.value.trim().toLowerCase();
     const already = new Set(g.memberNames);
-    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+    const matches = q ? db.members.filter(m=>!already.has(m.name) && m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
     const results = document.getElementById("grpAddResults");
     results.innerHTML = matches.length ? matches.map(m=>{
       const otherGroup = otherGroupOf(m.name, g.group);
@@ -1953,7 +1982,7 @@ function renderList(){
     </td></tr>`;
     html += ungrouped.map((m,i)=>`<tr data-id="${m.id}" class="${m.id===selectedId?'active':''} ${m.status!=='active'?'inactive-row':''}">
       <td class="muted" style="text-align:center;">${i+1}</td>
-      <td>${m.name}${m.status!=='active'?'<span class="badge inactive">Inactive</span>':''}${hasPerm("addCustomer") ? ` <button type="button" class="edit" data-assignmid="${m.id}" style="font-size:11px;">+ ${t("Koox","Group")}</button>` : ''}</td>
+      <td>${m.name}${m.status!=='active'?'<span class="badge inactive">Inactive</span>':''}${(hasPerm("addCustomer") && m.status==="active") ? ` <button type="button" class="edit" data-assignmid="${m.id}" style="font-size:11px;">+ ${t("Koox","Group")}</button>` : ''}</td>
       <td class="muted">${m.monthlyDue?money(m.monthlyDue):'—'}</td>
       <td style="text-align:right" class="bal ${computeBalance(m)<0?'neg':'pos'}">${money(computeBalance(m))}</td>
     </tr>`).join("");

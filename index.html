@@ -2877,6 +2877,8 @@ function openFullReportPreview(members){
 }
 
 function openReportGroupPicker(){
+  const membersByName = Object.fromEntries(db.members.map(m=>[m.name,m]));
+  const activeCountOf = (g)=>g.memberNames.filter(name=>membersByName[name] && membersByName[name].status==="active").length;
   openModal(`
     <h3>${t("Dooro Koox","Choose a group")}</h3>
     <div class="tx-list" style="max-height:360px;">
@@ -2884,7 +2886,7 @@ function openReportGroupPicker(){
         <div class="tx" data-group="${g.group.replace(/"/g,'&quot;')}" style="cursor:pointer;">
           <div class="l">
             <span>${g.group}</span>
-            <span class="muted">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${g.memberNames.length} ${t("xubnood","members")}</span>
+            <span class="muted">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${activeCountOf(g)} ${t("xubnood (active)","members (active)")}</span>
           </div>
           <i class="ti ti-chevron-right"></i>
         </div>
@@ -2896,8 +2898,7 @@ function openReportGroupPicker(){
   document.querySelectorAll("[data-group]").forEach(row=>{
     row.addEventListener("click", ()=>{
       const g = db.groups.find(x=>x.group===row.dataset.group);
-      const membersByName = Object.fromEntries(db.members.map(m=>[m.name,m]));
-      const members = g.memberNames.map(name=>membersByName[name]).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+      const members = g.memberNames.map(name=>membersByName[name]).filter(m=>m && m.status==="active").sort((a,b)=>a.name.localeCompare(b.name));
       openGroupReportPreview(g, members);
     });
   });

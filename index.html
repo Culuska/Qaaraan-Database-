@@ -1707,27 +1707,42 @@ function openAddToGroupModal(groupName){
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
   const searchEl = document.getElementById("grpAddSearch");
+  // Which OTHER group (if any) each member name is already filed under —
+  // so the admin is warned before adding someone who's already elsewhere,
+  // rather than silently ending up in two groups at once.
+  const otherGroupOf = (name)=>{
+    const other = db.groups.find(x=>x.group!==g.group && x.memberNames.includes(name));
+    return other ? other.group : null;
+  };
   const renderResults = ()=>{
     const q = searchEl.value.trim().toLowerCase();
     const already = new Set(g.memberNames);
     const matches = q ? db.members.filter(m=>!already.has(m.name) && m.name.toLowerCase().includes(q)).slice(0,8) : [];
     const results = document.getElementById("grpAddResults");
-    results.innerHTML = matches.length ? matches.map(m=>`
-      <div class="tx" data-addmid="${m.id}" style="cursor:pointer;">
-        <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
-        <i class="ti ti-plus"></i>
-      </div>
-    `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+    results.innerHTML = matches.length ? matches.map(m=>{
+      const otherGroup = otherGroupOf(m.name);
+      return `<div class="tx" data-addmid="${m.id}" style="cursor:pointer;">
+        <div class="l">
+          <span>${m.name}</span>
+          <span class="muted" ${otherGroup?'style="color:var(--warn);"':''}>${otherGroup ? '⚠ '+t('Horeba wuxuu ku jiraa','Already in')+': '+otherGroup : (m.phone || t('telefoon lama helin','no phone on file'))}</span>
+        </div>
+        <i class="ti ti-plus" data-addicon></i>
+      </div>`;
+    }).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
     results.querySelectorAll("[data-addmid]").forEach(row=>{
       row.addEventListener("click", async ()=>{
         const m = db.members.find(x=>x.id===row.dataset.addmid);
-        if(!m || g.memberNames.includes(m.name)) return;
+        if(!m || g.memberNames.includes(m.name) || row.dataset.added) return;
+        row.dataset.added = "1";
+        const icon = row.querySelector("[data-addicon]");
+        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--accent-ink)"; }
+        row.style.pointerEvents = "none";
         g.memberNames.push(m.name);
         logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
         await saveDb();
         showToast(t("Waa lagu daray kooxda","Added to group"));
-        closeModal();
         renderList();
+        setTimeout(renderResults, 500);
       });
     });
   };

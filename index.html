@@ -875,11 +875,17 @@ async function loadDb(){
     db.settings.inactiveMembersRemovedFromGroups2026Done = true;
   }
   // Admin asked for this specific member in Reer Bacaar directly, after
-  // the in-app add wasn't reliably showing up for them. Matched by
-  // normalized name (collapses whitespace) rather than an exact string,
-  // since the live record has an internal double space ("Abdullahi  Mohamed
-  // Xirsi") that's easy to get wrong by hand. Own flag, runs once.
-  if(!db.settings.abdullahiMohamedXirsiAddedToBacaar2026Done){
+  // the in-app add wasn't reliably showing up for them — turned out a
+  // stale browser tab/device with an older snapshot of db in memory was
+  // periodically re-saving over newer changes (the app does a full
+  // snapshot replace on every save, per the known concurrency gap — see
+  // CLAUDE.md). A one-time flag can get wiped out along with everything
+  // else by that same overwrite, so this deliberately has NO "done" flag
+  // and just re-checks/re-applies on every load — cheap, idempotent,
+  // self-healing against exactly that failure mode. Matched by normalized
+  // name (collapses whitespace) since the live record has an internal
+  // double space ("Abdullahi  Mohamed Xirsi").
+  {
     const norm = s => String(s||"").trim().toLowerCase().replace(/\s+/g," ");
     const g = db.groups.find(x=>x.group==="Reer Bacaar");
     const m = db.members.find(x=>norm(x.name)==="abdullahi mohamed xirsi" && x.status==="active");
@@ -887,7 +893,6 @@ async function loadDb(){
       g.memberNames.push(m.name);
       db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid xubin kooxda (admin request)", details:`${m.name} → ${g.group}`, status:"direct"});
     }
-    db.settings.abdullahiMohamedXirsiAddedToBacaar2026Done = true;
   }
   for(const u of db.users){
     if(!u.role) u.role = "admin";

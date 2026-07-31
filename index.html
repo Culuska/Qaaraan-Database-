@@ -2122,13 +2122,14 @@ function updateDragThumb(){
 function exportGroupExcel(g, members){
   const rows = [[t("Reer","Group"), g.group],[t("Wakiil","Rep"), g.wakiil],[t("Taariikhda warbixinta","Report date"), todayStr()],[],
     [t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance"]];
-  let total = 0;
+  let total = 0, dueTotal = 0;
   for(const m of members){
     const bal = computeBalance(m);
     total += bal;
+    dueTotal += m.monthlyDue||0;
     rows.push([m.name, m.phone||"-", m.monthlyDue||0, bal]);
   }
-  rows.push(["","",t("Wadarta","Total"), total]);
+  rows.push(["",t("Wadarta","Total"), dueTotal, total]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:32},{wch:16},{wch:12},{wch:14}];
   const wb = XLSX.utils.book_new();
@@ -2165,14 +2166,15 @@ function exportGroupPdf(g, members){
   doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y+=6;
   const cols = [14, 100, 140, 170, 196];
   y = pdfGridRow(doc, y, cols, [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"], {shade:true, bold:true});
-  let total = 0;
+  let total = 0, dueTotal = 0;
   for(const m of members){
     if(y > 275){ doc.addPage(); y = 18; y = pdfGridRow(doc, y, cols, [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"], {shade:true, bold:true}); }
     const bal = computeBalance(m);
     total += bal;
+    dueTotal += m.monthlyDue||0;
     y = pdfGridRow(doc, y, cols, [String(m.name).slice(0,42), String(m.phone||"-"), m.monthlyDue?("$"+m.monthlyDue):"-", "$"+bal.toFixed(2)]);
   }
-  y = pdfGridRow(doc, y, cols, ["", "", t("Wadarta","Total"), "$"+total.toFixed(2)], {bold:true});
+  y = pdfGridRow(doc, y, cols, ["", t("Wadarta","Total"), "$"+dueTotal.toFixed(2), "$"+total.toFixed(2)], {bold:true});
   doc.save(g.group.replace(/[^a-z0-9]+/gi,"_")+".pdf");
 }
 
@@ -2196,21 +2198,23 @@ function groupMembersForExport(members){
 function exportFullListExcel(members){
   const sections = groupMembersForExport(members);
   const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[t("Taariikhda warbixinta","Report date"), todayStr()],[]];
-  let grand = 0;
+  let grand = 0, dueGrand = 0;
   for(const s of sections){
     rows.push([s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : "")]);
     rows.push(["#",t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance","Status"]);
-    let subtotal = 0;
+    let subtotal = 0, dueSubtotal = 0;
     s.members.forEach((m,i)=>{
       const bal = computeBalance(m);
       subtotal += bal;
+      dueSubtotal += m.monthlyDue||0;
       rows.push([i+1, m.name, m.phone||"-", m.monthlyDue||0, bal, m.status]);
     });
-    rows.push(["","","",t("Wadarta","Total")+" "+s.group, subtotal, ""]);
+    rows.push(["",t("Wadarta","Total")+" "+s.group, "", dueSubtotal, subtotal, ""]);
     rows.push([]);
     grand += subtotal;
+    dueGrand += dueSubtotal;
   }
-  rows.push(["","","",t("WADARTA GUUD","GRAND TOTAL"), grand, ""]);
+  rows.push(["",t("WADARTA GUUD","GRAND TOTAL"), "", dueGrand, grand, ""]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:5},{wch:32},{wch:16},{wch:12},{wch:14},{wch:10}];
   const wb = XLSX.utils.book_new();
@@ -2228,17 +2232,18 @@ function exportFullListPdf(members){
   const cols = [14, 22, 108, 148, 172, 196];
   const headerCells = [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"];
   const drawHeader = ()=>{ y = pdfGridRow(doc, y, cols, ["#", ...headerCells], {shade:true, bold:true, fontSize:8, rowH:6}); };
-  let grand = 0;
+  let grand = 0, dueGrand = 0;
   for(const s of sections){
     if(y > 260){ doc.addPage(); y = 18; }
     doc.setFontSize(11); doc.setFont(undefined,"bold");
     doc.text(s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : ""), 14, y); y += 6;
     drawHeader();
-    let subtotal = 0;
+    let subtotal = 0, dueSubtotal = 0;
     s.members.forEach((m,i)=>{
       if(y > 278){ doc.addPage(); y = 18; drawHeader(); }
       const bal = computeBalance(m);
       subtotal += bal;
+      dueSubtotal += m.monthlyDue||0;
       y = pdfGridRow(doc, y, cols, [
         String(i+1),
         String(m.name).slice(0,36)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''),
@@ -2247,13 +2252,14 @@ function exportFullListPdf(members){
         "$"+bal.toFixed(2)
       ], {fontSize:8, rowH:6});
     });
-    y = pdfGridRow(doc, y, cols, ["", `${t('Wadarta','Total')} ${s.group} (${s.members.length})`, "", "", "$"+subtotal.toFixed(2)], {bold:true, fontSize:8, rowH:6});
+    y = pdfGridRow(doc, y, cols, ["", `${t('Wadarta','Total')} ${s.group} (${s.members.length})`, "", "$"+dueSubtotal.toFixed(2), "$"+subtotal.toFixed(2)], {bold:true, fontSize:8, rowH:6});
     y += 4;
     grand += subtotal;
+    dueGrand += dueSubtotal;
   }
   if(y > 270){ doc.addPage(); y = 18; }
   doc.setFontSize(12); doc.setFont(undefined,"bold");
-  doc.text(`${t('WADARTA GUUD','GRAND TOTAL')}: $${grand.toFixed(2)} (${members.length} ${t('xubnood','members')})`, 14, y);
+  doc.text(`${t('WADARTA GUUD','GRAND TOTAL')}: ${t('Qoondo','Due')} $${dueGrand.toFixed(2)} · Balance $${grand.toFixed(2)} (${members.length} ${t('xubnood','members')})`, 14, y);
   doc.save(t("xubnaha_oo_dhan","full_member_report")+".pdf");
 }
 

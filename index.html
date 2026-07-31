@@ -2115,7 +2115,7 @@ function updateDragThumb(){
 }
 
 function exportGroupExcel(g, members){
-  const rows = [[t("Reer","Group"), g.group],[t("Wakiil","Rep"), g.wakiil],[],
+  const rows = [[t("Reer","Group"), g.group],[t("Wakiil","Rep"), g.wakiil],[t("Taariikhda warbixinta","Report date"), todayStr()],[],
     [t("Magaca","Name"),t("Telefoon","Phone"),t("Qoondo/bil","Due/month"),"Balance"]];
   let total = 0;
   for(const m of members){
@@ -2136,7 +2136,8 @@ function exportGroupPdf(g, members){
   const doc = new jsPDF();
   let y = 18;
   doc.setFontSize(14); doc.text(g.group, 14, y); y+=7;
-  doc.setFontSize(10); doc.text(t("Wakiil","Rep")+": "+g.wakiil, 14, y); y+=9;
+  doc.setFontSize(10); doc.text(t("Wakiil","Rep")+": "+g.wakiil, 14, y); y+=6;
+  doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y+=8;
   doc.setFontSize(9);
   doc.text(t("Magaca","Name"), 14, y); doc.text(t("Telefoon","Phone"), 100, y); doc.text(t("Qoondo","Due"), 140, y); doc.text("Balance", 170, y);
   y += 4; doc.line(14,y,196,y); y += 5;
@@ -2176,7 +2177,7 @@ function groupMembersForExport(members){
 
 function exportFullListExcel(members){
   const sections = groupMembersForExport(members);
-  const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[]];
+  const rows = [[t("Xubnaha oo dhan — Report","Full Member Report")],[t("Taariikhda warbixinta","Report date"), todayStr()],[]];
   let grand = 0;
   for(const s of sections){
     rows.push([s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : "")]);
@@ -2204,7 +2205,8 @@ function exportFullListPdf(members){
   const doc = new jsPDF();
   const sections = groupMembersForExport(members);
   let y = 18;
-  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y += 10;
+  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y += 7;
+  doc.setFontSize(10); doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y += 9;
   let grand = 0;
   for(const s of sections){
     if(y > 260){ doc.addPage(); y = 18; }
@@ -2947,34 +2949,41 @@ function openFullReportPreview(members){
   const grand = members.reduce((s,m)=>s+computeBalance(m),0);
   const sectionsHtml = sections.map(s=>{
     const subtotal = s.members.reduce((s2,m)=>s2+computeBalance(m),0);
+    const memberRows = s.members.map((m,i)=>{
+      const bal = computeBalance(m);
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${m.name}</td>
+        <td>${m.phone || t('telefoon lama helin','no phone on file')}</td>
+        <td class="amt">${money(bal)}</td>
+      </tr>`;
+    }).join("");
     return `
-      <div class="grp-head" style="margin-top:10px;">
-        <div>${s.group}${s.wakiil?`<div class="wk">${t("Wakiil","Rep")}: ${s.wakiil}</div>`:''}</div>
-      </div>
-      <div class="tx-list">
-        ${s.members.map(m=>{
-          const bal = computeBalance(m);
-          return `<div class="tx">
-            <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
-            <span class="amt" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</span>
-          </div>`;
-        }).join("")}
-      </div>
-      <div class="grp-sub"><span>${t("Wadarta","Total")} ${s.group} (${s.members.length})</span><span>${money(subtotal)}</span></div>
+      <tr class="bs-section"><td colspan="4">${s.group}${s.wakiil?' — '+t("Wakiil","Rep")+': '+s.wakiil:''}</td></tr>
+      ${memberRows}
+      <tr class="bs-total"><td colspan="3">${t("Wadarta","Total")} ${s.group} (${s.members.length})</td><td class="amt">${money(subtotal)}</td></tr>
     `;
   }).join("");
   openModal(`
-    <h3>${t("Warbixinta oo dhan","Full Member Report")}</h3>
-    <p class="muted">${members.length} ${t("xubnood","members")}</p>
-    <div style="max-height:400px;overflow-y:auto;">${sectionsHtml}</div>
-    <div class="grp-sub" style="margin-top:6px;font-weight:700;"><span>${t("Wadarta guud","Grand total")}</span><span>${money(grand)}</span></div>
+    <div class="bs-title">
+      <div class="co">HALANE INSURANCE</div>
+      <div class="doc">${t("Warbixinta oo dhan","Full Member Report")}</div>
+      <div class="asof">${members.length} ${t("xubnood","members")} · ${t("Taariikhda warbixinta","Report date")}: ${todayStr()}</div>
+    </div>
+    <div style="max-height:400px;overflow-y:auto;">
+      <table class="bs-table">
+        <tr class="bs-section"><td>#</td><td>${t("Magaca","Name")}</td><td>${t("Telefoon","Phone")}</td><td class="amt">Balance</td></tr>
+        ${sectionsHtml}
+        <tr class="bs-grandtotal"><td colspan="3">${t("Wadarta guud","Grand total")}</td><td class="amt">${money(grand)}</td></tr>
+      </table>
+    </div>
     <div class="actions" style="margin-top:16px;">
       <button id="abBack">${t("Dib u noqo","Back")}</button>
       <button id="mCancel">${t("Xir","Close")}</button>
       <button id="rptXlsx">Excel</button>
       <button class="primary" id="rptPdf">PDF</button>
     </div>
-  `);
+  `, "bs-modal");
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("abBack").addEventListener("click", openReportsModal);
   document.getElementById("rptPdf").addEventListener("click", ()=>{
@@ -3019,26 +3028,33 @@ function openReportGroupPicker(){
 // member preview and Balance Sheet — before offering the export buttons.
 function openGroupReportPreview(g, members){
   const total = members.reduce((s,m)=>s+computeBalance(m),0);
+  const rowsHtml = members.length ? members.map((m,i)=>{
+    const bal = computeBalance(m);
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${m.name}${m.status!=="active"?` <span class="badge inactive">${t('Inactive','Inactive')}</span>`:''}</td>
+      <td>${m.phone || t('telefoon lama helin','no phone on file')}</td>
+      <td class="amt">${money(bal)}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="4" class="muted" style="text-align:center;">${t("Wax xubno ah lama helin.","No members found.")}</td></tr>`;
   openModal(`
-    <h3>${g.group}</h3>
-    <p class="muted">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${members.length} ${t("xubnood","members")}</p>
-    <div class="tx-list" style="max-height:360px;">
-      ${members.length ? members.map(m=>{
-        const bal = computeBalance(m);
-        return `<div class="tx">
-          <div class="l"><span>${m.name}${m.status!=="active"?` <span class="badge inactive">${t('Inactive','Inactive')}</span>`:''}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
-          <span class="amt" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</span>
-        </div>`;
-      }).join("") : `<div class="empty">${t("Wax xubno ah lama helin.","No members found.")}</div>`}
+    <div class="bs-title">
+      <div class="co">HALANE INSURANCE</div>
+      <div class="doc">${g.group}</div>
+      <div class="asof">${t("Wakiil","Rep")}: ${g.wakiil||'—'} · ${members.length} ${t("xubnood","members")} · ${t("Taariikhda warbixinta","Report date")}: ${todayStr()}</div>
     </div>
-    <div class="grp-sub" style="margin-top:10px;"><span>${t("Wadarta","Total")}</span><span>${money(total)}</span></div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>#</td><td>${t("Magaca","Name")}</td><td>${t("Telefoon","Phone")}</td><td class="amt">Balance</td></tr>
+      ${rowsHtml}
+      <tr class="bs-grandtotal"><td colspan="3">${t("Wadarta","Total")}</td><td class="amt">${money(total)}</td></tr>
+    </table>
     <div class="actions" style="margin-top:16px;">
       <button id="abBack">${t("Dib u noqo","Back")}</button>
       <button id="mCancel">${t("Xir","Close")}</button>
       <button id="rptXlsx">Excel</button>
       <button class="primary" id="rptPdf">PDF</button>
     </div>
-  `);
+  `, "bs-modal");
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("abBack").addEventListener("click", openReportGroupPicker);
   document.getElementById("rptPdf").addEventListener("click", ()=>{

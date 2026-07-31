@@ -2136,30 +2136,43 @@ function exportGroupExcel(g, members){
   XLSX.writeFile(wb, g.group.replace(/[^a-z0-9]+/gi,"_")+".xlsx");
 }
 
+// Draws one bordered row (vertical column lines + a bottom horizontal
+// line) at the given y and returns the y position for the next row —
+// jsPDF has no table plugin loaded, so this is a small hand-rolled grid
+// used by the report exports below to match the bordered look the
+// on-screen previews already have.
+function pdfGridRow(doc, y, cols, cells, opts={}){
+  const rowH = opts.rowH || 6.5;
+  if(opts.shade){ doc.setFillColor(239,237,231); doc.rect(cols[0], y, cols[cols.length-1]-cols[0], rowH, "F"); }
+  doc.setFont(undefined, opts.bold ? "bold" : "normal");
+  doc.setFontSize(opts.fontSize || 9);
+  cells.forEach((c,i)=>{
+    const isLast = i === cells.length-1;
+    if(isLast){ doc.text(String(c), cols[i+1]-2, y+rowH-2, {align:"right"}); }
+    else { doc.text(String(c), cols[i]+2, y+rowH-2); }
+  });
+  cols.forEach(x=>doc.line(x, y, x, y+rowH));
+  doc.line(cols[0], y+rowH, cols[cols.length-1], y+rowH);
+  return y+rowH;
+}
+
 function exportGroupPdf(g, members){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   let y = 18;
-  doc.setFontSize(14); doc.text(g.group, 14, y); y+=7;
+  doc.setFontSize(14); doc.setFont(undefined,"normal"); doc.text(g.group, 14, y); y+=7;
   doc.setFontSize(10); doc.text(t("Wakiil","Rep")+": "+g.wakiil, 14, y); y+=6;
-  doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y+=8;
-  doc.setFontSize(9);
-  doc.text(t("Magaca","Name"), 14, y); doc.text(t("Telefoon","Phone"), 100, y); doc.text(t("Qoondo","Due"), 140, y); doc.text("Balance", 170, y);
-  y += 4; doc.line(14,y,196,y); y += 5;
+  doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y+=6;
+  const cols = [14, 100, 140, 170, 196];
+  y = pdfGridRow(doc, y, cols, [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"], {shade:true, bold:true});
   let total = 0;
   for(const m of members){
-    if(y > 280){ doc.addPage(); y = 18; }
+    if(y > 275){ doc.addPage(); y = 18; y = pdfGridRow(doc, y, cols, [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"], {shade:true, bold:true}); }
     const bal = computeBalance(m);
     total += bal;
-    doc.text(String(m.name).slice(0,42), 14, y);
-    doc.text(String(m.phone||"-"), 100, y);
-    doc.text(m.monthlyDue?("$"+m.monthlyDue):"-", 140, y);
-    doc.text("$"+bal.toFixed(2), 170, y);
-    y += 6;
+    y = pdfGridRow(doc, y, cols, [String(m.name).slice(0,42), String(m.phone||"-"), m.monthlyDue?("$"+m.monthlyDue):"-", "$"+bal.toFixed(2)]);
   }
-  y += 2; doc.line(14,y,196,y); y += 6;
-  doc.setFontSize(10);
-  doc.text(t("Wadarta","Total")+": $"+total.toFixed(2), 140, y);
+  y = pdfGridRow(doc, y, cols, ["", "", t("Wadarta","Total"), "$"+total.toFixed(2)], {bold:true});
   doc.save(g.group.replace(/[^a-z0-9]+/gi,"_")+".pdf");
 }
 
@@ -2210,32 +2223,32 @@ function exportFullListPdf(members){
   const doc = new jsPDF();
   const sections = groupMembersForExport(members);
   let y = 18;
-  doc.setFontSize(14); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y += 7;
-  doc.setFontSize(10); doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y += 9;
+  doc.setFontSize(14); doc.setFont(undefined,"normal"); doc.text(t("Xubnaha oo dhan — Report","Full Member Report"), 14, y); y += 7;
+  doc.setFontSize(10); doc.text(t("Taariikhda warbixinta","Report date")+": "+todayStr(), 14, y); y += 8;
+  const cols = [14, 22, 108, 148, 172, 196];
+  const headerCells = [t("Magaca","Name"), t("Telefoon","Phone"), t("Qoondo","Due"), "Balance"];
+  const drawHeader = ()=>{ y = pdfGridRow(doc, y, cols, ["#", ...headerCells], {shade:true, bold:true, fontSize:8, rowH:6}); };
   let grand = 0;
   for(const s of sections){
     if(y > 260){ doc.addPage(); y = 18; }
     doc.setFontSize(11); doc.setFont(undefined,"bold");
     doc.text(s.group + (s.wakiil ? ` — ${t('Wakiil','Rep')}: ${s.wakiil}` : ""), 14, y); y += 6;
-    doc.setFont(undefined,"normal"); doc.setFontSize(8);
-    doc.text("#", 14, y); doc.text(t("Magaca","Name"), 22, y); doc.text(t("Telefoon","Phone"), 108, y); doc.text(t("Qoondo","Due"), 148, y); doc.text("Balance", 172, y);
-    y += 4; doc.line(14,y,196,y); y += 4.5;
+    drawHeader();
     let subtotal = 0;
     s.members.forEach((m,i)=>{
-      if(y > 280){ doc.addPage(); y = 18; }
+      if(y > 278){ doc.addPage(); y = 18; drawHeader(); }
       const bal = computeBalance(m);
       subtotal += bal;
-      doc.text(String(i+1), 14, y);
-      doc.text(String(m.name).slice(0,38)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''), 22, y);
-      doc.text(String(m.phone||"-"), 108, y);
-      doc.text(m.monthlyDue?("$"+m.monthlyDue):"-", 148, y);
-      doc.text("$"+bal.toFixed(2), 172, y);
-      y += 5;
+      y = pdfGridRow(doc, y, cols, [
+        String(i+1),
+        String(m.name).slice(0,36)+(m.status!=="active"?` (${t('Inactive','Inactive')})`:''),
+        String(m.phone||"-"),
+        m.monthlyDue?("$"+m.monthlyDue):"-",
+        "$"+bal.toFixed(2)
+      ], {fontSize:8, rowH:6});
     });
-    doc.setFont(undefined,"bold");
-    doc.text(`${t('Wadarta','Total')} ${s.group}: $${subtotal.toFixed(2)} (${s.members.length})`, 14, y);
-    doc.setFont(undefined,"normal");
-    y += 9;
+    y = pdfGridRow(doc, y, cols, ["", `${t('Wadarta','Total')} ${s.group} (${s.members.length})`, "", "", "$"+subtotal.toFixed(2)], {bold:true, fontSize:8, rowH:6});
+    y += 4;
     grand += subtotal;
   }
   if(y > 270){ doc.addPage(); y = 18; }

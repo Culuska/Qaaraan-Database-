@@ -834,6 +834,44 @@ async function loadDb(){
   if(!db){
     db = { members: SEED_MEMBERS.map(m=>({...m, status:"active", transactions:[], accruedMonths:[]})), disbursements: [], users: [], pendingActions: [], activityLog: [] };
   }
+  // idCounter (used by newMemberId()) is a plain in-memory variable that
+  // always started fresh at 1000 on every page load, with nothing syncing
+  // it past IDs that already exist in the loaded data. With 100+ real
+  // members already numbered up into the 1100s, that meant every "Add new
+  // member" in a freshly loaded tab minted an id ("m_new_1000", 1001, ...)
+  // that collided with an existing member — the new member got pushed
+  // into db.members, but every id-based lookup (find(x=>x.id===id)) kept
+  // resolving to the OLDER member with the same id, so the new one saved
+  // but was never reachable/visible anywhere. Resync the counter past the
+  // highest existing numeric suffix on every load so newly minted ids are
+  // always unique.
+  {
+    let maxId = 999;
+    for(const m of db.members){
+      const match = /^m_new_(\d+)$/.exec(m.id);
+      if(match) maxId = Math.max(maxId, parseInt(match[1], 10));
+    }
+    idCounter = Math.max(idCounter, maxId + 1);
+  }
+  // Recover from any past instance of the id-collision bug above: a member
+  // that got pushed onto the end of db.members with an id that already
+  // belonged to an earlier member would save fine, but every id-based
+  // lookup resolves to the FIRST match in the array, so it silently became
+  // permanently unreachable/invisible in the UI even though its data was
+  // never lost. Give any such later duplicate a fresh, safe id (keeping
+  // the earlier occurrence's id untouched) so it becomes visible again.
+  // No "done" flag — self-healing, cheap to re-check every load.
+  {
+    const seenIds = new Set();
+    for(const m of db.members){
+      if(seenIds.has(m.id)){
+        const oldId = m.id;
+        m.id = newMemberId();
+        db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Xubin qarsoon ayaa la soo celiyay (id collision fix)", details:`${m.name}: ${oldId} → ${m.id}`, status:"direct"});
+      }
+      seenIds.add(m.id);
+    }
+  }
   if(!db.disbursements) db.disbursements = [];
   if(!db.users) db.users = [];
   if(!db.pendingActions) db.pendingActions = [];

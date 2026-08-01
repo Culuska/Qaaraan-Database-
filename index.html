@@ -738,7 +738,14 @@ function applyAction(type, payload){
   let desc = "", resultId = null;
   if(type === "addCustomer"){
     const id = newMemberId();
-    db.members.push({id, name:payload.name, phone:payload.phone, monthlyDue:payload.monthlyDue, openingBalance:payload.openingBalance, status:"active", transactions:[], accruedMonths:[]});
+    // Mark all months up to now as already-accrued at creation time (not
+    // billed) so syncAccruals() — which runs right after and again on every
+    // future load — doesn't immediately backfill due invoices for months
+    // before this member even existed. Whatever they already owe from
+    // before joining belongs in openingBalance, entered by the admin;
+    // billing resumes automatically from next month onward like everyone
+    // else.
+    db.members.push({id, name:payload.name, phone:payload.phone, monthlyDue:payload.monthlyDue, openingBalance:payload.openingBalance, status:"active", transactions:[], accruedMonths: monthsDueSoFar()});
     syncAccruals();
     resultId = id;
     desc = `Xubin cusub: ${payload.name} ($${payload.monthlyDue}/bil, balance $${payload.openingBalance})`;

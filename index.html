@@ -941,9 +941,42 @@ async function loadDb(){
   fixAbdiWaliNameAgain2026();
   importSalaamBankLedger2026();
   deleteExternalCasesAccount2026();
+  dedupeAccrualDues2026();
   syncAccruals();
   await saveDb();
   return true;
+}
+
+// A stale browser tab/device re-saving an older snapshot (same full-replace
+// concurrency gap as the Reer Bacaar fix above) can desync a member's
+// accruedMonths from their real transactions, which used to let
+// syncAccruals() re-bill an already-billed month — e.g. Abdi Ali dan ended
+// up with two "Qoondo bille" dues for July 2026 and two for August 2026
+// instead of one each. syncAccruals() itself is now hardened to check
+// actual transactions before creating a new due, but that doesn't clean up
+// duplicates that already exist in saved data. Deliberately no "done" flag
+// (same reasoning as the Reer Bacaar fix): a future overwrite could bring
+// duplicates back, so this re-checks and re-heals on every load instead of
+// running once.
+function dedupeAccrualDues2026(){
+  for(const m of db.members){
+    if(!m.transactions || !m.transactions.length) continue;
+    const seen = new Set();
+    const kept = [];
+    let removed = 0;
+    for(const tx of m.transactions){
+      if(tx.type === "due" && tx.note && tx.note.startsWith("Qoondo bille")){
+        const key = tx.date + "|" + tx.amount + "|" + tx.note;
+        if(seen.has(key)){ removed++; continue; }
+        seen.add(key);
+      }
+      kept.push(tx);
+    }
+    if(removed > 0){
+      m.transactions = kept;
+      db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saafayn qoondo bille oo laba jibbaaray (dedupe)", details:`${m.name}: ${removed} taxane oo laba jibbaaray ayaa la saaray`, status:"direct"});
+    }
+  }
 }
 
 function renderLoadFailedScreen(){
@@ -1620,10 +1653,12 @@ function syncAccruals(){
     if(m.status !== "active") continue;
     if(!m.monthlyDue || m.monthlyDue<=0) continue;
     for(const mk of due){
-      if(!m.accruedMonths.includes(mk)){
+      const alreadyAccrued = m.accruedMonths.includes(mk);
+      const alreadyBilled = m.transactions.some(tx=>tx.type==="due" && tx.date===mk+"-01" && tx.note==="Qoondo bille — "+MONTH_LABEL[mk]);
+      if(!alreadyAccrued && !alreadyBilled){
         m.transactions.push({id:newTxId(), type:"due", amount:m.monthlyDue, date:mk+"-01", note:"Qoondo bille — "+MONTH_LABEL[mk]});
-        m.accruedMonths.push(mk);
       }
+      if(!alreadyAccrued) m.accruedMonths.push(mk);
     }
   }
 }

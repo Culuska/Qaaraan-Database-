@@ -3507,7 +3507,8 @@ function renderJournalEntryModal(){
       <div class="frow"><label>${t("Tixraac (ikhtiyaari)","Reference (optional)")}</label><input type="text" id="jeRef" value="${jeState.ref||''}" placeholder="${t('tusaale: #1234','e.g. #1234')}"></div>
       <div class="actions">
         <button type="button" id="jeCancel">${t("Jooji","Cancel")}</button>
-        <button type="submit" class="primary" id="jePost" ${canPost?'':'disabled'}>${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
+        ${type==="payment" ? `<button type="submit" id="jePostNew" ${canPost?'':'disabled'}>${t("Diiwaangeli oo Kudar Mid Kale","Record & New Entry")}</button>` : ''}
+        <button type="submit" class="primary" id="jePost" ${canPost?'':'disabled'}>${t("Diiwaangeli oo Xir","Record & Close")}</button>
       </div>
     </form>
   `, "ll-modal");
@@ -3561,6 +3562,7 @@ function wireJournalEntryModal(){
   const form = document.getElementById("jeForm");
   form.addEventListener("submit", async (e)=>{
     e.preventDefault();
+    const recordAndNew = e.submitter && e.submitter.id === "jePostNew";
     const type = jeState.type;
     const amount = parseFloat(document.getElementById("jeAmount").value);
     const date = document.getElementById("jeDate").value;
@@ -3586,8 +3588,17 @@ function wireJournalEntryModal(){
     }
     if(!r || r.status === "denied") return;
     renderSummary(); renderList(); renderDetail();
-    closeModal();
-    showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka","Your request is awaiting admin approval") : t("Diiwaanka waa la geliyay","Entry posted"));
+    if(recordAndNew){
+      // Keep the date and account picked (typical for a batch of receipts
+      // collected the same day into the same account); clear the member,
+      // amount, description and reference so the next entry starts fresh.
+      jeState = { type, date, account: jeState.account };
+      renderJournalEntryModal();
+      showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka — geli mid kale","Awaiting admin approval — enter another") : t("Diiwaanka waa la geliyay — geli mid kale","Entry posted — enter another"));
+    } else {
+      closeModal();
+      showToast(r.status === "pending" ? t("Codsigaaga wuxuu sugayaa ogolaanshaha admin-ka","Your request is awaiting admin approval") : t("Diiwaanka waa la geliyay","Entry posted"));
+    }
   });
 }
 

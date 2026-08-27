@@ -4817,7 +4817,7 @@ function openPayBillModal(payId){
   openModal(`
     <h3>${t("Bixi bill","Pay bill")} — ${p.vendor}</h3>
     <div class="frow"><label>${t("Lacagta","Amount")}: ${money(p.amount)}</label></div>
-    <div class="frow"><label>${t("Account laga bixiyo","Account to pay from")}</label><select id="apPayAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+    <div class="frow"><label>${t("Account laga bixiyo","Account to pay from")}</label><select id="apPayAccount">${jeAccountOptionsHtml()}</select></div>
     <div class="frow"><label>${t("Category (Kharashaadka)","Category (Expenses)")}</label>
       <select id="apPayCategory">
         <option>Xalane / Diya</option>
@@ -4977,7 +4977,7 @@ function openReceiveModal(recId){
   openModal(`
     <h3>${t("Aqbal lacagta","Receive payment")} — ${r.memberName}</h3>
     <div class="frow"><label>${t("Lacagta","Amount")}: ${money(r.amount)}</label></div>
-    <div class="frow"><label>${t("Account loo dhigayo","Account to deposit into")}</label><select id="arRecAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+    <div class="frow"><label>${t("Account loo dhigayo","Account to deposit into")}</label><select id="arRecAccount">${jeAccountOptionsHtml()}</select></div>
     <div class="actions">
       <button id="mCancel">${t("Maya","Cancel")}</button>
       <button class="primary" id="mConfirm">${t("Xaqiiji","Confirm")}</button>

@@ -77,8 +77,10 @@ CREATE TABLE IF NOT EXISTS receivables (
   status TEXT DEFAULT 'unpaid',
   created_date TEXT,
   paid_date TEXT,
-  account TEXT
+  account TEXT,
+  given_account TEXT
 );
+ALTER TABLE receivables ADD COLUMN IF NOT EXISTS given_account TEXT;
 
 -- A member's requested amount that the fund owes them (payable) is
 -- separate from what they might owe the fund beyond their regular

@@ -90,8 +90,13 @@ async function ensureSchema(client) {
     status TEXT DEFAULT 'unpaid',
     created_date TEXT,
     paid_date TEXT,
-    account TEXT
+    account TEXT,
+    given_account TEXT
   )`);
+  // ADD COLUMN IF NOT EXISTS too, in case this table was already created by
+  // an earlier deploy before given_account existed (same reasoning as
+  // payables.member_id above).
+  await client.query(`ALTER TABLE receivables ADD COLUMN IF NOT EXISTS given_account TEXT`);
   await client.query(`CREATE TABLE IF NOT EXISTS groups (
     group_name TEXT PRIMARY KEY,
     wakiil TEXT,
@@ -185,6 +190,7 @@ async function loadState(client) {
     receivables: receivables.rows.map(r => ({
       id: r.id, memberId: r.member_id, memberName: r.member_name, amount: Number(r.amount), dueDate: r.due_date,
       description: r.description, status: r.status, createdDate: r.created_date, paidDate: r.paid_date, account: r.account,
+      givenAccount: r.given_account,
     })),
     groups: groups.rows.map(g => ({
       group: g.group_name, wakiil: g.wakiil, memberNames: g.member_names || [],
@@ -286,8 +292,8 @@ async function saveState(client, state) {
     );
     await batchInsert(
       client, 'receivables',
-      ['id', 'member_id', 'member_name', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date', 'account'],
-      (state.receivables || []).map(r => [r.id, r.memberId || null, r.memberName || null, r.amount, r.dueDate || null, r.description || null, r.status || 'unpaid', r.createdDate || null, r.paidDate || null, r.account || null])
+      ['id', 'member_id', 'member_name', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date', 'account', 'given_account'],
+      (state.receivables || []).map(r => [r.id, r.memberId || null, r.memberName || null, r.amount, r.dueDate || null, r.description || null, r.status || 'unpaid', r.createdDate || null, r.paidDate || null, r.account || null, r.givenAccount || null])
     );
     await batchInsert(
       client, 'groups',

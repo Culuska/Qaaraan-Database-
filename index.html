@@ -3969,7 +3969,7 @@ function renderTabs(){
   const badDebtBtn = navList.querySelector("[data-action='baddebt']");
   if(badDebtBtn) badDebtBtn.addEventListener("click", ()=>openNewJournalEntryModal("writeoff"));
   const giveLoanBtn = navList.querySelector("[data-action='giveloan']");
-  if(giveLoanBtn) giveLoanBtn.addEventListener("click", openAddPayableModal);
+  if(giveLoanBtn) giveLoanBtn.addEventListener("click", openGiveLoanModal);
   const chargeMemberBtn = navList.querySelector("[data-action='chargemember']");
   if(chargeMemberBtn) chargeMemberBtn.addEventListener("click", openAddReceivableModal);
   const membersReportBtn = navList.querySelector("[data-action='membersreport']");
@@ -4086,6 +4086,7 @@ function accountBalance(acc){
   }
   for(const r of db.receivables){
     if(r.status==="paid" && r.account===acc.id) bal += r.amount;
+    if(r.givenAccount===acc.id) bal -= r.amount;
   }
   return bal;
 }
@@ -4100,6 +4101,7 @@ function accountBalanceReportRows(){
     for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
     for(const r of db.receivables) if(r.status==="paid" && r.account===acc.id) deposited += r.amount;
+    for(const r of db.receivables) if(r.givenAccount===acc.id) withdrawn += r.amount;
     return {id:acc.id, name:acc.name, opening:acc.openingBalance, deposited, withdrawn, balance:accountBalance(acc)};
   });
 }
@@ -4129,6 +4131,9 @@ function accountLedgerFor(accId){
   for(const r of db.receivables){
     if(r.status==="paid" && r.account===accId){
       rows.push({date:r.paidDate||r.createdDate, desc:`${t("Codsi la aqbalay (AR)","Receivable received")}: ${r.memberName}${r.description?(' — '+r.description):''}`, effect:r.amount});
+    }
+    if(r.givenAccount===accId){
+      rows.push({date:r.createdDate, desc:`${t("Deyn la bixiyay (AR)","Loan given")}: ${r.memberName}${r.description?(' — '+r.description):''}`, effect:-r.amount});
     }
   }
   rows.sort((a,b)=>a.date.localeCompare(b.date));
@@ -4875,7 +4880,7 @@ function renderReceivables(){
   list.innerHTML = sorted.length ? sorted.map(r=>`
     <div class="pay-row ${r.status}">
       <div class="l">
-        <span class="nm">${r.memberName}${r.status==="paid"?` <span class="badge">${t('La helay','Received')}</span>`:''}</span>
+        <span class="nm">${r.memberName}${r.status==="paid"?` <span class="badge">${t('La helay','Received')}</span>`:''}${r.givenAccount?` <span class="badge">${t('Deyn la bixiyay','Loan given')}</span>`:''}</span>
         <span class="meta4">${r.description||''} ${r.dueDate?('· '+t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -5007,6 +5012,97 @@ function openReceiveModal(recId){
     await saveDb();
     closeModal();
     showToast(t("Lacagta waa la aqbalay","Payment received"));
+    renderFinancialSummary();
+  });
+}
+
+// The real accounting shape for lending a member money is one journal
+// entry — Debit Accounts Receivable (they now owe it back), Credit the
+// bank/cash account (the cash actually left) — exactly how the admin's own
+// historical QuickBooks entries record it (e.g. "Deyn Dalabey": Dr AR
+// $50 / Cr Salaam Bank $50). Modeled as a single action instead of the
+// separate Payable-then-pay flow: creates the receivable AND immediately
+// reflects the cash outflow via a `givenAccount` tag read by
+// accountBalance()/accountLedgerFor() below, rather than a disbursement —
+// a loan payout is an asset swap (cash for a receivable), not a community
+// expense, so it deliberately doesn't count toward Expenses/categories.
+let glState = {};
+
+function openGiveLoanModal(){
+  if(!hasPerm("collectPayment")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  glState = { member: null };
+  renderGiveLoanModal();
+}
+
+function renderGiveLoanModal(){
+  openModal(`
+    <h3>${t("Deyn Bixin","Give Loan")}</h3>
+    ${glState.member ? `<div class="frow"><label>${t("Xubinta la doortay","Selected member")}</label>
+      <div class="tx" style="margin:0;">
+        <div class="l"><span>${glState.member.name}</span><span class="muted">${glState.member.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        <button type="button" id="glChangeMember">${t("Beddel","Change")}</button>
+      </div>
+    </div>` : `
+      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="glMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div id="glMemberResults" class="tx-list" style="max-height:220px;"></div>
+    `}
+    <div class="ll-drcr-row">
+      <div class="ll-drcr-box debit"><div class="lbl">${t("DEBIT (DR)","DEBIT (DR)")}</div><div class="val">${JE_AR_LABEL}</div></div>
+      <div class="ll-drcr-arrow"><i class="ti ti-arrow-right"></i></div>
+      <div class="ll-drcr-box credit"><div class="lbl">${t("CREDIT (CR)","CREDIT (CR)")}</div><select id="glAccount">${jeAccountOptionsHtml()}</select></div>
+    </div>
+    <form id="glForm">
+      <div class="frow"><label>${t("Taariikhda","Date")}</label><input required type="date" id="glDate" value="${todayStr()}"></div>
+      <div class="frow"><label>${t("Lacagta","Amount")}</label><input required type="number" step="0.01" min="0.01" id="glAmount"></div>
+      <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="glDesc" placeholder="${t('tusaale: Deyn Dalabey','e.g. loan request')}"></div>
+      <div class="actions">
+        <button type="button" id="mCancel">${t("Jooji","Cancel")}</button>
+        <button type="submit" class="primary" id="mConfirm" ${glState.member?'':'disabled'}>${t("Diiwaangeli (Post Entry)","Post Entry")}</button>
+      </div>
+    </form>
+  `, "ll-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+
+  const searchEl = document.getElementById("glMemberSearch");
+  if(searchEl){
+    searchEl.addEventListener("input", ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const results = document.getElementById("glMemberResults");
+      results.innerHTML = matches.length ? matches.map(m=>`
+        <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+          <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        </div>
+      `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+      results.querySelectorAll("[data-mid]").forEach(row=>{
+        row.addEventListener("click", ()=>{
+          glState.member = db.members.find(x=>x.id===row.dataset.mid) || null;
+          renderGiveLoanModal();
+        });
+      });
+    });
+    searchEl.focus();
+  }
+  const changeBtn = document.getElementById("glChangeMember");
+  if(changeBtn) changeBtn.addEventListener("click", ()=>{ glState.member = null; renderGiveLoanModal(); });
+
+  const form = document.getElementById("glForm");
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    if(!glState.member){ showToast(t("Fadlan dooro xubin","Please select a member")); return; }
+    const account = document.getElementById("glAccount").value;
+    const date = document.getElementById("glDate").value;
+    const amount = parseFloat(document.getElementById("glAmount").value);
+    const description = document.getElementById("glDesc").value.trim();
+    if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+    db.receivables.push({id:"ar"+Date.now(), memberId:glState.member.id, memberName:glState.member.name, amount, dueDate:"", description: description || t("Deyn","Loan"), status:"unpaid", createdDate:date, givenAccount:account});
+    logActivity("Deyn Bixin (AR)", `${glState.member.name}: ${money(amount)} (${(db.accounts.find(a=>a.id===account)||{}).name||account})`, "direct");
+    await saveDb();
+    closeModal();
+    showToast(t("Deynta waa la bixiyay","Loan recorded and paid out"));
     renderFinancialSummary();
   });
 }

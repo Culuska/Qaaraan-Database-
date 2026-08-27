@@ -3913,6 +3913,15 @@ function renderTabs(){
     reportTabs.push({id:"acctreport-action", label:t("Faahfaahinta Balance-ka Accounts","Account Balance Details"), icon:"ti-building-bank", action:"acctreport"});
     reportTabs.push({id:"balancesheet-action", label:t("Xaaladda Maaliyadeed","Balance Sheet"), icon:"ti-report-money", action:"balancesheet"});
     reportTabs.push({id:"batchinvoice-action", label:t("Invoice Wadajir ah","Batch Invoicing"), icon:"ti-files", action:"batchinvoice"});
+    // These two are real views (financialView/accountsView), not one-off
+    // report actions — they existed in the code (and accountsView still
+    // had its own working Add Account button) but were never actually
+    // added to this nav list, so there was never a way to click into them
+    // at all. navBtn/switchTab already handle plain view tabs like these
+    // fine (same shape as "dashboard"/"members" above); they just needed
+    // to be in this array.
+    reportTabs.push({id:"financial", label:t("Xisaabaadka Guud","Financials"), icon:"ti-report-money"});
+    reportTabs.push({id:"accounts", label:t("Konoonyada","Accounts"), icon:"ti-building-bank"});
   }
   if(hasPerm("viewReports")){
     tabs.push({id:"forecast-action", label:t("Saadaasha Billaha","Monthly Forecast"), icon:"ti-chart-line", action:"forecast"});

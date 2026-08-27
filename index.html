@@ -3904,6 +3904,7 @@ function renderTabs(){
     entryTabs.push({id:"receipt-action", label:t("Rasiid","Receipt"), icon:"ti-receipt", action:"receipt"});
     entryTabs.push({id:"payment-action", label:t("Lacag-bixin","Payment"), icon:"ti-cash", action:"payment"});
     entryTabs.push({id:"baddebt-action", label:t("Deyn Xun (Bad Debt)","Bad Debt"), icon:"ti-file-off", action:"baddebt"});
+    entryTabs.push({id:"giveloan-action", label:t("Deyn Bixin","Give Loan"), icon:"ti-wallet", action:"giveloan"});
     entryTabs.push({id:"chargemember-action", label:t("Codsi Xubin","Charge Member"), icon:"ti-cash-banknote", action:"chargemember"});
   }
   // "Report" group: read-only exports/lookups, separate from the Entry
@@ -3967,6 +3968,8 @@ function renderTabs(){
   if(paymentBtn) paymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
   const badDebtBtn = navList.querySelector("[data-action='baddebt']");
   if(badDebtBtn) badDebtBtn.addEventListener("click", ()=>openNewJournalEntryModal("writeoff"));
+  const giveLoanBtn = navList.querySelector("[data-action='giveloan']");
+  if(giveLoanBtn) giveLoanBtn.addEventListener("click", openAddPayableModal);
   const chargeMemberBtn = navList.querySelector("[data-action='chargemember']");
   if(chargeMemberBtn) chargeMemberBtn.addEventListener("click", openAddReceivableModal);
   const membersReportBtn = navList.querySelector("[data-action='membersreport']");
@@ -4757,6 +4760,10 @@ function apVendorMemberFieldHtml(){
 }
 
 function openAddPayableModal(){
+  if(!hasPerm("collectPayment")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
   apPickedMember = null;
   renderAddPayableModal();
 }

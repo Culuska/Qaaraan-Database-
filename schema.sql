@@ -55,7 +55,46 @@ CREATE TABLE IF NOT EXISTS payables (
   description TEXT,
   status TEXT DEFAULT 'unpaid',
   created_date TEXT,
-  paid_date TEXT
+  paid_date TEXT,
+  member_id TEXT REFERENCES members(id) ON DELETE SET NULL
+);
+
+-- Money the fund owes out TO a member (e.g. an approved loan/advance
+-- request) is just a payable with member_id set instead of NULL — reuses
+-- the same unpaid/paid + "pay it" -> disbursement flow. member_id is
+-- ALTERed onto the existing table below (not just declared here) since
+-- CREATE TABLE IF NOT EXISTS is a no-op against a table that already
+-- exists in production.
+ALTER TABLE payables ADD COLUMN IF NOT EXISTS member_id TEXT REFERENCES members(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS receivables (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id) ON DELETE CASCADE,
+  member_name TEXT,
+  amount NUMERIC NOT NULL,
+  due_date TEXT,
+  description TEXT,
+  status TEXT DEFAULT 'unpaid',
+  created_date TEXT,
+  paid_date TEXT,
+  account TEXT
+);
+
+-- A member's requested amount that the fund owes them (payable) is
+-- separate from what they might owe the fund beyond their regular
+-- monthly dues (receivable) — see CLAUDE.md.
+
+CREATE TABLE IF NOT EXISTS groups (
+  group_name TEXT PRIMARY KEY,
+  wakiil TEXT,
+  member_names JSONB DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS password_reset_requests (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  requested_at TEXT,
+  status TEXT DEFAULT 'pending'
 );
 
 CREATE TABLE IF NOT EXISTS activity_log (

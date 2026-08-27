@@ -73,7 +73,35 @@ async function ensureSchema(client) {
     description TEXT,
     status TEXT DEFAULT 'unpaid',
     created_date TEXT,
-    paid_date TEXT
+    paid_date TEXT,
+    member_id TEXT REFERENCES members(id) ON DELETE SET NULL
+  )`);
+  // ADD COLUMN IF NOT EXISTS, not just declared in the CREATE TABLE above,
+  // because CREATE TABLE IF NOT EXISTS is a no-op against a payables table
+  // that already exists in production (it predates member_id).
+  await client.query(`ALTER TABLE payables ADD COLUMN IF NOT EXISTS member_id TEXT REFERENCES members(id) ON DELETE SET NULL`);
+  await client.query(`CREATE TABLE IF NOT EXISTS receivables (
+    id TEXT PRIMARY KEY,
+    member_id TEXT REFERENCES members(id) ON DELETE CASCADE,
+    member_name TEXT,
+    amount NUMERIC NOT NULL,
+    due_date TEXT,
+    description TEXT,
+    status TEXT DEFAULT 'unpaid',
+    created_date TEXT,
+    paid_date TEXT,
+    account TEXT
+  )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS groups (
+    group_name TEXT PRIMARY KEY,
+    wakiil TEXT,
+    member_names JSONB DEFAULT '[]'
+  )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    requested_at TEXT,
+    status TEXT DEFAULT 'pending'
   )`);
   await client.query(`CREATE TABLE IF NOT EXISTS activity_log (
     id TEXT PRIMARY KEY,
@@ -104,7 +132,7 @@ async function loadState(client) {
   // save, row order can drift between saves. Application code (e.g. which
   // account is treated as the default "first" one) must never assume a
   // SELECT with no ORDER BY comes back in insertion order.
-  const [members, transactions, disbursements, users, accounts, payables, activityLog, pendingActions, settingsRows] =
+  const [members, transactions, disbursements, users, accounts, payables, receivables, groups, passwordResetRequests, activityLog, pendingActions, settingsRows] =
     await Promise.all([
       client.query('SELECT * FROM members ORDER BY id'),
       client.query('SELECT * FROM transactions ORDER BY id'),
@@ -112,6 +140,9 @@ async function loadState(client) {
       client.query('SELECT * FROM users ORDER BY id'),
       client.query('SELECT * FROM accounts ORDER BY id'),
       client.query('SELECT * FROM payables ORDER BY id'),
+      client.query('SELECT * FROM receivables ORDER BY id'),
+      client.query('SELECT * FROM groups ORDER BY group_name'),
+      client.query('SELECT * FROM password_reset_requests ORDER BY id'),
       client.query('SELECT * FROM activity_log ORDER BY id'),
       client.query('SELECT * FROM pending_actions ORDER BY id'),
       client.query('SELECT * FROM app_settings'),
@@ -149,6 +180,17 @@ async function loadState(client) {
     payables: payables.rows.map(p => ({
       id: p.id, vendor: p.vendor, amount: Number(p.amount), dueDate: p.due_date,
       description: p.description, status: p.status, createdDate: p.created_date, paidDate: p.paid_date,
+      memberId: p.member_id,
+    })),
+    receivables: receivables.rows.map(r => ({
+      id: r.id, memberId: r.member_id, memberName: r.member_name, amount: Number(r.amount), dueDate: r.due_date,
+      description: r.description, status: r.status, createdDate: r.created_date, paidDate: r.paid_date, account: r.account,
+    })),
+    groups: groups.rows.map(g => ({
+      group: g.group_name, wakiil: g.wakiil, memberNames: g.member_names || [],
+    })),
+    passwordResetRequests: passwordResetRequests.rows.map(r => ({
+      id: r.id, username: r.username, requestedAt: r.requested_at, status: r.status,
     })),
     activityLog: activityLog.rows.map(a => ({
       id: a.id, ts: a.ts, actor: a.actor, action: a.action, details: a.details, status: a.status,
@@ -202,6 +244,9 @@ async function saveState(client, state) {
     await client.query('DELETE FROM users');
     await client.query('DELETE FROM accounts');
     await client.query('DELETE FROM payables');
+    await client.query('DELETE FROM receivables');
+    await client.query('DELETE FROM groups');
+    await client.query('DELETE FROM password_reset_requests');
     await client.query('DELETE FROM activity_log');
     await client.query('DELETE FROM pending_actions');
     await client.query('DELETE FROM app_settings');
@@ -236,8 +281,24 @@ async function saveState(client, state) {
     );
     await batchInsert(
       client, 'payables',
-      ['id', 'vendor', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date'],
-      (state.payables || []).map(p => [p.id, p.vendor, p.amount, p.dueDate || null, p.description || null, p.status || 'unpaid', p.createdDate || null, p.paidDate || null])
+      ['id', 'vendor', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date', 'member_id'],
+      (state.payables || []).map(p => [p.id, p.vendor, p.amount, p.dueDate || null, p.description || null, p.status || 'unpaid', p.createdDate || null, p.paidDate || null, p.memberId || null])
+    );
+    await batchInsert(
+      client, 'receivables',
+      ['id', 'member_id', 'member_name', 'amount', 'due_date', 'description', 'status', 'created_date', 'paid_date', 'account'],
+      (state.receivables || []).map(r => [r.id, r.memberId || null, r.memberName || null, r.amount, r.dueDate || null, r.description || null, r.status || 'unpaid', r.createdDate || null, r.paidDate || null, r.account || null])
+    );
+    await batchInsert(
+      client, 'groups',
+      ['group_name', 'wakiil', 'member_names'],
+      (state.groups || []).map(g => [g.group, g.wakiil || null, JSON.stringify(g.memberNames || [])]),
+      'group_name'
+    );
+    await batchInsert(
+      client, 'password_reset_requests',
+      ['id', 'username', 'requested_at', 'status'],
+      (state.passwordResetRequests || []).map(r => [r.id, r.username, r.requestedAt || null, r.status || 'pending'])
     );
     await batchInsert(
       client, 'activity_log',

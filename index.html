@@ -531,6 +531,14 @@
       <div id="payablesList"></div>
       <div class="foot-note" id="payablesFoot"></div>
     </div>
+    <div class="panel" style="margin-top:16px;">
+      <div class="panel-head">
+        <h2 data-t-en="Accounts Receivable (member requests)">Accounts Receivable (Codsiyada Xubnaha)</h2>
+        <button id="btnAddReceivable" data-t-en="Add request">Ku dar codsi</button>
+      </div>
+      <div id="receivablesList"></div>
+      <div class="foot-note" id="receivablesFoot"></div>
+    </div>
   </div>
 
   <div id="ledgerView" style="display:none;">
@@ -888,6 +896,7 @@ async function loadDb(){
   if(db.settings.adminEmail === undefined) db.settings.adminEmail = "cusmanhersi@gmail.com";
   if(db.settings.adminPhone === undefined) db.settings.adminPhone = "+252615200615";
   if(!db.payables) db.payables = [];
+  if(!db.receivables) db.receivables = [];
   if(!db.passwordResetRequests) db.passwordResetRequests = [];
   // GROUPS used to be a hardcoded, read-only constant — fine while nobody
   // could edit membership, but now that Add/Remove buttons let an admin
@@ -4060,6 +4069,9 @@ function accountBalance(acc){
   for(const d of db.disbursements){
     if(d.account===acc.id) bal -= d.amount;
   }
+  for(const r of db.receivables){
+    if(r.status==="paid" && r.account===acc.id) bal += r.amount;
+  }
   return bal;
 }
 
@@ -4072,6 +4084,7 @@ function accountBalanceReportRows(){
     let deposited = 0, withdrawn = 0;
     for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
+    for(const r of db.receivables) if(r.status==="paid" && r.account===acc.id) deposited += r.amount;
     return {id:acc.id, name:acc.name, opening:acc.openingBalance, deposited, withdrawn, balance:accountBalance(acc)};
   });
 }
@@ -4096,6 +4109,11 @@ function accountLedgerFor(accId){
     if(d.account===accId){
       const label = d.recipient || d.memo || "";
       rows.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${label?(' — '+label):''}`, effect:-d.amount});
+    }
+  }
+  for(const r of db.receivables){
+    if(r.status==="paid" && r.account===accId){
+      rows.push({date:r.paidDate||r.createdDate, desc:`${t("Codsi la aqbalay (AR)","Receivable received")}: ${r.memberName}${r.description?(' — '+r.description):''}`, effect:r.amount});
     }
   }
   rows.sort((a,b)=>a.date.localeCompare(b.date));
@@ -4612,7 +4630,8 @@ function computeAccountImpact(acc){
 }
 
 function renderFinancialSummary(){
-  const totalAR = db.members.reduce((s,m)=>{ const b = computeBalance(m); return b>0 ? s+b : s; }, 0);
+  const totalAR = db.members.reduce((s,m)=>{ const b = computeBalance(m); return b>0 ? s+b : s; }, 0)
+    + db.receivables.filter(r=>r.status==="unpaid").reduce((s,r)=>s+r.amount,0);
   const totalAP = db.payables.filter(p=>p.status==="unpaid").reduce((s,p)=>s+p.amount,0);
   const totalExpenses = db.disbursements.reduce((s,d)=>s+d.amount,0);
   const totalBadDebt = db.members.reduce((s,m)=>s+totalWrittenOff(m),0) + historicalBadDebtTotal();
@@ -4646,6 +4665,7 @@ function renderFinancialSummary(){
     </div>
   `;
   renderPayables();
+  renderReceivables();
 }
 
 function historicalBadDebtTotal(){
@@ -4706,28 +4726,76 @@ function renderPayables(){
   });
 }
 
+let apPickedMember = null;
+
+function apVendorMemberFieldHtml(){
+  if(apPickedMember){
+    return `<div class="frow"><label>${t("Xubinta la doortay","Selected member")}</label>
+      <div class="tx" style="margin:0;">
+        <div class="l"><span>${apPickedMember.name}</span><span class="muted">${apPickedMember.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        <button type="button" id="apChangeMember">${t("Beddel","Change")}</button>
+      </div>
+    </div>`;
+  }
+  return `
+    <div class="frow"><label>${t("Vendor / cida la leeyahay","Vendor / who is owed")}</label><input type="text" id="apVendor" placeholder="${t('tusaale: Dahir Cawale','e.g. Dahir Cawale')}"></div>
+    <div class="frow"><label>${t("Ama dooro xubin (ikhtiyaari)","Or pick a member instead (optional)")}</label><input type="text" id="apMemberSearch" placeholder="${t('Qor magaca xubinta...','Type a member name...')}"></div>
+    <div id="apMemberResults" class="tx-list" style="max-height:180px;"></div>
+  `;
+}
+
 function openAddPayableModal(){
+  apPickedMember = null;
+  renderAddPayableModal();
+}
+
+function renderAddPayableModal(){
   openModal(`
     <h3>${t("Ku dar bill (Accounts Payable)","Add bill (Accounts Payable)")}</h3>
-    <div class="frow"><label>${t("Vendor / cida la leeyahay","Vendor / who is owed")}</label><input type="text" id="apVendor" placeholder="${t('tusaale: Dahir Cawale','e.g. Dahir Cawale')}"></div>
+    ${apVendorMemberFieldHtml()}
     <div class="frow"><label>${t("Lacagta","Amount")}</label><input type="number" step="0.01" id="apAmount" placeholder="0.00"></div>
     <div class="frow"><label>${t("Waa la bixin bilaha (ikhtiyaari)","Due date (optional)")}</label><input type="date" id="apDueDate"></div>
-    <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="apDesc" placeholder="${t('sababta bill-ka','reason for the bill')}"></div>
+    <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="apDesc" placeholder="${apPickedMember ? t('tusaale: Codsi deyn/advance','e.g. loan/advance request') : t('sababta bill-ka','reason for the bill')}"></div>
     <div class="actions">
       <button id="mCancel">${t("Maya","Cancel")}</button>
       <button class="primary" id="mConfirm">${t("Ku dar","Add")}</button>
     </div>
   `);
   document.getElementById("mCancel").addEventListener("click", closeModal);
+
+  const searchEl = document.getElementById("apMemberSearch");
+  if(searchEl){
+    searchEl.addEventListener("input", ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const results = document.getElementById("apMemberResults");
+      results.innerHTML = matches.length ? matches.map(m=>`
+        <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+          <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        </div>
+      `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+      results.querySelectorAll("[data-mid]").forEach(row=>{
+        row.addEventListener("click", ()=>{
+          apPickedMember = db.members.find(x=>x.id===row.dataset.mid) || null;
+          renderAddPayableModal();
+        });
+      });
+    });
+    searchEl.focus();
+  }
+  const changeBtn = document.getElementById("apChangeMember");
+  if(changeBtn) changeBtn.addEventListener("click", ()=>{ apPickedMember = null; renderAddPayableModal(); });
+
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
-    const vendor = document.getElementById("apVendor").value.trim();
+    const vendor = apPickedMember ? apPickedMember.name : document.getElementById("apVendor").value.trim();
+    const memberId = apPickedMember ? apPickedMember.id : null;
     const amount = parseFloat(document.getElementById("apAmount").value);
     const dueDate = document.getElementById("apDueDate").value;
     const description = document.getElementById("apDesc").value.trim();
-    if(!vendor){ showToast(t("Geli vendor-ka","Enter the vendor")); return; }
+    if(!vendor){ showToast(t("Geli vendor-ka ama dooro xubin","Enter the vendor or pick a member")); return; }
     if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
-    db.payables.push({id:"ap"+Date.now(), vendor, amount, dueDate, description, status:"unpaid", createdDate:todayStr()});
-    logActivity("Ku darid bill (AP)", `${vendor}: ${money(amount)}`, "direct");
+    db.payables.push({id:"ap"+Date.now(), vendor, amount, dueDate, description, status:"unpaid", createdDate:todayStr(), memberId});
+    logActivity("Ku darid bill (AP)", `${vendor}: ${money(amount)}${memberId?' ('+t('codsi xubin','member request')+')':''}`, "direct");
     await saveDb();
     closeModal();
     renderFinancialSummary();
@@ -4765,6 +4833,157 @@ function openPayBillModal(payId){
     await saveDb();
     closeModal();
     showToast(t("Bill-ka waa la bixiyay, wuxuuna hadda ku jiraa Expenses","The bill was paid, and it's now listed under Expenses"));
+    renderFinancialSummary();
+  });
+}
+
+// Accounts Receivable here means a specific one-off amount a member owes
+// beyond their regular monthly dues (e.g. repaying an advance/loan that was
+// recorded above as a member-tied Payable) — kept as its own list so it
+// never touches m.transactions/computeBalance() and doesn't get mixed into
+// the normal Qoondo bille due/payment tracking. Marking one "received"
+// deposits straight into the chosen account (accountBalance() below
+// includes paid receivables the same way it includes member due payments),
+// the mirror image of how paying a bill withdraws from an account.
+function renderReceivables(){
+  const canManage = hasPerm("collectPayment");
+  document.getElementById("btnAddReceivable").style.display = canManage ? "" : "none";
+  const sorted = [...db.receivables].sort((a,b)=>{
+    if(a.status !== b.status) return a.status==="unpaid" ? -1 : 1;
+    return (b.dueDate||"").localeCompare(a.dueDate||"");
+  });
+  const list = document.getElementById("receivablesList");
+  list.innerHTML = sorted.length ? sorted.map(r=>`
+    <div class="pay-row ${r.status}">
+      <div class="l">
+        <span class="nm">${r.memberName}${r.status==="paid"?` <span class="badge">${t('La helay','Received')}</span>`:''}</span>
+        <span class="meta4">${r.description||''} ${r.dueDate?('· '+t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="amt">${money(r.amount)}</span>
+        ${(r.status==="unpaid" && canManage) ? `<button data-recid="${r.id}" data-act="receive">${t('Aqbal','Receive')}</button>` : ''}
+        ${canManage ? `<button class="del" data-recid="${r.id}" data-act="del" title="${t('Tirtir','Delete')}">✕</button>` : ''}
+      </div>
+    </div>
+  `).join("") : `<div class="empty">${t("Wax codsi ah lama diiwaangelin.","No requests recorded yet.")}</div>`;
+  document.getElementById("receivablesFoot").textContent = `${db.receivables.filter(r=>r.status==='unpaid').length} ${t("oo aan weli la helin","outstanding")}, ${db.receivables.filter(r=>r.status==='paid').length} ${t("oo la helay","received")}`;
+
+  list.querySelectorAll("[data-act='receive']").forEach(btn=>{
+    btn.addEventListener("click", ()=>openReceiveModal(btn.dataset.recid));
+  });
+  list.querySelectorAll("[data-act='del']").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const r = db.receivables.find(x=>x.id===btn.dataset.recid);
+      if(!r) return;
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${t("Ma hubtaa inaad tirtirto codsigan","Are you sure you want to delete this request")}: ${r.memberName} — ${money(r.amount)}?</p>
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, tirtir","Yes, delete")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        db.receivables = db.receivables.filter(x=>x.id!==r.id);
+        logActivity("Tirtirid codsi (AR)", "", "direct");
+        await saveDb();
+        closeModal();
+        renderFinancialSummary();
+      });
+    });
+  });
+}
+
+function openAddReceivableModal(){
+  arPickedMember = null;
+  renderAddReceivableModal();
+}
+
+let arPickedMember = null;
+
+function renderAddReceivableModal(){
+  openModal(`
+    <h3>${t("Ku dar codsi (Accounts Receivable)","Add request (Accounts Receivable)")}</h3>
+    ${arPickedMember ? `<div class="frow"><label>${t("Xubinta la doortay","Selected member")}</label>
+      <div class="tx" style="margin:0;">
+        <div class="l"><span>${arPickedMember.name}</span><span class="muted">${arPickedMember.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        <button type="button" id="arChangeMember">${t("Beddel","Change")}</button>
+      </div>
+    </div>` : `
+      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="arMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div id="arMemberResults" class="tx-list" style="max-height:220px;"></div>
+    `}
+    <div class="frow"><label>${t("Lacagta","Amount")}</label><input type="number" step="0.01" id="arAmount" placeholder="0.00"></div>
+    <div class="frow"><label>${t("Waa la bixin bilaha (ikhtiyaari)","Due date (optional)")}</label><input type="date" id="arDueDate"></div>
+    <div class="frow"><label>${t("Faahfaahin","Description")}</label><input type="text" id="arDesc" placeholder="${t('tusaale: Soo celinta deynta','e.g. loan repayment')}"></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm" ${arPickedMember?'':'disabled'}>${t("Ku dar","Add")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+
+  const searchEl = document.getElementById("arMemberSearch");
+  if(searchEl){
+    searchEl.addEventListener("input", ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const results = document.getElementById("arMemberResults");
+      results.innerHTML = matches.length ? matches.map(m=>`
+        <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+          <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        </div>
+      `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+      results.querySelectorAll("[data-mid]").forEach(row=>{
+        row.addEventListener("click", ()=>{
+          arPickedMember = db.members.find(x=>x.id===row.dataset.mid) || null;
+          renderAddReceivableModal();
+        });
+      });
+    });
+    searchEl.focus();
+  }
+  const changeBtn = document.getElementById("arChangeMember");
+  if(changeBtn) changeBtn.addEventListener("click", ()=>{ arPickedMember = null; renderAddReceivableModal(); });
+
+  const confirmBtn = document.getElementById("mConfirm");
+  confirmBtn.addEventListener("click", async ()=>{
+    if(!arPickedMember){ showToast(t("Fadlan dooro xubin","Please select a member")); return; }
+    const amount = parseFloat(document.getElementById("arAmount").value);
+    const dueDate = document.getElementById("arDueDate").value;
+    const description = document.getElementById("arDesc").value.trim();
+    if(!amount || amount<=0){ showToast(t("Geli lacag sax ah","Enter a valid amount")); return; }
+    db.receivables.push({id:"ar"+Date.now(), memberId:arPickedMember.id, memberName:arPickedMember.name, amount, dueDate, description, status:"unpaid", createdDate:todayStr()});
+    logActivity("Ku darid codsi (AR)", `${arPickedMember.name}: ${money(amount)}`, "direct");
+    await saveDb();
+    closeModal();
+    renderFinancialSummary();
+  });
+}
+
+function openReceiveModal(recId){
+  const r = db.receivables.find(x=>x.id===recId);
+  if(!r) return;
+  openModal(`
+    <h3>${t("Aqbal lacagta","Receive payment")} — ${r.memberName}</h3>
+    <div class="frow"><label>${t("Lacagta","Amount")}: ${money(r.amount)}</label></div>
+    <div class="frow"><label>${t("Account loo dhigayo","Account to deposit into")}</label><select id="arRecAccount">${db.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></div>
+    <div class="actions">
+      <button id="mCancel">${t("Maya","Cancel")}</button>
+      <button class="primary" id="mConfirm">${t("Xaqiiji","Confirm")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("mConfirm").addEventListener("click", async ()=>{
+    const account = document.getElementById("arRecAccount").value;
+    r.status = "paid";
+    r.paidDate = todayStr();
+    r.account = account;
+    logActivity("Aqbalidda codsi (AR)", `${r.memberName}: ${money(r.amount)}`, "direct");
+    await saveDb();
+    closeModal();
+    showToast(t("Lacagta waa la aqbalay","Payment received"));
     renderFinancialSummary();
   });
 }
@@ -5183,6 +5402,7 @@ document.querySelectorAll("#disbCatFilters [data-catfilter]").forEach(btn=>{
 document.getElementById("btnDisbCatPdf").addEventListener("click", exportCategoryPdf);
 
 document.getElementById("btnAddPayable").addEventListener("click", openAddPayableModal);
+document.getElementById("btnAddReceivable").addEventListener("click", openAddReceivableModal);
 
 document.getElementById("btnAddAccount").addEventListener("click", ()=>{
   openModal(`
@@ -6398,6 +6618,7 @@ function showRestoreConfirm(backupData, exportedAt){
     if(db.settings.adminEmail === undefined) db.settings.adminEmail = "cusmanhersi@gmail.com";
     if(db.settings.adminPhone === undefined) db.settings.adminPhone = "+252615200615";
     if(!db.payables) db.payables = [];
+    if(!db.receivables) db.receivables = [];
     if(!db.passwordResetRequests) db.passwordResetRequests = [];
     logActivity("Xogta waa la soo celiyay (restore)", "", "direct");
     await saveDb();

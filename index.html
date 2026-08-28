@@ -903,8 +903,27 @@ async function loadDb(){
   // change who's in a group, that has to live in the saved db instead.
   // One-time copy into db.groups (deep-copied so nothing here can mutate
   // the original GROUPS const); every group-related read below switches
-  // from GROUPS to db.groups.
-  if(!db.groups) db.groups = GROUPS.map(g=>({group:g.group, wakiil:g.wakiil, memberNames:[...g.memberNames]}));
+  // from GROUPS to db.groups. Was originally gated on `!db.groups` alone,
+  // which relied on the real backend never returning a `groups` key at all
+  // (a separate bug — db.groups wasn't in api/data.js's persisted tables
+  // until it was added). Once that got fixed, a real-but-empty `[]` from a
+  // freshly-created (still empty) groups table is truthy, so `!db.groups`
+  // stopped firing — and since loadDb() ends with an unconditional
+  // saveDb(), that empty state got saved right back, permanently, for
+  // everyone, the very first load after the table existed. One-time
+  // re-seed for anyone currently stuck at an empty list; once done, an
+  // intentionally-cleared groups list is respected going forward.
+  if((!db.groups || db.groups.length === 0) && !db.settings.groupsReseeded2026Done){
+    db.groups = GROUPS.map(g=>({group:g.group, wakiil:g.wakiil, memberNames:[...g.memberNames]}));
+    db.settings.groupsReseeded2026Done = true;
+    // This fresh copy is the raw hardcoded GROUPS constant again — it needs
+    // the same one-time corrections re-applied (rename, inactive-member
+    // cleanup) below, but their own "done" flags are already spent from
+    // when they ran against the (since-wiped) real data. Reset them so the
+    // very next two blocks reapply against this reseed instead of skipping.
+    db.settings.ahmednurGroupRenamed2026Done = false;
+    db.settings.inactiveMembersRemovedFromGroups2026Done = false;
+  }
   // "& aden Nur" was never accurate — Aden Nur's family is its own group
   // ("Rer Adan Nur", with its own separate members) and was never part of
   // this one; the name just wrongly implied an overlap. Own flag, runs

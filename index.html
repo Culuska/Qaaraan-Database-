@@ -3238,14 +3238,25 @@ function openReportPersonPicker(){
 // before printing, instead of only after generating a PDF and re-checking
 // against the app separately. PDF/Excel export stays available at the
 // bottom, unchanged.
+// Date range filter state for the Personal report preview — reset every
+// time the modal is (re)opened for a member so a previous member's filter
+// never leaks into the next one. Filtering only changes which rows are
+// shown/exported; the running balance is always computed from the
+// member's FULL history first (same reasoning as the Account Balance
+// Details ledger filter) so it stays accurate regardless of the range.
+let memberReportFilter = {from:"", to:""};
+
 function openMemberReportPreview(m){
   const canEditDel = hasPerm("delete");
+  memberReportFilter = {from:"", to:""};
   const render = ()=>{
     const bal = computeBalance(m);
     const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
     let running = m.openingBalance;
+    const {from, to} = memberReportFilter;
     const rows = sorted.map(tx=>{
       running += (tx.type==="due" ? tx.amount : -tx.amount);
+      if((from && tx.date<from) || (to && tx.date>to)) return "";
       const label = tx.type==='due' ? t('Qoondo bille','Monthly due') : (tx.type==='writeoff' ? t('Bad debt — Cafinaad','Bad debt — written off') : 'Payment');
       return `<div class="tx ${tx.type}">
         <div class="l">
@@ -3267,6 +3278,11 @@ function openMemberReportPreview(m){
         <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
         <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
       </div>
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px;">
+        <label style="font-size:12px;color:var(--ink-2);">${t("Laga bilaabo","From")}<br><input type="date" id="mrpFrom" value="${from}"></label>
+        <label style="font-size:12px;color:var(--ink-2);">${t("Ilaa","To")}<br><input type="date" id="mrpTo" value="${to}"></label>
+        <button id="mrpClearFilter">${t("Nadiifi","Clear")}</button>
+      </div>
       <div class="muted" style="margin-bottom:8px;">${t("Taariikhda dhaqdhaqaaqyada (transactions)","Transaction history")}</div>
       <div class="tx-list" style="max-height:340px;">
         ${rows || `<div class="muted">${t("Wali ma jiraan dhaqdhaqaaq.","No transactions yet.")}</div>`}
@@ -3278,11 +3294,14 @@ function openMemberReportPreview(m){
       </div>
     `);
     document.getElementById("mCancel").addEventListener("click", closeModal);
+    document.getElementById("mrpFrom").addEventListener("change", (e)=>{ memberReportFilter.from = e.target.value; render(); });
+    document.getElementById("mrpTo").addEventListener("change", (e)=>{ memberReportFilter.to = e.target.value; render(); });
+    document.getElementById("mrpClearFilter").addEventListener("click", ()=>{ memberReportFilter = {from:"", to:""}; render(); });
     document.getElementById("rptPdf").addEventListener("click", ()=>{
-      try{ exportMemberLiveReportPdf(m); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+      try{ exportMemberLiveReportPdf(m, memberReportFilter); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
     });
     document.getElementById("rptXlsx").addEventListener("click", ()=>{
-      try{ exportMemberLiveReportExcel(m); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+      try{ exportMemberLiveReportExcel(m, memberReportFilter); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
     });
     if(canEditDel){
       document.querySelectorAll("[data-edittxid]").forEach(btn=>{
@@ -3323,7 +3342,8 @@ function openReportFormatChoice(title, onPdf, onXlsx){
   });
 }
 
-function exportMemberLiveReportExcel(m){
+function exportMemberLiveReportExcel(m, filter){
+  const {from, to} = filter || {};
   const bal = computeBalance(m);
   const sorted = [...m.transactions].sort((a,b)=>a.date.localeCompare(b.date));
   let running = m.openingBalance;
@@ -3335,11 +3355,12 @@ function exportMemberLiveReportExcel(m){
     [t("Wadarta la bixiyay","Total paid"), totalPaid(m)],
     [t("Deyn la cafiyay","Debt written off"), totalWrittenOff(m)],
     [t("Balance hadda","Current balance"), bal],
-    [],
-    [t("Taariikhda","Date"), t("Nooca","Type"), t("Lacagta","Amount"), t("Balance ka dib","Balance after"), t("Faahfaahin","Note")]
   ];
+  if(from || to) rows.push([t("Xiliga la soo xulay","Date range"), `${from||t('bilowga','start')} — ${to||t('maanta','today')}`]);
+  rows.push([], [t("Taariikhda","Date"), t("Nooca","Type"), t("Lacagta","Amount"), t("Balance ka dib","Balance after"), t("Faahfaahin","Note")]);
   for(const tx of sorted){
     if(tx.type==="due") running += tx.amount; else running -= tx.amount;
+    if((from && tx.date<from) || (to && tx.date>to)) continue;
     const label = tx.type==="due" ? t("Qoondo bille","Monthly due") : (tx.type==="writeoff" ? t("Cafinaad","Write-off") : t("Lacag bixin","Payment"));
     rows.push([tx.date, label, tx.type==="due"?tx.amount:-tx.amount, running, tx.note||""]);
   }
@@ -3350,7 +3371,8 @@ function exportMemberLiveReportExcel(m){
   XLSX.writeFile(wb, m.name.replace(/[^a-z0-9]+/gi,"_")+"_personal_report.xlsx");
 }
 
-function exportMemberLiveReportPdf(m){
+function exportMemberLiveReportPdf(m, filter){
+  const {from, to} = filter || {};
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const bal = computeBalance(m);
@@ -3359,14 +3381,17 @@ function exportMemberLiveReportPdf(m){
   doc.setFontSize(14); doc.text(m.name, 14, y); y += 7;
   doc.setFontSize(10);
   doc.text(`${t('Telefoon','Phone')}: ${m.phone||'-'}  |  ${t('Qoondo/bil','Due/month')}: $${m.monthlyDue||0}`, 14, y); y += 6;
-  doc.text(`${t('Balance bilowga ah','Opening balance')}: $${m.openingBalance.toFixed(2)}  |  ${t('Wadarta la bixiyay','Total paid')}: $${totalPaid(m).toFixed(2)}  |  ${t('Balance hadda','Current balance')}: $${bal.toFixed(2)}`, 14, y); y += 9;
+  doc.text(`${t('Balance bilowga ah','Opening balance')}: $${m.openingBalance.toFixed(2)}  |  ${t('Wadarta la bixiyay','Total paid')}: $${totalPaid(m).toFixed(2)}  |  ${t('Balance hadda','Current balance')}: $${bal.toFixed(2)}`, 14, y); y += 6;
+  if(from || to){ doc.text(`${t('Xiliga la soo xulay','Date range')}: ${from||t('bilowga','start')} — ${to||t('maanta','today')}`, 14, y); y += 6; }
+  y += 3;
   doc.setFontSize(9);
   doc.text(t("Taariikhda","Date"), 14, y); doc.text(t("Nooca","Type"), 55, y); doc.text(t("Lacagta","Amount"), 105, y); doc.text(t("Balance ka dib","Balance after"), 140, y); doc.text(t("Faahfaahin","Note"), 175, y);
   y += 4; doc.line(14,y,196,y); y += 5;
   let running = m.openingBalance;
   for(const tx of sorted){
-    if(y > 280){ doc.addPage(); y = 18; }
     if(tx.type==="due") running += tx.amount; else running -= tx.amount;
+    if((from && tx.date<from) || (to && tx.date>to)) continue;
+    if(y > 280){ doc.addPage(); y = 18; }
     const label = tx.type==="due" ? t("Qoondo bille","Monthly due") : (tx.type==="writeoff" ? t("Cafinaad","Write-off") : t("Lacag bixin","Payment"));
     doc.text(tx.date, 14, y);
     doc.text(label, 55, y);

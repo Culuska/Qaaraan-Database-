@@ -3171,9 +3171,15 @@ function openReportGroupPicker(){
         </div>
       `).join("")}
     </div>
-    <div class="actions"><button id="mCancel">${t("Dib u noqo","Back")}</button></div>
+    <div class="actions">
+      <button id="mCancel">${t("Dib u noqo","Back")}</button>
+      <button class="primary" id="grpDownloadAll">${t("Soo Deji Dhammaan","Download All")}</button>
+    </div>
   `);
   document.getElementById("mCancel").addEventListener("click", openReportsModal);
+  document.getElementById("grpDownloadAll").addEventListener("click", ()=>{
+    openFullReportPreview(db.members.filter(m=>m.status==="active"));
+  });
   document.querySelectorAll("[data-group]").forEach(row=>{
     row.addEventListener("click", ()=>{
       const g = db.groups.find(x=>x.group===row.dataset.group);

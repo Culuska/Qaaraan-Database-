@@ -3979,6 +3979,7 @@ function renderTabs(){
     entryTabs.push({id:"baddebt-action", label:t("Deyn Xun (Bad Debt)","Bad Debt"), icon:"ti-file-off", action:"baddebt"});
     entryTabs.push({id:"giveloan-action", label:t("Deyn Bixin","Give Loan"), icon:"ti-wallet", action:"giveloan"});
     entryTabs.push({id:"chargemember-action", label:t("Codsi Xubin","Charge Member"), icon:"ti-cash-banknote", action:"chargemember"});
+    entryTabs.push({id:"loanreceipt-action", label:t("Rasiidka Deynta","Loan Receipt"), icon:"ti-receipt-2", action:"loanreceipt"});
   }
   // "Report" group: read-only exports/lookups, separate from the Entry
   // actions above.
@@ -4045,6 +4046,8 @@ function renderTabs(){
   if(giveLoanBtn) giveLoanBtn.addEventListener("click", openGiveLoanModal);
   const chargeMemberBtn = navList.querySelector("[data-action='chargemember']");
   if(chargeMemberBtn) chargeMemberBtn.addEventListener("click", openAddReceivableModal);
+  const loanReceiptBtn = navList.querySelector("[data-action='loanreceipt']");
+  if(loanReceiptBtn) loanReceiptBtn.addEventListener("click", openLoanReceiptModal);
   const membersReportBtn = navList.querySelector("[data-action='membersreport']");
   if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
   const acctReportBtn = navList.querySelector("[data-action='acctreport']");
@@ -5090,6 +5093,77 @@ function openReceiveModal(recId){
     closeModal();
     showToast(t("Lacagta waa la aqbalay","Payment received"));
     renderFinancialSummary();
+  });
+}
+
+// Quick "Loan Receipt" entry point (Entry sidebar) — receiving a repayment
+// used to mean going to Financials > Accounts Receivable and finding the
+// right row there. This searches a member first, lists whichever of THEIR
+// outstanding loans/charges are still unpaid, and hands off to the same
+// openReceiveModal() confirm flow once one is picked.
+let lrState = {};
+
+function openLoanReceiptModal(){
+  if(!hasPerm("collectPayment")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  lrState = { member: null };
+  renderLoanReceiptModal();
+}
+
+function renderLoanReceiptModal(){
+  if(!lrState.member){
+    openModal(`
+      <h3>${t("Rasiidka Deynta","Loan Receipt")}</h3>
+      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="lrMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div id="lrMemberResults" class="tx-list" style="max-height:280px;"></div>
+      <div class="actions"><button id="mCancel">${t("Jooji","Cancel")}</button></div>
+    `);
+    document.getElementById("mCancel").addEventListener("click", closeModal);
+    const searchEl = document.getElementById("lrMemberSearch");
+    searchEl.addEventListener("input", ()=>{
+      const q = searchEl.value.trim().toLowerCase();
+      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const results = document.getElementById("lrMemberResults");
+      results.innerHTML = matches.length ? matches.map(m=>`
+        <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
+          <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
+        </div>
+      `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
+      results.querySelectorAll("[data-mid]").forEach(row=>{
+        row.addEventListener("click", ()=>{
+          lrState.member = db.members.find(x=>x.id===row.dataset.mid) || null;
+          renderLoanReceiptModal();
+        });
+      });
+    });
+    searchEl.focus();
+    return;
+  }
+  const outstanding = db.receivables.filter(r=>r.memberId===lrState.member.id && r.status==="unpaid");
+  openModal(`
+    <h3>${t("Rasiidka Deynta","Loan Receipt")} — ${lrState.member.name}</h3>
+    ${outstanding.length ? `
+      <div class="muted" style="margin-bottom:8px;">${t("Dooro deynta/codsiga la aqbalayo","Choose which loan/charge to receive")}</div>
+      <div class="tx-list" style="max-height:280px;">
+        ${outstanding.map(r=>`
+          <div class="tx" data-recid="${r.id}" style="cursor:pointer;">
+            <div class="l"><span>${r.description||t('Deyn','Loan')}</span><span class="muted">${r.dueDate?(t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span></div>
+            <span class="amt">${money(r.amount)}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : `<div class="empty">${t("Xubintan wax deyn/codsi ah oo aan la aqbalin ma haysato.","This member has no outstanding loans/charges.")}</div>`}
+    <div class="actions">
+      <button id="lrChangeMember">${t("Beddel xubinta","Change member")}</button>
+      <button id="mCancel">${t("Xir","Close")}</button>
+    </div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("lrChangeMember").addEventListener("click", ()=>{ lrState.member = null; renderLoanReceiptModal(); });
+  document.querySelectorAll("[data-recid]").forEach(row=>{
+    row.addEventListener("click", ()=>openReceiveModal(row.dataset.recid));
   });
 }
 

@@ -801,6 +801,34 @@ function applyAction(type, payload){
   return {desc, resultId};
 }
 
+// Short two-note confirmation chime, like QuickBooks' "cha-ching" on saving
+// a transaction — synthesized with the Web Audio API rather than an
+// embedded audio file, so it doesn't need a binary asset in this
+// single-file app. Best-effort: browsers that block/lack audio just get no
+// sound, never a broken action (autoplay policies can throw before any
+// user gesture, though every call site here is itself inside a click
+// handler, which satisfies that).
+function playEntrySound(){
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    [{freq:880, start:0, dur:0.09}, {freq:1318.51, start:0.08, dur:0.16}].forEach(({freq,start,dur})=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now+start);
+      gain.gain.linearRampToValueAtTime(0.25, now+start+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now+start+dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now+start); osc.stop(now+start+dur+0.02);
+    });
+    setTimeout(()=>ctx.close(), 500);
+  }catch(e){ /* best-effort — never block the action on audio failure */ }
+}
+
 async function attemptAction(type, payload, permKey, label){
   if(!hasPerm(permKey)){
     showToast(t("Uma haysatid ogolaansho (permission) falkan.","You don't have permission for this action."));
@@ -810,6 +838,7 @@ async function attemptAction(type, payload, permKey, label){
     const {desc, resultId} = applyAction(type, payload);
     logActivity(label, desc, "direct");
     await saveDb();
+    playEntrySound();
     return {status:"applied", resultId};
   }
   db.pendingActions.push({id:"p"+Date.now()+"_"+Math.random().toString(36).slice(2,7), type, payload, label, requestedBy:currentUser, requestedAt:new Date().toISOString(), status:"pending"});
@@ -4865,6 +4894,7 @@ function renderAddPayableModal(){
     db.payables.push({id:"ap"+Date.now(), vendor, amount, dueDate, description, status:"unpaid", createdDate:todayStr(), memberId});
     logActivity("Ku darid bill (AP)", `${vendor}: ${money(amount)}${memberId?' ('+t('codsi xubin','member request')+')':''}`, "direct");
     await saveDb();
+    playEntrySound();
     closeModal();
     renderFinancialSummary();
   });
@@ -4899,6 +4929,7 @@ function openPayBillModal(payId){
     p.paidDate = todayStr();
     logActivity("Bixinta bill (AP -> Expense)", `${p.vendor}: ${money(p.amount)}`, "direct");
     await saveDb();
+    playEntrySound();
     closeModal();
     showToast(t("Bill-ka waa la bixiyay, wuxuuna hadda ku jiraa Expenses","The bill was paid, and it's now listed under Expenses"));
     renderFinancialSummary();
@@ -5029,6 +5060,7 @@ function renderAddReceivableModal(){
     db.receivables.push({id:"ar"+Date.now(), memberId:arPickedMember.id, memberName:arPickedMember.name, amount, dueDate, description, status:"unpaid", createdDate:todayStr()});
     logActivity("Ku darid codsi (AR)", `${arPickedMember.name}: ${money(amount)}`, "direct");
     await saveDb();
+    playEntrySound();
     closeModal();
     renderFinancialSummary();
   });
@@ -5054,6 +5086,7 @@ function openReceiveModal(recId){
     r.account = account;
     logActivity("Aqbalidda codsi (AR)", `${r.memberName}: ${money(r.amount)}`, "direct");
     await saveDb();
+    playEntrySound();
     closeModal();
     showToast(t("Lacagta waa la aqbalay","Payment received"));
     renderFinancialSummary();
@@ -5145,6 +5178,7 @@ function renderGiveLoanModal(){
     db.receivables.push({id:"ar"+Date.now(), memberId:glState.member.id, memberName:glState.member.name, amount, dueDate:"", description: description || t("Deyn","Loan"), status:"unpaid", createdDate:date, givenAccount:account});
     logActivity("Deyn Bixin (AR)", `${glState.member.name}: ${money(amount)} (${(db.accounts.find(a=>a.id===account)||{}).name||account})`, "direct");
     await saveDb();
+    playEntrySound();
     closeModal();
     showToast(t("Deynta waa la bixiyay","Loan recorded and paid out"));
     renderFinancialSummary();

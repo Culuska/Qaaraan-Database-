@@ -3178,7 +3178,17 @@ function openReportGroupPicker(){
   `);
   document.getElementById("mCancel").addEventListener("click", openReportsModal);
   document.getElementById("grpDownloadAll").addEventListener("click", ()=>{
-    openFullReportPreview(db.members.filter(m=>m.status==="active"));
+    const groupsWithMembers = db.groups
+      .map(g=>({ g, members: g.memberNames.map(name=>membersByName[name]).filter(m=>m && m.status==="active").sort((a,b)=>a.name.localeCompare(b.name)) }))
+      .filter(x=>x.members.length > 0);
+    if(!groupsWithMembers.length){ showToast(t("Wax koox ah oo xubno leh lama helin.","No groups with members found.")); return; }
+    // Each group downloads as its own file (same exportGroupPdf/Excel used
+    // by a single group's preview) — staggered slightly so the browser
+    // doesn't throttle/block a burst of near-simultaneous downloads.
+    openReportFormatChoice(t("Soo Deji Dhammaan Kooxaha","Download All Groups"),
+      ()=>{ groupsWithMembers.forEach(({g, members}, i)=>setTimeout(()=>exportGroupPdf(g, members), i*400)); },
+      ()=>{ groupsWithMembers.forEach(({g, members}, i)=>setTimeout(()=>exportGroupExcel(g, members), i*400)); }
+    );
   });
   document.querySelectorAll("[data-group]").forEach(row=>{
     row.addEventListener("click", ()=>{

@@ -5616,6 +5616,8 @@ function renderAccounts(){
     let deposited = 0, withdrawn = 0;
     for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.account===acc.id) deposited += tx.amount;
     for(const d of db.disbursements) if(d.account===acc.id) withdrawn += d.amount;
+    for(const r of db.receivables) if(r.status==="paid" && r.account===acc.id) deposited += r.amount;
+    for(const r of db.receivables) if(r.givenAccount===acc.id) withdrawn += r.amount;
     return `<div class="acct-card">
       <div class="name">${acc.name} ${canManage ? `<button class="edit" data-editacctid="${acc.id}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
       <div class="rows">

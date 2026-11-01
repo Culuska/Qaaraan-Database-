@@ -4047,6 +4047,7 @@ function renderTabs(){
     reportTabs.push({id:"membersreport-action", label:t("Warbixinta Xubnaha","Members Report"), icon:"ti-file-report", action:"membersreport"});
     reportTabs.push({id:"acctreport-action", label:t("Faahfaahinta Balance-ka Accounts","Account Balance Details"), icon:"ti-building-bank", action:"acctreport"});
     reportTabs.push({id:"balancesheet-action", label:t("Xaaladda Maaliyadeed","Balance Sheet"), icon:"ti-report-money", action:"balancesheet"});
+    reportTabs.push({id:"baddebtreport-action", label:t("Warbixinta Deynta Xun","Bad Debt Report"), icon:"ti-file-x", action:"baddebtreport"});
     reportTabs.push({id:"batchinvoice-action", label:t("Invoice Wadajir ah","Batch Invoicing"), icon:"ti-files", action:"batchinvoice"});
     // These two are real views (financialView/accountsView), not one-off
     // report actions — they existed in the code (and accountsView still
@@ -4113,6 +4114,8 @@ function renderTabs(){
   if(acctReportBtn) acctReportBtn.addEventListener("click", openAccountBalanceReportModal);
   const balanceSheetBtn = navList.querySelector("[data-action='balancesheet']");
   if(balanceSheetBtn) balanceSheetBtn.addEventListener("click", openBalanceSheetReportModal);
+  const badDebtReportBtn = navList.querySelector("[data-action='baddebtreport']");
+  if(badDebtReportBtn) badDebtReportBtn.addEventListener("click", openBadDebtReport);
   const batchInvoiceBtn = navList.querySelector("[data-action='batchinvoice']");
   if(batchInvoiceBtn) batchInvoiceBtn.addEventListener("click", openBatchInvoicingModal);
   const forecastBtn = navList.querySelector("[data-action='forecast']");
@@ -4829,6 +4832,117 @@ function historicalBadDebtTotal(){
     for(const tx of txs){ if(tx.type==="writeoff") t += tx.amount; }
   }
   return t;
+}
+
+// Bad Debt report — who's actually behind the $23,703.50 total on the
+// Financials card, combining live write-offs (m.transactions, type
+// "writeoff") with the historical ones imported from the original
+// QuickBooks data (HISTORY_REPORTS, keyed by member id) — same two
+// sources historicalBadDebtTotal()/totalWrittenOff() already sum for the
+// card total, just broken out per person here. A handful of historical
+// write-offs are tied to a member id that no longer exists in db.members
+// (merged/removed since); those still show up, labeled accordingly,
+// rather than silently dropped — the dashboard total already counts them.
+function badDebtReportRows(){
+  const rows = [];
+  const knownIds = new Set();
+  for(const m of db.members){
+    knownIds.add(m.id);
+    const live = totalWrittenOff(m);
+    const hist = (HISTORY_REPORTS[m.id]||[]).filter(tx=>tx.type==="writeoff").reduce((s,tx)=>s+tx.amount,0);
+    const total = live + hist;
+    if(total > 0) rows.push({name:m.name, live, hist, total});
+  }
+  for(const [id, txs] of Object.entries(HISTORY_REPORTS)){
+    if(knownIds.has(id)) continue;
+    const hist = txs.filter(tx=>tx.type==="writeoff").reduce((s,tx)=>s+tx.amount,0);
+    if(hist > 0) rows.push({name: t("Xubin hore (lama helin)","Former member (not found)")+" — "+id, live:0, hist, total:hist});
+  }
+  rows.sort((a,b)=>b.total-a.total);
+  return rows;
+}
+
+function openBadDebtReport(){
+  if(!hasPerm("viewReports")){
+    showToast(t("Uma haysatid ogolaansho falkan.","You don't have permission for this action."));
+    return;
+  }
+  const rows = badDebtReportRows();
+  const grand = rows.reduce((s,r)=>s+r.total,0);
+  const rowsHtml = rows.map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${r.name}</td>
+      <td class="amt">${money(r.live)}</td>
+      <td class="amt">${money(r.hist)}</td>
+      <td class="amt">${money(r.total)}</td>
+    </tr>
+  `).join("");
+  openModal(`
+    <div class="bs-title">
+      <div class="co">HALANE INSURANCE</div>
+      <div class="doc">${t("Warbixinta Deynta Xun","Bad Debt Report")}</div>
+      <div class="asof">${rows.length} ${t("qof","people")} · ${t("Taariikhda warbixinta","Report date")}: ${todayStr()}</div>
+    </div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>#</td><td>${t("Magaca","Name")}</td><td>${t("Hadda","Live")}</td><td>${t("Taariikhiga","Historical")}</td><td class="amt">${t("Wadarta","Total")}</td></tr>
+      ${rowsHtml || `<tr><td colspan="5" style="text-align:center;color:var(--ink-2);">${t("Wax deyn xun ah lama helin","No bad debt found")}</td></tr>`}
+      <tr class="bs-grandtotal"><td colspan="4">${t("WADARTA GUUD","GRAND TOTAL")}</td><td class="amt">${money(grand)}</td></tr>
+    </table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button id="rptXlsx">Excel</button>
+      <button class="primary" id="rptPdf">PDF</button>
+    </div>
+  `, "bs-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("rptPdf").addEventListener("click", ()=>{
+    try{ exportBadDebtReportPdf(rows, grand); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.getElementById("rptXlsx").addEventListener("click", ()=>{
+    try{ exportBadDebtReportExcel(rows, grand); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+}
+
+function exportBadDebtReportExcel(rows, grand){
+  const aoa = [
+    [t("Warbixinta Deynta Xun","Bad Debt Report")],
+    [t("Taariikhda warbixinta","Report date"), todayStr()],
+    [],
+    ["#", t("Magaca","Name"), t("Hadda","Live"), t("Taariikhiga","Historical"), t("Wadarta","Total")],
+  ];
+  rows.forEach((r,i)=>aoa.push([i+1, r.name, r.live, r.hist, r.total]));
+  aoa.push([], ["", t("WADARTA GUUD","GRAND TOTAL"), "", "", grand]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:5},{wch:30},{wch:12},{wch:14},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Bad Debt");
+  XLSX.writeFile(wb, "bad_debt_report.xlsx");
+}
+
+function exportBadDebtReportPdf(rows, grand){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 18;
+  doc.setFontSize(14); doc.text(t("Warbixinta Deynta Xun","Bad Debt Report"), 14, y); y += 7;
+  doc.setFontSize(10); doc.text(`${t('Taariikhda warbixinta','Report date')}: ${todayStr()}  |  ${rows.length} ${t('qof','people')}`, 14, y); y += 9;
+  doc.setFontSize(9);
+  doc.text("#", 14, y); doc.text(t("Magaca","Name"), 22, y); doc.text(t("Hadda","Live"), 110, y); doc.text(t("Taariikhiga","Historical"), 140, y); doc.text(t("Wadarta","Total"), 175, y);
+  y += 4; doc.line(14,y,196,y); y += 5;
+  rows.forEach((r,i)=>{
+    if(y > 280){ doc.addPage(); y = 18; }
+    doc.text(String(i+1), 14, y);
+    doc.text(r.name.slice(0,44), 22, y);
+    doc.text("$"+r.live.toFixed(2), 110, y);
+    doc.text("$"+r.hist.toFixed(2), 140, y);
+    doc.text("$"+r.total.toFixed(2), 175, y);
+    y += 6;
+  });
+  if(y > 275){ doc.addPage(); y = 18; }
+  y += 3; doc.line(14,y,196,y); y += 6;
+  doc.setFont(undefined, "bold");
+  doc.text(`${t("WADARTA GUUD","GRAND TOTAL")}: $${grand.toFixed(2)}`, 14, y);
+  doc.save("bad_debt_report.pdf");
 }
 
 function renderPayables(){

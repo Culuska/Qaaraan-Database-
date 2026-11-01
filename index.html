@@ -5019,7 +5019,10 @@ function renderReceivables(){
           <span class="nm"><i class="ti ${expanded?'ti-chevron-down':'ti-chevron-right'}" style="font-size:13px;vertical-align:-2px;"></i> ${g.memberName}</span>
           <span class="meta4">${g.unpaidCount} ${t("oo aan weli la helin","outstanding")}${g.settledCount?(', '+g.settledCount+' '+t('oo la helay','settled')):''}</span>
         </div>
-        <span class="amt" style="color:${g.outstanding>0?'var(--warn)':'var(--accent-ink)'}">${g.outstanding>0 ? money(g.outstanding) : t('La xisaabiyay','Settled')}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button data-reportkey="${String(g.key).replace(/"/g,'&quot;')}" title="${t('Warbixin','Report')}"><i class="ti ti-file-report"></i> ${t('Warbixin','Report')}</button>
+          <span class="amt" style="color:${g.outstanding>0?'var(--warn)':'var(--accent-ink)'}">${g.outstanding>0 ? money(g.outstanding) : t('La xisaabiyay','Settled')}</span>
+        </div>
       </div>
       ${itemsHtml}
     `;
@@ -5030,6 +5033,12 @@ function renderReceivables(){
     row.addEventListener("click", ()=>{
       receivablesExpanded[row.dataset.memkey] = !receivablesExpanded[row.dataset.memkey];
       renderReceivables();
+    });
+  });
+  list.querySelectorAll("[data-reportkey]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      openMemberLoanReport(btn.dataset.reportkey);
     });
   });
   list.querySelectorAll("[data-act='receive']").forEach(btn=>{
@@ -5061,6 +5070,96 @@ function renderReceivables(){
       });
     });
   });
+}
+
+// Per-member loan/charge report — how much they've ever requested
+// (every entry, paid or not), how much they've actually paid back, and
+// what's still outstanding, with the full dated breakdown. Same
+// preview-then-export pattern as the other reports in this app.
+function openMemberLoanReport(key){
+  const items = db.receivables.filter(r=>(r.memberId || r.memberName) === key).sort((a,b)=>(a.createdDate||"").localeCompare(b.createdDate||""));
+  if(!items.length) return;
+  const memberName = items[0].memberName;
+  const totalRequested = items.reduce((s,r)=>s+r.amount,0);
+  const totalPaid = items.filter(r=>r.status==="paid").reduce((s,r)=>s+r.amount,0);
+  const outstanding = totalRequested - totalPaid;
+  const rowsHtml = items.map(r=>`
+    <tr>
+      <td>${r.createdDate||''}</td>
+      <td>${r.description||t('Codsi','Request')}${r.givenAccount?' ('+t('Deyn la bixiyay','Loan given')+')':''}</td>
+      <td>${r.status==="paid" ? t('La bixiyay','Paid')+(r.paidDate?' — '+r.paidDate:'') : t('Aan la bixin','Outstanding')}</td>
+      <td class="amt">${money(r.amount)}</td>
+    </tr>
+  `).join("");
+  openModal(`
+    <div class="bs-title">
+      <div class="co">HALANE INSURANCE</div>
+      <div class="doc">${t("Warbixinta Deynta","Loan Report")} — ${memberName}</div>
+      <div class="asof">${t("Taariikhda warbixinta","Report date")}: ${todayStr()}</div>
+    </div>
+    <div class="bal-row" style="margin-bottom:14px;">
+      <div class="bal-box"><div class="lbl">${t("Wadarta la codsaday","Total requested")}</div><div class="val">${money(totalRequested)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Hadhaaga","Outstanding")}</div><div class="val" style="color:${outstanding>0?'var(--danger-ink)':'var(--accent-ink)'}">${money(outstanding)}</div></div>
+    </div>
+    <table class="bs-table">
+      <tr class="bs-section"><td>${t("Taariikh","Date")}</td><td>${t("Faahfaahin","Description")}</td><td>${t("Xaalada","Status")}</td><td class="amt">${t("Qadarka","Amount")}</td></tr>
+      ${rowsHtml}
+    </table>
+    <div class="actions" style="margin-top:16px;">
+      <button id="mCancel">${t("Xir","Close")}</button>
+      <button id="rptXlsx">Excel</button>
+      <button class="primary" id="rptPdf">PDF</button>
+    </div>
+  `, "bs-modal");
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  document.getElementById("rptPdf").addEventListener("click", ()=>{
+    try{ exportMemberLoanReportPdf(memberName, items, {totalRequested, totalPaid, outstanding}); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+  document.getElementById("rptXlsx").addEventListener("click", ()=>{
+    try{ exportMemberLoanReportExcel(memberName, items, {totalRequested, totalPaid, outstanding}); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
+  });
+}
+
+function exportMemberLoanReportExcel(memberName, items, totals){
+  const rows = [
+    [t("Warbixinta Deynta","Loan Report"), memberName],
+    [t("Taariikhda warbixinta","Report date"), todayStr()],
+    [t("Wadarta la codsaday","Total requested"), totals.totalRequested],
+    [t("Wadarta la bixiyay","Total paid"), totals.totalPaid],
+    [t("Hadhaaga","Outstanding"), totals.outstanding],
+    [],
+    [t("Taariikh","Date"), t("Faahfaahin","Description"), t("Xaalada","Status"), t("Qadarka","Amount")],
+  ];
+  for(const r of items){
+    rows.push([r.createdDate||'', r.description||t('Codsi','Request'), r.status==="paid"?t('La bixiyay','Paid'):t('Aan la bixin','Outstanding'), r.amount]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:24},{wch:16},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, memberName.replace(/[^a-z0-9]+/gi,"_")+"_loan_report.xlsx");
+}
+
+function exportMemberLoanReportPdf(memberName, items, totals){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 18;
+  doc.setFontSize(14); doc.text(t("Warbixinta Deynta","Loan Report")+" — "+memberName, 14, y); y += 7;
+  doc.setFontSize(10); doc.text(`${t('Taariikhda warbixinta','Report date')}: ${todayStr()}`, 14, y); y += 6;
+  doc.text(`${t('Wadarta la codsaday','Total requested')}: $${totals.totalRequested.toFixed(2)}  |  ${t('Wadarta la bixiyay','Total paid')}: $${totals.totalPaid.toFixed(2)}  |  ${t('Hadhaaga','Outstanding')}: $${totals.outstanding.toFixed(2)}`, 14, y); y += 9;
+  doc.setFontSize(9);
+  doc.text(t("Taariikh","Date"), 14, y); doc.text(t("Faahfaahin","Description"), 55, y); doc.text(t("Xaalada","Status"), 140, y); doc.text(t("Qadarka","Amount"), 175, y);
+  y += 4; doc.line(14,y,196,y); y += 5;
+  for(const r of items){
+    if(y > 280){ doc.addPage(); y = 18; }
+    doc.text(r.createdDate||'', 14, y);
+    doc.text((r.description||t('Codsi','Request')).slice(0,40), 55, y);
+    doc.text(r.status==="paid"?t('La bixiyay','Paid'):t('Aan la bixin','Outstanding'), 140, y);
+    doc.text("$"+r.amount.toFixed(2), 175, y);
+    y += 6;
+  }
+  doc.save(memberName.replace(/[^a-z0-9]+/gi,"_")+"_loan_report.pdf");
 }
 
 function openAddReceivableModal(){

@@ -684,6 +684,15 @@ function getMemberSerial(member){
   return sorted.findIndex(m=>m.id===member.id) + 1;
 }
 
+// Shared by every "search member" quick-picker used when entering a
+// transaction (Receipt/Invoice/Payment, Give Loan, Charge Member, Loan
+// Receipt, Add bill) — matches on name OR phone number, so typing a
+// number finds whoever has it on file instead of only matching names.
+function memberMatchesSearch(m, q){
+  if(m.name.toLowerCase().includes(q)) return true;
+  return !!(m.phone && m.phone.replace(/\s+/g,"").includes(q.replace(/\s+/g,"")));
+}
+
 function computeBalance(member){
   let bal = member.openingBalance;
   for(const tx of member.transactions){
@@ -3604,7 +3613,7 @@ function jeMemberPickerHtml(){
     </div>`;
   }
   return `
-    <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="jeMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+    <div class="frow"><label>${t("Raadi xubin (magaca ama taleefan)","Search member (name or phone)")}</label><input type="text" id="jeMemberSearch" placeholder="${t('Qor magaca ama taleefanka...','Type a name or phone...')}"></div>
     <div id="jeMemberResults" class="tx-list" style="max-height:220px;margin-bottom:14px;"></div>
   `;
 }
@@ -3664,7 +3673,7 @@ function wireJournalEntryModal(){
   if(searchEl){
     const renderResults = ()=>{
       const q = searchEl.value.trim().toLowerCase();
-      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const matches = q ? db.members.filter(m=>m.status==="active" && memberMatchesSearch(m,q)).slice(0,8) : [];
       const results = document.getElementById("jeMemberResults");
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
@@ -5008,7 +5017,7 @@ function apVendorMemberFieldHtml(){
   }
   return `
     <div class="frow"><label>${t("Vendor / cida la leeyahay","Vendor / who is owed")}</label><input type="text" id="apVendor" placeholder="${t('tusaale: Dahir Cawale','e.g. Dahir Cawale')}"></div>
-    <div class="frow"><label>${t("Ama dooro xubin (ikhtiyaari)","Or pick a member instead (optional)")}</label><input type="text" id="apMemberSearch" placeholder="${t('Qor magaca xubinta...','Type a member name...')}"></div>
+    <div class="frow"><label>${t("Ama dooro xubin (ikhtiyaari)","Or pick a member instead (optional)")}</label><input type="text" id="apMemberSearch" placeholder="${t('Qor magaca ama taleefanka xubinta...','Type a member name or phone...')}"></div>
     <div id="apMemberResults" class="tx-list" style="max-height:180px;"></div>
   `;
 }
@@ -5040,7 +5049,7 @@ function renderAddPayableModal(){
   if(searchEl){
     searchEl.addEventListener("input", ()=>{
       const q = searchEl.value.trim().toLowerCase();
-      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const matches = q ? db.members.filter(m=>m.status==="active" && memberMatchesSearch(m,q)).slice(0,8) : [];
       const results = document.getElementById("apMemberResults");
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
@@ -5365,7 +5374,7 @@ function renderAddReceivableModal(){
         <button type="button" id="arChangeMember">${t("Beddel","Change")}</button>
       </div>
     </div>` : `
-      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="arMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div class="frow"><label>${t("Raadi xubin (magaca ama taleefan)","Search member (name or phone)")}</label><input type="text" id="arMemberSearch" placeholder="${t('Qor magaca ama taleefanka...','Type a name or phone...')}"></div>
       <div id="arMemberResults" class="tx-list" style="max-height:220px;"></div>
     `}
     <div class="frow"><label>${t("Lacagta","Amount")}</label><input type="number" step="0.01" id="arAmount" placeholder="0.00"></div>
@@ -5382,7 +5391,7 @@ function renderAddReceivableModal(){
   if(searchEl){
     searchEl.addEventListener("input", ()=>{
       const q = searchEl.value.trim().toLowerCase();
-      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const matches = q ? db.members.filter(m=>m.status==="active" && memberMatchesSearch(m,q)).slice(0,8) : [];
       const results = document.getElementById("arMemberResults");
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
@@ -5464,7 +5473,7 @@ function renderLoanReceiptModal(){
   if(!lrState.member){
     openModal(`
       <h3>${t("Rasiidka Deynta","Loan Receipt")}</h3>
-      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="lrMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div class="frow"><label>${t("Raadi xubin (magaca ama taleefan)","Search member (name or phone)")}</label><input type="text" id="lrMemberSearch" placeholder="${t('Qor magaca ama taleefanka...','Type a name or phone...')}"></div>
       <div id="lrMemberResults" class="tx-list" style="max-height:280px;"></div>
       <div class="actions"><button id="mCancel">${t("Jooji","Cancel")}</button></div>
     `);
@@ -5472,7 +5481,7 @@ function renderLoanReceiptModal(){
     const searchEl = document.getElementById("lrMemberSearch");
     searchEl.addEventListener("input", ()=>{
       const q = searchEl.value.trim().toLowerCase();
-      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const matches = q ? db.members.filter(m=>m.status==="active" && memberMatchesSearch(m,q)).slice(0,8) : [];
       const results = document.getElementById("lrMemberResults");
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
@@ -5545,7 +5554,7 @@ function renderGiveLoanModal(){
         <button type="button" id="glChangeMember">${t("Beddel","Change")}</button>
       </div>
     </div>` : `
-      <div class="frow"><label>${t("Raadi xubin (magaca)","Search member (name)")}</label><input type="text" id="glMemberSearch" placeholder="${t('Qor magaca...','Type a name...')}"></div>
+      <div class="frow"><label>${t("Raadi xubin (magaca ama taleefan)","Search member (name or phone)")}</label><input type="text" id="glMemberSearch" placeholder="${t('Qor magaca ama taleefanka...','Type a name or phone...')}"></div>
       <div id="glMemberResults" class="tx-list" style="max-height:220px;"></div>
     `}
     <div class="ll-drcr-row">
@@ -5569,7 +5578,7 @@ function renderGiveLoanModal(){
   if(searchEl){
     searchEl.addEventListener("input", ()=>{
       const q = searchEl.value.trim().toLowerCase();
-      const matches = q ? db.members.filter(m=>m.status==="active" && m.name.toLowerCase().includes(q)).slice(0,8) : [];
+      const matches = q ? db.members.filter(m=>m.status==="active" && memberMatchesSearch(m,q)).slice(0,8) : [];
       const results = document.getElementById("glMemberResults");
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">

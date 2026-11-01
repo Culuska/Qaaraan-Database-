@@ -4963,34 +4963,84 @@ function openPayBillModal(payId){
 // deposits straight into the chosen account (accountBalance() below
 // includes paid receivables the same way it includes member due payments),
 // the mirror image of how paying a bill withdraws from an account.
+//
+// Grouped by member instead of one flat growing list: a member who's
+// requested a few loans/charges over time used to show up as several
+// separate rows with no way to see their overall position at a glance.
+// Each member now shows one summary row (name + net outstanding balance),
+// click to expand and see the individual entries — each clearly tagged
+// "Deyn la bixiyay" (Loan given) when it actually moved cash out via the
+// Give Loan Dr AR/Cr Bank entry, vs a plain charge with no cash movement,
+// so it's obvious which ones represent a real loan payout before using
+// "Aqbal" (which always means money coming INTO the fund — a repayment,
+// never a payout) on them.
+let receivablesExpanded = {};
+
 function renderReceivables(){
   const canManage = hasPerm("collectPayment");
   document.getElementById("btnAddReceivable").style.display = canManage ? "" : "none";
-  const sorted = [...db.receivables].sort((a,b)=>{
-    if(a.status !== b.status) return a.status==="unpaid" ? -1 : 1;
-    return (b.dueDate||"").localeCompare(a.dueDate||"");
+
+  const byMember = {};
+  for(const r of db.receivables){
+    const key = r.memberId || r.memberName;
+    if(!byMember[key]) byMember[key] = { key, memberName: r.memberName, items: [] };
+    byMember[key].items.push(r);
+  }
+  const groups = Object.values(byMember).map(g=>{
+    const outstanding = g.items.filter(r=>r.status==="unpaid").reduce((s,r)=>s+r.amount,0);
+    const unpaidCount = g.items.filter(r=>r.status==="unpaid").length;
+    const settledCount = g.items.length - unpaidCount;
+    return {...g, outstanding, unpaidCount, settledCount};
+  }).sort((a,b)=>{
+    if((a.outstanding>0) !== (b.outstanding>0)) return a.outstanding>0 ? -1 : 1;
+    return b.outstanding - a.outstanding;
   });
+
   const list = document.getElementById("receivablesList");
-  list.innerHTML = sorted.length ? sorted.map(r=>`
-    <div class="pay-row ${r.status}">
-      <div class="l">
-        <span class="nm">${r.memberName}${r.status==="paid"?` <span class="badge">${t('La helay','Received')}</span>`:''}${r.givenAccount?` <span class="badge">${t('Deyn la bixiyay','Loan given')}</span>`:''}</span>
-        <span class="meta4">${r.description||''} ${r.dueDate?('· '+t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span>
+  list.innerHTML = groups.length ? groups.map(g=>{
+    const expanded = !!receivablesExpanded[g.key];
+    const sortedItems = [...g.items].sort((a,b)=>(b.createdDate||"").localeCompare(a.createdDate||""));
+    const itemsHtml = expanded ? sortedItems.map(r=>`
+      <div class="pay-row ${r.status}" style="padding-left:28px;">
+        <div class="l">
+          <span class="nm">${r.status==="paid"?`<span class="badge">${t('La helay','Received')}</span> `:''}${r.givenAccount?`<span class="badge">${t('Deyn la bixiyay','Loan given')}</span> `:''}${r.description||t('Codsi','Request')}</span>
+          <span class="meta4">${r.createdDate||''}${r.dueDate?(' · '+t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="amt">${money(r.amount)}</span>
+          ${(r.status==="unpaid" && canManage) ? `<button data-recid="${r.id}" data-act="receive">${t('Aqbal','Receive')}</button>` : ''}
+          ${canManage ? `<button class="del" data-recid="${r.id}" data-act="del" title="${t('Tirtir','Delete')}">✕</button>` : ''}
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="amt">${money(r.amount)}</span>
-        ${(r.status==="unpaid" && canManage) ? `<button data-recid="${r.id}" data-act="receive">${t('Aqbal','Receive')}</button>` : ''}
-        ${canManage ? `<button class="del" data-recid="${r.id}" data-act="del" title="${t('Tirtir','Delete')}">✕</button>` : ''}
+    `).join("") : "";
+    return `
+      <div class="pay-row" data-memkey="${String(g.key).replace(/"/g,'&quot;')}" style="cursor:pointer;">
+        <div class="l">
+          <span class="nm"><i class="ti ${expanded?'ti-chevron-down':'ti-chevron-right'}" style="font-size:13px;vertical-align:-2px;"></i> ${g.memberName}</span>
+          <span class="meta4">${g.unpaidCount} ${t("oo aan weli la helin","outstanding")}${g.settledCount?(', '+g.settledCount+' '+t('oo la helay','settled')):''}</span>
+        </div>
+        <span class="amt" style="color:${g.outstanding>0?'var(--warn)':'var(--accent-ink)'}">${g.outstanding>0 ? money(g.outstanding) : t('La xisaabiyay','Settled')}</span>
       </div>
-    </div>
-  `).join("") : `<div class="empty">${t("Wax codsi ah lama diiwaangelin.","No requests recorded yet.")}</div>`;
+      ${itemsHtml}
+    `;
+  }).join("") : `<div class="empty">${t("Wax codsi ah lama diiwaangelin.","No requests recorded yet.")}</div>`;
   document.getElementById("receivablesFoot").textContent = `${db.receivables.filter(r=>r.status==='unpaid').length} ${t("oo aan weli la helin","outstanding")}, ${db.receivables.filter(r=>r.status==='paid').length} ${t("oo la helay","received")}`;
 
+  list.querySelectorAll("[data-memkey]").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      receivablesExpanded[row.dataset.memkey] = !receivablesExpanded[row.dataset.memkey];
+      renderReceivables();
+    });
+  });
   list.querySelectorAll("[data-act='receive']").forEach(btn=>{
-    btn.addEventListener("click", ()=>openReceiveModal(btn.dataset.recid));
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      openReceiveModal(btn.dataset.recid);
+    });
   });
   list.querySelectorAll("[data-act='del']").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
       const r = db.receivables.find(x=>x.id===btn.dataset.recid);
       if(!r) return;
       openModal(`
@@ -5165,7 +5215,7 @@ function renderLoanReceiptModal(){
       <div class="tx-list" style="max-height:280px;">
         ${outstanding.map(r=>`
           <div class="tx" data-recid="${r.id}" style="cursor:pointer;">
-            <div class="l"><span>${r.description||t('Deyn','Loan')}</span><span class="muted">${r.dueDate?(t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span></div>
+            <div class="l"><span>${r.givenAccount?`<span class="badge">${t('Deyn la bixiyay','Loan given')}</span> `:''}${r.description||t('Deyn','Loan')}</span><span class="muted">${r.dueDate?(t('Waa la bixin bilaha','Due')+': '+r.dueDate):''}</span></div>
             <span class="amt">${money(r.amount)}</span>
           </div>
         `).join("")}

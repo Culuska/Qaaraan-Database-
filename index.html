@@ -5613,12 +5613,27 @@ function buildJournalEntries(){
     if(d.payableId) continue; // already posted above as a Dr AP / Cr Bank entry
     entries.push({date:d.date, desc:`${t("Kharash","Expense")}: ${d.category}${d.recipient?(' — '+d.recipient):''}`, debit:expenseAcctName(d.category), credit:acctName(d.account), amount:d.amount, kind:"exp"});
   }
+  // Give Loan / Receive (Accounts Receivable) — accountBalance() already
+  // treats these as real cash movements (Dr AR/Cr Bank when given, Dr
+  // Bank/Cr AR when repaid; see openGiveLoanModal/openReceiveModal), so the
+  // Balance Sheet/General Ledger has to post the same two entries or its
+  // bank balance silently drifts out of sync with what the Dashboard and
+  // Account Balance Details show — exactly the net outstanding loan amount
+  // off, in practice.
+  for(const r of db.receivables){
+    if(r.givenAccount){
+      entries.push({date:r.createdDate||todayStr(), desc:`${t("Deyn la bixiyay","Loan given")}: ${r.memberName}${r.description?(' — '+r.description):''}`, debit:AR, credit:acctName(r.givenAccount), amount:r.amount, kind:"loan"});
+    }
+    if(r.status==="paid" && r.account){
+      entries.push({date:r.paidDate||r.createdDate||todayStr(), desc:`${t("Codsi la aqbalay","Receivable received")}: ${r.memberName}${r.description?(' — '+r.description):''}`, debit:acctName(r.account), credit:AR, amount:r.amount, kind:"rcv"});
+    }
+  }
   entries.sort((a,b)=>a.date.localeCompare(b.date));
   // Tag each entry with a short reference code (INV-001, PMT-001, ...) and a
   // sequential journal number (J001, J002, ...), assigned in the final
   // chronological order — purely cosmetic labeling, doesn't affect any of
   // the amounts/accounts computed above.
-  const REF_PREFIX = {ob:"OB", inv:"INV", pmt:"PMT", wo:"WO", bill:"BILL", exp:"EXP"};
+  const REF_PREFIX = {ob:"OB", inv:"INV", pmt:"PMT", wo:"WO", bill:"BILL", exp:"EXP", loan:"LOAN", rcv:"RCV"};
   const counters = {};
   entries.forEach((e,i)=>{
     const prefix = REF_PREFIX[e.kind] || "GJ";

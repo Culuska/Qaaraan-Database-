@@ -1006,10 +1006,11 @@ async function loadDb(){
   // separate $150 "Bill payment (AP)" disbursement dated 2026-11-01,
   // created via the Payables "Add bill" flow, was confirmed by the admin
   // to be a mistake/duplicate — not a real payment — so it's reversed
-  // here (disbursement removed, the underlying bill put back to unpaid)
-  // instead of tracked as a loan. No settings flag — self-healing, so it
-  // keeps correcting itself if a stale tab/device resaves the
-  // pre-correction state.
+  // (disbursement removed); the underlying bill (created 2026-08-27, from
+  // before Deyn Bixin existed) was then confirmed as never a real
+  // obligation either, so it's deleted outright rather than left sitting
+  // as unpaid. No settings flag — self-healing, so it keeps correcting
+  // itself if a stale tab/device resaves the pre-correction state.
   {
     const PHANTOM_RECEIVABLE_IDS = ["ar1789983021891", "ar1792912600097"];
     const WRONGLY_RECEIVED_LOAN_IDS = ["ar1789984750515", "ar1792912467556"];
@@ -1030,12 +1031,9 @@ async function loadDb(){
       const disbBefore = db.disbursements.length;
       db.disbursements = db.disbursements.filter(d=>d.id!==MISTAKEN_DISBURSEMENT_ID);
       if(db.disbursements.length !== disbBefore) changed = true;
-      const payable = db.payables.find(p=>p.id===MISTAKEN_PAYABLE_ID);
-      if(payable && payable.status==="paid"){
-        payable.status = "unpaid";
-        payable.paidDate = null;
-        changed = true;
-      }
+      const payablesBefore = db.payables.length;
+      db.payables = db.payables.filter(p=>p.id!==MISTAKEN_PAYABLE_ID);
+      if(db.payables.length !== payablesBefore) changed = true;
       if(changed){
         db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka deynta (admin xaqiijiyay)", details:"Abdullahi Hassan Iman: AR waa la saxay — la tirtiray codsiyo aan dhab ahayn oo la 'helay', deymaha dhabta ah ee aan la bixin waa dib loo celiyay; billka $150 ee 2026-11-01 waa la tirtiray (admin xaqiijiyay in uusan dhab ahayn)", status:"direct"});
       }

@@ -1002,20 +1002,24 @@ async function loadDb(){
   // out (no givenAccount), but got marked "La helay" (received) by
   // mistake — each silently added money to Salaam Bank that was never
   // actually deposited. Two genuine Give Loan entries ($47.50, $50) also
-  // got marked received even though he hasn't paid them back yet.
-  // Separately, a real $150 was paid out to him the same day through the
-  // Payables "Add bill" flow (not Give Loan), which never creates a
-  // tracking receivable — so there was no record anywhere that he owes it
-  // back. No settings flag — self-healing, so it keeps correcting itself
-  // if a stale tab/device resaves the pre-correction state.
+  // got marked received even though he hasn't paid them back yet. A
+  // separate $150 "Bill payment (AP)" disbursement dated 2026-11-01,
+  // created via the Payables "Add bill" flow, was confirmed by the admin
+  // to be a mistake/duplicate — not a real payment — so it's reversed
+  // here (disbursement removed, the underlying bill put back to unpaid)
+  // instead of tracked as a loan. No settings flag — self-healing, so it
+  // keeps correcting itself if a stale tab/device resaves the
+  // pre-correction state.
   {
     const PHANTOM_RECEIVABLE_IDS = ["ar1789983021891", "ar1792912600097"];
     const WRONGLY_RECEIVED_LOAN_IDS = ["ar1789984750515", "ar1792912467556"];
+    const MISTAKEN_DISBURSEMENT_ID = "d1793537976828";
+    const MISTAKEN_PAYABLE_ID = "ap1787844914026";
     const abdullahi = db.members.find(x=>x.id==="m_new_1039" && x.name==="Abdullahi Hassan Iman");
     if(abdullahi){
       let changed = false;
       const before = db.receivables.length;
-      db.receivables = db.receivables.filter(r=>!PHANTOM_RECEIVABLE_IDS.includes(r.id));
+      db.receivables = db.receivables.filter(r=>!PHANTOM_RECEIVABLE_IDS.includes(r.id) && r.id!=="ar_billloan_abdullahi_20261101");
       if(db.receivables.length !== before) changed = true;
       for(const r of db.receivables){
         if(WRONGLY_RECEIVED_LOAN_IDS.includes(r.id) && r.status==="paid"){
@@ -1023,15 +1027,17 @@ async function loadDb(){
           changed = true;
         }
       }
-      if(!db.receivables.some(r=>r.id==="ar_billloan_abdullahi_20261101")){
-        // No givenAccount here — the cash already left Salaam Bank via the
-        // existing Payables disbursement (d1793537976828); this only adds
-        // the missing "he owes it back" tracking, without double-deducting.
-        db.receivables.push({id:"ar_billloan_abdullahi_20261101", memberId:abdullahi.id, memberName:abdullahi.name, amount:150, dueDate:"", description:"Bill payment (AP) — 2026-11-01", status:"unpaid", createdDate:"2026-11-01"});
+      const disbBefore = db.disbursements.length;
+      db.disbursements = db.disbursements.filter(d=>d.id!==MISTAKEN_DISBURSEMENT_ID);
+      if(db.disbursements.length !== disbBefore) changed = true;
+      const payable = db.payables.find(p=>p.id===MISTAKEN_PAYABLE_ID);
+      if(payable && payable.status==="paid"){
+        payable.status = "unpaid";
+        payable.paidDate = null;
         changed = true;
       }
       if(changed){
-        db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka deynta (admin xaqiijiyay)", details:"Abdullahi Hassan Iman: AR waa la saxay — la tirtiray codsiyo aan dhab ahayn oo la 'helay', deymaha dhabta ah ee aan la bixin waa dib loo celiyay, billka $150 ee 2026-11-01 waa lagu daray sida deyn la sugayo", status:"direct"});
+        db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka deynta (admin xaqiijiyay)", details:"Abdullahi Hassan Iman: AR waa la saxay — la tirtiray codsiyo aan dhab ahayn oo la 'helay', deymaha dhabta ah ee aan la bixin waa dib loo celiyay; billka $150 ee 2026-11-01 waa la tirtiray (admin xaqiijiyay in uusan dhab ahayn)", status:"direct"});
       }
     }
   }

@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS disbursements (
   recipient TEXT,
   shared_with TEXT,
   memo TEXT,
-  account TEXT
+  account TEXT,
+  payable_id TEXT
 );
+ALTER TABLE disbursements ADD COLUMN IF NOT EXISTS payable_id TEXT;
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

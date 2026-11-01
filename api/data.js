@@ -51,8 +51,13 @@ async function ensureSchema(client) {
     recipient TEXT,
     shared_with TEXT,
     memo TEXT,
-    account TEXT
+    account TEXT,
+    payable_id TEXT
   )`);
+  // ADD COLUMN IF NOT EXISTS too — the disbursements table already exists
+  // in production without this column, so CREATE TABLE IF NOT EXISTS above
+  // is a no-op against it (same reasoning as payables.member_id).
+  await client.query(`ALTER TABLE disbursements ADD COLUMN IF NOT EXISTS payable_id TEXT`);
   await client.query(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -177,6 +182,7 @@ async function loadState(client) {
     disbursements: disbursements.rows.map(d => ({
       id: d.id, category: d.category, amount: Number(d.amount), date: d.date,
       recipient: d.recipient, sharedWith: d.shared_with, memo: d.memo, account: d.account,
+      payableId: d.payable_id,
     })),
     users: users.rows.map(u => ({
       id: u.id, username: u.username, password: u.password, role: u.role, permissions: u.permissions || {},
@@ -272,8 +278,8 @@ async function saveState(client, state) {
 
     await batchInsert(
       client, 'disbursements',
-      ['id', 'category', 'amount', 'date', 'recipient', 'shared_with', 'memo', 'account'],
-      (state.disbursements || []).map(d => [d.id, d.category, d.amount, d.date, d.recipient || null, d.sharedWith || null, d.memo || null, d.account || null])
+      ['id', 'category', 'amount', 'date', 'recipient', 'shared_with', 'memo', 'account', 'payable_id'],
+      (state.disbursements || []).map(d => [d.id, d.category, d.amount, d.date, d.recipient || null, d.sharedWith || null, d.memo || null, d.account || null, d.payableId || null])
     );
     await batchInsert(
       client, 'users',

@@ -996,6 +996,45 @@ async function loadDb(){
       db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Ku darid xubin kooxda (admin request)", details:`${m.name} → ${g.group}`, status:"direct"});
     }
   }
+  // Admin-confirmed correction (2026-11-01) for Abdullahi Hassan Iman's
+  // Accounts Receivable: two entries ($150 created 2026-09-21, $50 created
+  // 2026-10-25) were plain Charge Member requests with no cash ever paid
+  // out (no givenAccount), but got marked "La helay" (received) by
+  // mistake — each silently added money to Salaam Bank that was never
+  // actually deposited. Two genuine Give Loan entries ($47.50, $50) also
+  // got marked received even though he hasn't paid them back yet.
+  // Separately, a real $150 was paid out to him the same day through the
+  // Payables "Add bill" flow (not Give Loan), which never creates a
+  // tracking receivable — so there was no record anywhere that he owes it
+  // back. No settings flag — self-healing, so it keeps correcting itself
+  // if a stale tab/device resaves the pre-correction state.
+  {
+    const PHANTOM_RECEIVABLE_IDS = ["ar1789983021891", "ar1792912600097"];
+    const WRONGLY_RECEIVED_LOAN_IDS = ["ar1789984750515", "ar1792912467556"];
+    const abdullahi = db.members.find(x=>x.id==="m_new_1039" && x.name==="Abdullahi Hassan Iman");
+    if(abdullahi){
+      let changed = false;
+      const before = db.receivables.length;
+      db.receivables = db.receivables.filter(r=>!PHANTOM_RECEIVABLE_IDS.includes(r.id));
+      if(db.receivables.length !== before) changed = true;
+      for(const r of db.receivables){
+        if(WRONGLY_RECEIVED_LOAN_IDS.includes(r.id) && r.status==="paid"){
+          r.status = "unpaid"; r.paidDate = null; r.account = null;
+          changed = true;
+        }
+      }
+      if(!db.receivables.some(r=>r.id==="ar_billloan_abdullahi_20261101")){
+        // No givenAccount here — the cash already left Salaam Bank via the
+        // existing Payables disbursement (d1793537976828); this only adds
+        // the missing "he owes it back" tracking, without double-deducting.
+        db.receivables.push({id:"ar_billloan_abdullahi_20261101", memberId:abdullahi.id, memberName:abdullahi.name, amount:150, dueDate:"", description:"Bill payment (AP) — 2026-11-01", status:"unpaid", createdDate:"2026-11-01"});
+        changed = true;
+      }
+      if(changed){
+        db.activityLog.unshift({id:"a"+Date.now()+"_"+Math.random().toString(36).slice(2,7), ts:new Date().toISOString(), actor:"System", action:"Saxitaanka deynta (admin xaqiijiyay)", details:"Abdullahi Hassan Iman: AR waa la saxay — la tirtiray codsiyo aan dhab ahayn oo la 'helay', deymaha dhabta ah ee aan la bixin waa dib loo celiyay, billka $150 ee 2026-11-01 waa lagu daray sida deyn la sugayo", status:"direct"});
+      }
+    }
+  }
   for(const u of db.users){
     if(!u.role) u.role = "admin";
     if(!u.permissions) u.permissions = {addCustomer:true,collectPayment:true,delete:true,deactivate:true,viewReports:true};
@@ -5009,6 +5048,7 @@ function renderReceivables(){
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="amt">${money(r.amount)}</span>
           ${(r.status==="unpaid" && canManage) ? `<button data-recid="${r.id}" data-act="receive">${t('Aqbal','Receive')}</button>` : ''}
+          ${(r.status==="paid" && canManage) ? `<button data-recid="${r.id}" data-act="undo">${t('Dib u celi','Undo')}</button>` : ''}
           ${canManage ? `<button class="del" data-recid="${r.id}" data-act="del" title="${t('Tirtir','Delete')}">✕</button>` : ''}
         </div>
       </div>
@@ -5045,6 +5085,31 @@ function renderReceivables(){
     btn.addEventListener("click", (e)=>{
       e.stopPropagation();
       openReceiveModal(btn.dataset.recid);
+    });
+  });
+  list.querySelectorAll("[data-act='undo']").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      const r = db.receivables.find(x=>x.id===btn.dataset.recid);
+      if(!r) return;
+      openModal(`
+        <h3>${t("Ma hubtaa","Are you sure")}?</h3>
+        <p class="muted">${t("Ma hubtaa inaad dib u celiso","Are you sure you want to undo marking this as received")}: ${r.memberName} — ${money(r.amount)}? ${t("Tani waxay ka saaraysaa lacagta account-ka, waxayna dib ugu celisaa aan la bixin.","This removes the amount from the account and sets it back to outstanding.")}</p>
+        <div class="actions">
+          <button id="mCancel">${t("Maya","No")}</button>
+          <button class="ghost-danger" id="mConfirm">${t("Haa, dib u celi","Yes, undo")}</button>
+        </div>
+      `);
+      document.getElementById("mCancel").addEventListener("click", closeModal);
+      document.getElementById("mConfirm").addEventListener("click", async ()=>{
+        r.status = "unpaid";
+        r.paidDate = null;
+        r.account = null;
+        logActivity("Dib u celinta codsi (AR undo)", `${r.memberName}: ${money(r.amount)}`, "direct");
+        await saveDb();
+        closeModal();
+        renderFinancialSummary();
+      });
     });
   });
   list.querySelectorAll("[data-act='del']").forEach(btn=>{

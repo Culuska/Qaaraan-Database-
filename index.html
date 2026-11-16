@@ -5426,18 +5426,39 @@ function renderAddReceivableModal(){
   });
 }
 
+function arRecAccountInfoHtml(accId){
+  const acc = db.accounts.find(a=>a.id===accId);
+  if(!acc) return '';
+  const ledger = accountLedgerFor(accId);
+  const last = ledger[ledger.length-1];
+  return `
+    <div class="muted" style="margin-top:6px;">
+      ${t("Balance-ka hadda","Current balance")}: <strong>${money(accountBalance(acc))}</strong>
+      ${last ? `<br>${t("Dhaqdhaqaaqii ugu dambeeyay","Last transaction")}: ${last.date} — ${last.desc} (${last.effect>=0?'+':''}${money(last.effect)})` : `<br>${t("Wali wax dhaqdhaqaaq ah ma jiraan.","No transactions yet.")}`}
+    </div>`;
+}
+
 function openReceiveModal(recId){
   const r = db.receivables.find(x=>x.id===recId);
   if(!r) return;
+  const defaultAccId = db.accounts.some(a=>a.id==="acc_salaam") ? "acc_salaam" : (db.accounts[0] ? db.accounts[0].id : "");
   openModal(`
     <h3>${t("Aqbal lacagta","Receive payment")} — ${r.memberName}</h3>
     <div class="frow"><label>${t("Lacagta","Amount")}: ${money(r.amount)}</label></div>
-    <div class="frow"><label>${t("Account loo dhigayo","Account to deposit into")}</label><select id="arRecAccount">${jeAccountOptionsHtml()}</select></div>
+    <div class="ll-drcr-row">
+      <div class="ll-drcr-box debit"><div class="lbl">${t("DEBIT (DR)","DEBIT (DR)")}</div><select id="arRecAccount">${jeAccountOptionsHtml()}</select></div>
+      <div class="ll-drcr-arrow"><i class="ti ti-arrow-right"></i></div>
+      <div class="ll-drcr-box credit"><div class="lbl">${t("CREDIT (CR)","CREDIT (CR)")}</div><div class="val">${JE_AR_LABEL}</div></div>
+    </div>
+    <div id="arRecAccountInfo">${arRecAccountInfoHtml(defaultAccId)}</div>
     <div class="actions">
       <button id="mCancel">${t("Maya","Cancel")}</button>
       <button class="primary" id="mConfirm">${t("Xaqiiji","Confirm")}</button>
     </div>
   `);
+  document.getElementById("arRecAccount").addEventListener("change", (e)=>{
+    document.getElementById("arRecAccountInfo").innerHTML = arRecAccountInfoHtml(e.target.value);
+  });
   document.getElementById("mCancel").addEventListener("click", closeModal);
   document.getElementById("mConfirm").addEventListener("click", async ()=>{
     const account = document.getElementById("arRecAccount").value;

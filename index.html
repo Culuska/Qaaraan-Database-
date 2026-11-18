@@ -73,6 +73,16 @@
     .page-head h1{font-size:18px;}
   }
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
+  .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+  @media (max-width:860px){.chart-row{grid-template-columns:1fr;}}
+  .chart-card .panel-head h2{font-size:13.5px;}
+  .chart-legend{display:flex;flex-direction:column;gap:9px;flex:1;min-width:110px;}
+  .chart-legend-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);}
+  .chart-legend-row .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .chart-legend-row .lbl{flex:1;}
+  .chart-legend-row .pct{font-weight:600;color:var(--ink);}
+  .acct-chart{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  .acct-chart .acct-chart-lbl{font-size:11px;color:var(--ink-2);margin-bottom:4px;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
   .card .lbl{font-size:12px;color:var(--ink-2);margin-bottom:4px;}
   .card .val{font-size:20px;font-weight:600;}
@@ -395,6 +405,7 @@
       <div class="page-sub" data-t-en="Opening balance: 30 June 2026 • Dues period: July–December 2026">Balance bilowga ah: 30 June 2026 &nbsp;•&nbsp; Qoondooyinka billaha: July–December 2026</div>
     </div>
     <div class="cards" id="summaryCards"></div>
+    <div class="chart-row" id="dashboardCharts"></div>
   </div>
 
   <div id="membersView" style="display:none;">
@@ -1846,10 +1857,109 @@ function playPip(){
   }catch(e){}
 }
 
+// Presentation-only chart helpers (inline SVG, no library/dependency).
+// These only READ already-computed figures passed in by the caller — they
+// never calculate balances/totals themselves, so the numbers they draw are
+// exactly whatever the existing report/summary functions already produced.
+function svgBarChart(data, opts){
+  opts = opts || {};
+  const w = opts.width || 480, h = opts.height || 170, padL = 40, padB = 20, padT = 10, padR = 8;
+  const max = Math.max(1, ...data.map(d=>d.value));
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const gap = Math.min(10, plotW/data.length*0.25);
+  const barW = (plotW - gap*(data.length-1)) / data.length;
+  const ticks = 4;
+  let grid = "";
+  for(let i=0;i<=ticks;i++){
+    const val = max * i/ticks;
+    const y = padT + plotH - (val/max)*plotH;
+    grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" style="stroke:var(--line)" stroke-width="1"/>`;
+    grid += `<text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" text-anchor="end" style="fill:var(--ink-3)">${money(val)}</text>`;
+  }
+  let bars = "";
+  data.forEach((d,i)=>{
+    const x = padL + i*(barW+gap);
+    const barH = max ? (d.value/max)*plotH : 0;
+    const y = padT + plotH - barH;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" style="fill:var(--accent)"/>`;
+    bars += `<text x="${(x+barW/2).toFixed(1)}" y="${h-5}" font-size="9" text-anchor="middle" style="fill:var(--ink-2)">${d.label}</text>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;" role="img">${grid}${bars}</svg>`;
+}
+function svgDonutChart(segments, opts){
+  opts = opts || {};
+  const size = opts.size || 150, cx = size/2, cy = size/2, r = size/2 - 13, strokeW = 20;
+  const total = segments.reduce((s,seg)=>s+seg.value,0) || 1;
+  const circumference = 2*Math.PI*r;
+  let offset = 0, arcs = "";
+  segments.forEach(seg=>{
+    const len = (seg.value/total)*circumference;
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" style="stroke:${seg.color}" stroke-width="${strokeW}" stroke-dasharray="${len.toFixed(2)} ${(circumference-len).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += len;
+  });
+  return `<svg viewBox="0 0 ${size} ${size}" style="width:${size}px;height:${size}px;flex-shrink:0;" role="img">${arcs}</svg>`;
+}
+function chartLegendHtml(segments){
+  const total = segments.reduce((s,x)=>s+x.value,0) || 1;
+  return `<div class="chart-legend">${segments.map(seg=>`
+    <div class="chart-legend-row"><span class="dot" style="background:${seg.color}"></span><span class="lbl">${seg.label}</span><span class="pct">${Math.round(seg.value/total*100)}%</span></div>
+  `).join("")}</div>`;
+}
+function svgLineChart(points, opts){
+  opts = opts || {};
+  const w = opts.width || 460, h = opts.height || 120, padL = 36, padB = 18, padT = 10, padR = 8;
+  const vals = points.map(p=>p.value);
+  const max = Math.max(...vals, 0), min = Math.min(...vals, 0);
+  const range = (max-min) || 1;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const stepX = points.length>1 ? plotW/(points.length-1) : 0;
+  const coords = points.map((p,i)=>[padL+i*stepX, padT + plotH - ((p.value-min)/range)*plotH]);
+  const path = coords.map((c,i)=> (i===0?"M":"L")+c[0].toFixed(1)+","+c[1].toFixed(1)).join(" ");
+  const areaPath = `${path} L${coords[coords.length-1][0].toFixed(1)},${(padT+plotH).toFixed(1)} L${coords[0][0].toFixed(1)},${(padT+plotH).toFixed(1)} Z`;
+  const labels = points.map((p,i)=>`<text x="${coords[i][0].toFixed(1)}" y="${h-3}" font-size="9" text-anchor="middle" style="fill:var(--ink-2)">${p.label}</text>`).join("");
+  const dots = coords.map(c=>`<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.5" style="fill:var(--accent)"/>`).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;" role="img">
+    <path d="${areaPath}" style="fill:var(--accent-bg)"/>
+    <path d="${path}" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>
+    ${dots}${labels}
+  </svg>`;
+}
+// Monthly collections (sum of member due payments per fiscal month) and
+// expense-by-category totals — both read already-stored transactions, same
+// as accountBalanceReportRows()/badDebtReportRows() elsewhere in this file,
+// just bucketed for the dashboard charts instead of a report table.
+function monthlyCollectionsData(){
+  return MONTHS_2026.map(mk=>{
+    let total = 0;
+    for(const m of db.members) for(const tx of m.transactions) if(tx.type==="payment" && tx.date && tx.date.slice(0,7)===mk) total += tx.amount;
+    return { label: (MONTH_LABEL[mk]||mk).slice(0,3), value: total };
+  });
+}
+function expenseCategoryData(){
+  const colors = ["var(--accent)","var(--pos)","var(--line-strong)","var(--ink)"];
+  return JE_EXPENSE_CATEGORIES.map((cat,i)=>({
+    label: cat,
+    value: db.disbursements.filter(d=>d.category===cat).reduce((s,d)=>s+d.amount,0),
+    color: colors[i % colors.length],
+  }));
+}
+function accountMonthlyBalanceSeries(accId){
+  const acc = db.accounts.find(a=>a.id===accId);
+  const ledger = accountLedgerFor(accId);
+  return MONTHS_2026.map(mk=>{
+    const cutoff = mk+"-31";
+    const rowsUpTo = ledger.filter(r=>r.date && r.date<=cutoff);
+    const value = rowsUpTo.length ? rowsUpTo[rowsUpTo.length-1].running : (acc ? acc.openingBalance : 0);
+    return { label: (MONTH_LABEL[mk]||mk).slice(0,3), value };
+  });
+}
+
 function renderSummary(){
   const el = document.getElementById("summaryCards");
+  const chartsEl = document.getElementById("dashboardCharts");
   if(!hasPerm("viewReports")){
     el.innerHTML = "";
+    if(chartsEl) chartsEl.innerHTML = "";
     return;
   }
   const active = db.members.filter(m=>m.status==="active");
@@ -1892,6 +2002,23 @@ function renderSummary(){
       if(u) openResetPasswordModal(u);
     });
   });
+  if(chartsEl){
+    const monthly = monthlyCollectionsData();
+    const expenseData = expenseCategoryData();
+    chartsEl.innerHTML = `
+      <div class="panel chart-card">
+        <div class="panel-head"><h2>${t("Ururinta bilaha","Monthly collections")}</h2></div>
+        <div style="padding:14px;">${svgBarChart(monthly)}</div>
+      </div>
+      <div class="panel chart-card">
+        <div class="panel-head"><h2>${t("Kharashaadka iyadoo qeyb ahaan","Expenses by category")}</h2></div>
+        <div style="padding:14px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+          ${svgDonutChart(expenseData)}
+          ${chartLegendHtml(expenseData)}
+        </div>
+      </div>
+    `;
+  }
 }
 
 function memberRowHtml(m, idx, groupName){
@@ -1987,7 +2114,7 @@ function openEditGroupModal(groupName){
         if(!m || g.memberNames.includes(m.name) || row.dataset.added) return;
         row.dataset.added = "1";
         const icon = row.querySelector("[data-editaddicon]");
-        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--accent-ink)"; }
+        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--pos-ink)"; }
         row.style.pointerEvents = "none";
         g.memberNames.push(m.name);
         logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
@@ -2106,7 +2233,7 @@ function openAddToGroupModal(groupName){
         if(!m || g.memberNames.includes(m.name) || row.dataset.added) return;
         row.dataset.added = "1";
         const icon = row.querySelector("[data-addicon]");
-        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--accent-ink)"; }
+        if(icon){ icon.classList.remove("ti-plus"); icon.classList.add("ti-check"); icon.style.color = "var(--pos-ink)"; }
         row.style.pointerEvents = "none";
         g.memberNames.push(m.name);
         logActivity("Ku darid xubin kooxda", `${m.name} → ${g.group}`, "direct");
@@ -2615,10 +2742,10 @@ function renderDetail(){
     <div class="detail-body">
       <div class="bal-row">
         <div class="bal-box"><div class="lbl">${t("Balance 30 June","Balance 30 June")}</div><div class="val">${money(m.openingBalance)}</div></div>
-        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--pos-ink)">${money(totalPaid(m))}</div></div>
         <div class="bal-box"><div class="lbl">${t("Deyn la cafiyay","Debt written off")}</div><div class="val" style="color:var(--danger-ink)">${money(totalWrittenOff(m))}</div></div>
-        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-        ${(m.monthlyDue>0) ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan","Months owed")}</div><div class="val" style="color:${bal>0?'var(--danger-ink)':'var(--accent-ink)'}">${(bal/m.monthlyDue).toFixed(1)} ${t("bil","mo")}</div></div>` : ''}
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        ${(m.monthlyDue>0) ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan","Months owed")}</div><div class="val" style="color:${bal>0?'var(--danger-ink)':'var(--pos-ink)'}">${(bal/m.monthlyDue).toFixed(1)} ${t("bil","mo")}</div></div>` : ''}
       </div>
 
       ${(()=>{
@@ -2629,9 +2756,9 @@ function renderDetail(){
           <div class="top"><span>${t("Bilo la bixiyay","Months paid")}</span><span>${t("Wadarta bilaha (qoondo)","Total months (dues)")}</span></div>
           <div class="bar"><div class="fill" style="width:${mc.pct.toFixed(1)}%"></div></div>
           <div class="nums">
-            <span style="color:var(--accent-ink);font-weight:600;">${mc.monthsPaid.toFixed(1)} ${t("bil la bixiyay","months paid")}</span>
+            <span style="color:var(--pos-ink);font-weight:600;">${mc.monthsPaid.toFixed(1)} ${t("bil la bixiyay","months paid")}</span>
             <span style="color:var(--ink-2);">/ ${mc.monthsTotal.toFixed(1)} ${t("bil oo dhan","months total")}</span>
-            <span style="color:${mc.monthsRemaining>0?'var(--danger-ink)':'var(--accent-ink)'};font-weight:600;">${mc.monthsRemaining.toFixed(1)} ${t("bil ku hartay","months left")}</span>
+            <span style="color:${mc.monthsRemaining>0?'var(--danger-ink)':'var(--pos-ink)'};font-weight:600;">${mc.monthsRemaining.toFixed(1)} ${t("bil ku hartay","months left")}</span>
           </div>
         </div>`;
       })()}
@@ -2936,7 +3063,7 @@ function renderMonthAgingTab(m){
           <span>${a.label}</span>
           <span class="muted">${a.status==='Partial' ? `${t('Qayb ahaan la bixiyay','Partially paid')}: ${money(a.covered)} / ${money(a.amount)}` : (a.status==='Paid' ? t('La bixiyay oo dhan','Fully paid') : t('Weli lama bixin','Not paid yet'))}</span>
         </div>
-        <span class="amt" style="color:${a.status==='Paid'?'var(--accent-ink)':(a.status==='Partial'?'var(--warn)':'var(--danger-ink)')}">${a.status==='Paid'?'✓ '+t('La bixiyay','Paid'):(a.status==='Partial'?money(a.remaining)+' '+t('hadhay','left'):money(a.amount))}</span>
+        <span class="amt" style="color:${a.status==='Paid'?'var(--pos-ink)':(a.status==='Partial'?'var(--warn)':'var(--danger-ink)')}">${a.status==='Paid'?'✓ '+t('La bixiyay','Paid'):(a.status==='Partial'?money(a.remaining)+' '+t('hadhay','left'):money(a.amount))}</span>
       </div>
     `).join("")}
   </div>`;
@@ -2953,9 +3080,9 @@ function openBalanceSummaryModal(m){
     return `
     <div class="bal-row" style="margin-bottom:0;">
       <div class="bal-box"><div class="lbl">${t("Balance (balance summary file)","Balance (balance summary file)")}</div><div class="val">${money(m.openingBalance)}</div></div>
-      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay (app)","Total paid (app)")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
-      ${monthsOwed !== null ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan (balance ÷ qoondo)","Months owed (balance ÷ due)")}</div><div class="val" style="color:${monthsOwed>0?'var(--danger-ink)':'var(--accent-ink)'}">${monthsOwed>=0?monthsOwed.toFixed(1):'0'} ${t("bil","mo")}</div></div>` : ''}
+      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay (app)","Total paid (app)")}</div><div class="val" style="color:var(--pos-ink)">${money(totalPaid(m))}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+      ${monthsOwed !== null ? `<div class="bal-box"><div class="lbl">${t("Bilo ku taagan (balance ÷ qoondo)","Months owed (balance ÷ due)")}</div><div class="val" style="color:${monthsOwed>0?'var(--danger-ink)':'var(--pos-ink)'}">${monthsOwed>=0?monthsOwed.toFixed(1):'0'} ${t("bil","mo")}</div></div>` : ''}
     </div>
   `;
   };
@@ -3335,7 +3462,7 @@ function openReportPersonPicker(){
           <span>${m.name}</span>
           <span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span>
         </div>
-        <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+        <span class="amt" style="color:${computeBalance(m)<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
       </div>
     `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
     results.querySelectorAll("[data-mid]").forEach(row=>{
@@ -3394,8 +3521,8 @@ function openMemberReportPreview(m){
       <p class="muted">${m.phone || t('telefoon lama helin','no phone on file')} ${m.monthlyDue ? ' · '+t('Qoondo/bil','Due/month')+': '+money(m.monthlyDue) : ''}</p>
       <div class="bal-row" style="margin-bottom:14px;">
         <div class="bal-box"><div class="lbl">${t("Balance bilowga ah","Opening balance")}</div><div class="val">${money(m.openingBalance)}</div></div>
-        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--pos-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
       </div>
       <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px;">
         <label style="font-size:12px;color:var(--ink-2);">${t("Laga bilaabo","From")}<br><input type="date" id="mrpFrom" value="${from}"></label>
@@ -3555,12 +3682,12 @@ function openForecastModal(mk){
       <select id="fcMonth">${MONTHS_2026.map(mo=>`<option value="${mo}" ${mo===mk?'selected':''}>${MONTH_LABEL[mo]}</option>`).join("")}</select>
     </div>
     <div class="bal-row" style="margin:14px 0;">
-      <div class="bal-box"><div class="lbl">${t("La ururiyay","Collected")}</div><div class="val" style="color:var(--accent-ink)">${money(data.collected)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("La ururiyay","Collected")}</div><div class="val" style="color:var(--pos-ink)">${money(data.collected)}</div></div>
       <div class="bal-box"><div class="lbl">${t("Kharashka","Expenses")}</div><div class="val" style="color:var(--danger-ink)">${money(data.expensed)}</div></div>
-      <div class="bal-box"><div class="lbl">Net</div><div class="val" style="color:${net>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(net)}</div></div>
+      <div class="bal-box"><div class="lbl">Net</div><div class="val" style="color:${net>=0?'var(--pos-ink)':'var(--danger-ink)'}">${money(net)}</div></div>
     </div>
     <div class="bal-row" style="margin-bottom:14px;">
-      <div class="bal-box"><div class="lbl">${t("Kuwa bixiyay","Paid")}</div><div class="val" style="color:var(--accent-ink)">${data.paid.length} / ${data.eligible.length}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Kuwa bixiyay","Paid")}</div><div class="val" style="color:var(--pos-ink)">${data.paid.length} / ${data.eligible.length}</div></div>
       <div class="bal-box"><div class="lbl">${t("Kuwa aan bixin","Not paid")}</div><div class="val" style="color:var(--danger-ink)">${data.notPaid.length} / ${data.eligible.length}</div></div>
     </div>
     ${data.notPaid.length ? `
@@ -3629,7 +3756,7 @@ function jeMemberPickerHtml(){
     return `<div class="tx" style="margin-bottom:14px;">
       <div class="l"><span>${jeState.member.name}</span><span class="muted">${jeState.member.phone || t('telefoon lama helin','no phone on file')}</span></div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <span class="amt" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</span>
+        <span class="amt" style="color:${bal<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</span>
         <button type="button" id="jeChangeMember">${t("Beddel","Change")}</button>
       </div>
     </div>`;
@@ -3700,7 +3827,7 @@ function wireJournalEntryModal(){
       results.innerHTML = matches.length ? matches.map(m=>`
         <div class="tx" data-mid="${m.id}" style="cursor:pointer;">
           <div class="l"><span>${m.name}</span><span class="muted">${m.phone || t('telefoon lama helin','no phone on file')}</span></div>
-          <span class="amt" style="color:${computeBalance(m)<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
+          <span class="amt" style="color:${computeBalance(m)<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(computeBalance(m))}</span>
         </div>
       `).join("") : (q ? `<div class="empty">${t("Wax natiijo ah lama helin.","No results found.")}</div>` : '');
       results.querySelectorAll("[data-mid]").forEach(row=>{
@@ -4366,7 +4493,7 @@ function renderAcctBalanceList(){
     </div>
     <table class="bs-table">
       <tr class="bs-section"><td colspan="2">${t("Accounts","Accounts")}</td></tr>
-      ${rows.map(r=>`<tr class="ab-row" data-id="${r.id}" style="cursor:pointer;"><td>${r.name}</td><td class="amt" style="color:${r.balance<0?'var(--danger-ink)':'var(--accent-ink)'}">${money(r.balance)}</td></tr>`).join("")}
+      ${rows.map(r=>`<tr class="ab-row" data-id="${r.id}" style="cursor:pointer;"><td>${r.name}</td><td class="amt" style="color:${r.balance<0?'var(--danger-ink)':'var(--pos-ink)'}">${money(r.balance)}</td></tr>`).join("")}
       <tr class="bs-total"><td>${t("Wadarta accounts","Accounts total")}</td><td class="amt">${money(grandTotal)}</td></tr>
       <tr class="bs-section"><td colspan="2">${t("Kharashka (Categories)","Expense Categories")}</td></tr>
       ${JE_EXPENSE_CATEGORIES.map(cat=>`<tr class="ab-exp-row" data-cat="${cat}" style="cursor:pointer;"><td>${cat}</td><td class="amt" style="color:var(--danger-ink);">${money(expenseCategoryTotal(cat))}</td></tr>`).join("")}
@@ -4445,7 +4572,7 @@ function renderAcctBalanceDetail(){
     </div>
     <table class="bs-table">
       <tr class="bs-section"><td>${t("Taariikh","Date")}</td><td>${t("Faahfaahin","Description")}</td><td class="amt">${t("Qadarka","Amount")}</td><td class="amt">${t("Balance","Balance")}</td></tr>
-      ${filtered.length ? filtered.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td class="amt" style="color:${r.effect<0?'var(--danger-ink)':'var(--accent-ink)'}">${money(r.effect)}</td><td class="amt">${money(r.running)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--ink-2);">${t("Wax dhaqdhaqaaq ah lama helin","No transactions found")}</td></tr>`}
+      ${filtered.length ? filtered.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td class="amt" style="color:${r.effect<0?'var(--danger-ink)':'var(--pos-ink)'}">${money(r.effect)}</td><td class="amt">${money(r.running)}</td></tr>`).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--ink-2);">${t("Wax dhaqdhaqaaq ah lama helin","No transactions found")}</td></tr>`}
     </table>
     <div class="actions" style="margin-top:16px;">
       <button id="abBack">${t("Dib u noqo","Back")}</button>
@@ -4849,7 +4976,7 @@ function renderFinancialSummary(){
     </div>
     <div class="fin-card">
       <div class="lbl">Net Position (AR − AP)</div>
-      <div class="val" style="color:${netPosition>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(netPosition)}</div>
+      <div class="val" style="color:${netPosition>=0?'var(--pos-ink)':'var(--danger-ink)'}">${money(netPosition)}</div>
       <div class="sub">${t("Xaaladda guud ee maaliyadda","Overall financial position")}</div>
     </div>
   `;
@@ -5210,7 +5337,7 @@ function renderReceivables(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <button data-reportkey="${String(g.key).replace(/"/g,'&quot;')}" title="${t('Warbixin','Report')}"><i class="ti ti-file-report"></i> ${t('Warbixin','Report')}</button>
-          <span class="amt" style="color:${g.outstanding>0?'var(--warn)':'var(--accent-ink)'}">${g.outstanding>0 ? money(g.outstanding) : t('La xisaabiyay','Settled')}</span>
+          <span class="amt" style="color:${g.outstanding>0?'var(--warn)':'var(--pos-ink)'}">${g.outstanding>0 ? money(g.outstanding) : t('La xisaabiyay','Settled')}</span>
         </div>
       </div>
       ${itemsHtml}
@@ -5313,8 +5440,8 @@ function openMemberLoanReport(key){
     </div>
     <div class="bal-row" style="margin-bottom:14px;">
       <div class="bal-box"><div class="lbl">${t("Wadarta la codsaday","Total requested")}</div><div class="val">${money(totalRequested)}</div></div>
-      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid)}</div></div>
-      <div class="bal-box"><div class="lbl">${t("Hadhaaga","Outstanding")}</div><div class="val" style="color:${outstanding>0?'var(--danger-ink)':'var(--accent-ink)'}">${money(outstanding)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Wadarta la bixiyay","Total paid")}</div><div class="val" style="color:var(--pos-ink)">${money(totalPaid)}</div></div>
+      <div class="bal-box"><div class="lbl">${t("Hadhaaga","Outstanding")}</div><div class="val" style="color:${outstanding>0?'var(--danger-ink)':'var(--pos-ink)'}">${money(outstanding)}</div></div>
     </div>
     <table class="bs-table">
       <tr class="bs-section"><td>${t("Taariikh","Date")}</td><td>${t("Faahfaahin","Description")}</td><td>${t("Xaalada","Status")}</td><td class="amt">${t("Qadarka","Amount")}</td></tr>
@@ -5674,9 +5801,13 @@ function renderAccounts(){
       <div class="name">${acc.name} ${canManage ? `<button class="edit" data-editacctid="${acc.id}" style="font-size:11px;">${t('Wax ka beddel','Edit')}</button>` : ''} ${canManage && acc.id!=="acc_salaam" ? `<button class="del" data-acctid="${acc.id}" style="font-size:11px;color:var(--danger-ink);">${t('Tirtir','Delete')}</button>` : ''}</div>
       <div class="rows">
         <div><div class="lbl">${t("Balance bilowga ah","Opening balance")}</div><div class="val">${money(acc.openingBalance)}</div></div>
-        <div><div class="lbl">${t("La saaray (deposits)","Deposited")}</div><div class="val" style="color:var(--accent-ink)">${money(deposited)}</div></div>
+        <div><div class="lbl">${t("La saaray (deposits)","Deposited")}</div><div class="val" style="color:var(--pos-ink)">${money(deposited)}</div></div>
         <div><div class="lbl">${t("Laga bixiyay (withdrawals)","Withdrawn")}</div><div class="val" style="color:var(--danger-ink)">${money(withdrawn)}</div></div>
-        <div><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal>=0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        <div><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal>=0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+      </div>
+      <div class="acct-chart">
+        <div class="acct-chart-lbl">${t("Socodka Lacagta (Cash Flow)","Cash flow")}</div>
+        ${svgLineChart(accountMonthlyBalanceSeries(acc.id))}
       </div>
     </div>`;
   }).join("");
@@ -6988,7 +7119,7 @@ function showTransactionsImportPreview(members, newMembers, unknownTypes, totalT
         <span>${name} ${m.ok===false?`<span class="status-tag locked">${t('isku mid maaha','mismatch')}</span>`:''}</span>
         <span class="muted">${m.txns.length} ${t("dhaqdhaqaaq","txns")} · ${t("balance",".")} ${money(m.computed)}${m.stated!=null?` / ${t('faylka','file')} ${money(m.stated)}`:''} ${m.via?`<span style="opacity:.7;">(${m.via})</span>`:''}</span>
       </div>
-      <span class="amt" style="color:${m.ok===false?'var(--danger-ink)':'var(--accent-ink)'}">${money(m.computed)}</span>
+      <span class="amt" style="color:${m.ok===false?'var(--danger-ink)':'var(--pos-ink)'}">${money(m.computed)}</span>
     </div>
   `;
   const listHtml = members.map(m=>rowHtml(m.member.name, m)).join("");
@@ -7058,7 +7189,7 @@ function showImportBalancesPreview(matches, unmatched, onDone){
         <span>${x.member.name}</span>
         <span class="muted">${t("hadda","now")} ${money(x.current)} → ${money(x.target)} <span style="opacity:.7;">(${x.via})</span></span>
       </div>
-      <span class="amt" style="color:${x.delta>=0?'var(--danger-ink)':'var(--accent-ink)'}">${x.delta>=0?'+':''}${money(x.delta)}</span>
+      <span class="amt" style="color:${x.delta>=0?'var(--danger-ink)':'var(--pos-ink)'}">${x.delta>=0?'+':''}${money(x.delta)}</span>
     </div>
   `).join("") : `<div class="empty">${t("Ma jiraan wax isbeddel ah — dhammaan waafaqsan yihiin.","No changes — everything already matches.")}</div>`;
 
@@ -7153,7 +7284,7 @@ function showStatusImportPreview(matches, unmatched, onDone){
         <span>${x.member.name}</span>
         <span class="muted">${statusLabel(x.oldStatus)} → ${statusLabel(x.newStatus)} <span style="opacity:.7;">(${x.via})</span></span>
       </div>
-      <span class="amt" style="color:${x.newStatus==='active'?'var(--accent-ink)':'var(--danger-ink)'}">${statusLabel(x.newStatus)}</span>
+      <span class="amt" style="color:${x.newStatus==='active'?'var(--pos-ink)':'var(--danger-ink)'}">${statusLabel(x.newStatus)}</span>
     </div>
   `).join("") : `<div class="empty">${t("Ma jiraan wax isbeddel ah — dhammaan waafaqsan yihiin.","No changes — everything already matches.")}</div>`;
 
@@ -7409,8 +7540,8 @@ function renderPublicMemberView(memberId){
       <div class="sub">${t("Xaaladda qaaraankaaga","Your fund status")}</div>
       <div class="bal-row" style="margin:16px 0;">
         <div class="bal-box"><div class="lbl">${t("Qoondo/bil","Due/month")}</div><div class="val">${money(m.monthlyDue||0)}</div></div>
-        <div class="bal-box"><div class="lbl">${t("La bixiyay","Paid")}</div><div class="val" style="color:var(--accent-ink)">${money(totalPaid(m))}</div></div>
-        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--accent-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
+        <div class="bal-box"><div class="lbl">${t("La bixiyay","Paid")}</div><div class="val" style="color:var(--pos-ink)">${money(totalPaid(m))}</div></div>
+        <div class="bal-box"><div class="lbl">${t("Balance hadda","Current balance")}</div><div class="val" style="color:${bal<0?'var(--pos-ink)':'var(--danger-ink)'}">${money(bal)}</div></div>
       </div>
       <div class="muted" style="margin-bottom:8px;">${t("Dhaqdhaqaaqyadii ugu dambeeyay","Recent transactions")}</div>
       <div class="tx-list" style="margin-bottom:16px;">

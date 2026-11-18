@@ -1868,8 +1868,23 @@ function renderSummary(){
     <div class="card"><div class="lbl">${t("Wadarta kharashka","Total expenses")}</div><div class="val neg">${money(totalDisb)}</div></div>
     ${isAdmin() && db.pendingActions.filter(p=>p.status==="pending").length ? `<div class="card"><div class="lbl">${t("Codsi sugaya","Pending requests")}</div><div class="val" style="color:var(--warn)">${db.pendingActions.filter(p=>p.status==="pending").length}</div></div>` : ''}
     ${isAdmin() && lockedUsers.length ? `<div class="card" style="border-color:var(--danger-ink);"><div class="lbl" style="color:var(--danger-ink);">${t("Digniin: Account la xiray","Security alert: locked account")}</div><div class="val" style="color:var(--danger-ink);">${lockedUsers.map(u=>u.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: locked account(s) — ${lockedUsers.map(u=>u.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
-    ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);"><div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div><div class="val" style="color:var(--warn);">${pendingResets.map(r=>r.username).join(", ")}</div><a href="${waLinkForAdmin(`Qaaraan alert: password reset requested — ${pendingResets.map(r=>r.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;">${t("Dir WhatsApp","Send WhatsApp")}</a></div>` : ''}
+    ${isAdmin() && pendingResets.length ? `<div class="card" style="border-color:var(--warn);">
+      <div class="lbl" style="color:var(--warn);">${t("Codsiyo password cusub","Password reset requests")}</div>
+      ${pendingResets.map(r=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
+          <span class="val" style="color:var(--warn);font-size:16px;">${r.username}</span>
+          <button type="button" data-resetpw-username="${r.username}" style="font-size:12px;padding:4px 8px;">${t("Beddel Password","Reset Password")}</button>
+        </div>
+      `).join("")}
+      <a href="${waLinkForAdmin(`Qaaraan alert: password reset requested — ${pendingResets.map(r=>r.username).join(", ")}`)}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:8px;">${t("Dir WhatsApp","Send WhatsApp")}</a>
+    </div>` : ''}
   `;
+  el.querySelectorAll("[data-resetpw-username]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const u = db.users.find(x=>x.username===btn.dataset.resetpwUsername);
+      if(u) openResetPasswordModal(u);
+    });
+  });
 }
 
 function memberRowHtml(m, idx, groupName){
@@ -6441,12 +6456,12 @@ function openManageUsersModal(){
   document.querySelectorAll("[data-resetpw-uid]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const u = db.users.find(x=>x.id===btn.dataset.resetpwUid);
-      if(u) openResetPasswordModal(u);
+      if(u) openResetPasswordModal(u, true);
     });
   });
 }
 
-function openResetPasswordModal(u){
+function openResetPasswordModal(u, returnToUsers){
   openModal(`
     <h3>${t("Beddel Password","Reset Password")} — ${u.username}</h3>
     <div class="frow"><label>${t("Password cusub","New password")}</label><input type="password" id="rpNewPass" placeholder="${t('ugu yaraan 4 xaraf','at least 4 characters')}"></div>
@@ -6472,7 +6487,11 @@ function openResetPasswordModal(u){
       <p class="muted">${t("U sheeg qofkan password-kan (WhatsApp, taleefan, iwm) — halkan lagama diro si toos ah.","Tell this person their new password yourself (WhatsApp, phone call, etc.) — it isn't sent automatically.")}</p>
       <div class="actions"><button class="primary" id="mDone">${t("Xir","Close")}</button></div>
     `);
-    document.getElementById("mDone").addEventListener("click", ()=>{ closeModal(); openManageUsersModal(); });
+    document.getElementById("mDone").addEventListener("click", ()=>{
+      closeModal();
+      renderSummary();
+      if(returnToUsers) openManageUsersModal();
+    });
   });
 }
 

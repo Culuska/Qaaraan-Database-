@@ -4872,15 +4872,19 @@ function badDebtReportRows(){
   const knownIds = new Set();
   for(const m of db.members){
     knownIds.add(m.id);
-    const live = totalWrittenOff(m);
-    const hist = (HISTORY_REPORTS[m.id]||[]).filter(tx=>tx.type==="writeoff").reduce((s,tx)=>s+tx.amount,0);
+    const liveItems = m.transactions.filter(tx=>tx.type==="writeoff").map(tx=>({date:tx.date, amount:tx.amount, note:tx.note||"", source:t("Hadda","Live")}));
+    const histItems = (HISTORY_REPORTS[m.id]||[]).filter(tx=>tx.type==="writeoff").map(tx=>({date:tx.date, amount:tx.amount, note:tx.num?("#"+tx.num):"", source:t("Taariikhiga","Historical")}));
+    const live = liveItems.reduce((s,x)=>s+x.amount,0);
+    const hist = histItems.reduce((s,x)=>s+x.amount,0);
     const total = live + hist;
-    if(total > 0) rows.push({name:m.name, live, hist, total});
+    const items = [...liveItems, ...histItems].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+    if(total > 0) rows.push({name:m.name, live, hist, total, items});
   }
   for(const [id, txs] of Object.entries(HISTORY_REPORTS)){
     if(knownIds.has(id)) continue;
-    const hist = txs.filter(tx=>tx.type==="writeoff").reduce((s,tx)=>s+tx.amount,0);
-    if(hist > 0) rows.push({name: t("Xubin hore (lama helin)","Former member (not found)")+" — "+id, live:0, hist, total:hist});
+    const items = txs.filter(tx=>tx.type==="writeoff").map(tx=>({date:tx.date, amount:tx.amount, note:tx.num?("#"+tx.num):"", source:t("Taariikhiga","Historical")}));
+    const hist = items.reduce((s,x)=>s+x.amount,0);
+    if(hist > 0) rows.push({name: t("Xubin hore (lama helin)","Former member (not found)")+" — "+id, live:0, hist, total:hist, items});
   }
   rows.sort((a,b)=>b.total-a.total);
   return rows;
@@ -4894,12 +4898,21 @@ function openBadDebtReport(){
   const rows = badDebtReportRows();
   const grand = rows.reduce((s,r)=>s+r.total,0);
   const rowsHtml = rows.map((r,i)=>`
-    <tr>
+    <tr class="bdr-row" data-bdr="${i}" style="cursor:${r.items.length>1?'pointer':'default'};">
       <td>${i+1}</td>
-      <td>${r.name}</td>
+      <td>${r.name}${r.items.length>1?` <span class="muted">(${r.items.length} ${t('cafinaad','write-offs')})</span>`:''}</td>
       <td class="amt">${money(r.live)}</td>
       <td class="amt">${money(r.hist)}</td>
       <td class="amt">${money(r.total)}</td>
+    </tr>
+    <tr class="bdr-detail" data-bdr-detail="${i}" style="display:none;">
+      <td></td>
+      <td colspan="4">
+        ${r.items.map(it=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;color:var(--ink-2);">
+          <span>${it.date||''} — ${it.source}${it.note?(' — '+it.note):''}</span>
+          <span style="font-weight:600;color:var(--ink);">${money(it.amount)}</span>
+        </div>`).join("")}
+      </td>
     </tr>
   `).join("");
   openModal(`
@@ -4926,6 +4939,12 @@ function openBadDebtReport(){
   document.getElementById("rptXlsx").addEventListener("click", ()=>{
     try{ exportBadDebtReportExcel(rows, grand); }catch(e){ showToast(t("Khalad ayaa dhacay marka warbixinta la abuurayay.","Something went wrong generating the report.")); }
   });
+  document.querySelectorAll(".bdr-row[data-bdr]").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      const detail = document.querySelector(`.bdr-detail[data-bdr-detail="${row.dataset.bdr}"]`);
+      if(detail) detail.style.display = detail.style.display==="none" ? "" : "none";
+    });
+  });
 }
 
 function exportBadDebtReportExcel(rows, grand){
@@ -4941,6 +4960,13 @@ function exportBadDebtReportExcel(rows, grand){
   ws['!cols'] = [{wch:5},{wch:30},{wch:12},{wch:14},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Bad Debt");
+  // One row per individual write-off — so different amounts for the same
+  // person (multiple write-offs) are each visible, not just the per-person total.
+  const detailAoa = [[t("Magaca","Name"), t("Taariikhda","Date"), t("Isha","Source"), t("Faahfaahin","Note"), t("Lacagta","Amount")]];
+  rows.forEach(r=>{ r.items.forEach(it=>{ detailAoa.push([r.name, it.date||"", it.source, it.note||"", it.amount]); }); });
+  const wsDetail = XLSX.utils.aoa_to_sheet(detailAoa);
+  wsDetail['!cols'] = [{wch:30},{wch:12},{wch:12},{wch:30},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsDetail, "Bad Debt Detail");
   XLSX.writeFile(wb, "bad_debt_report.xlsx");
 }
 

@@ -4047,7 +4047,10 @@ function renderActivity(){
   document.getElementById("activityFoot").textContent = `${filtered.length} / ${db.activityLog.length} ${t("diiwaan","records")}`;
 }
 
-function renderTabs(){
+// Shared by the sidebar (renderTabs) and the mobile "More" menu
+// (openMobileMoreMenu) so both always list exactly the same items — no
+// separate hand-maintained copy of the nav structure to fall out of sync.
+function buildNavGroups(){
   const tabs = [
     {id:"dashboard", label:t("Guddoon","Dashboard"), icon:"ti-layout-grid"},
     {id:"members", label:t("Xubnaha","Members"), icon:"ti-users"},
@@ -4094,7 +4097,72 @@ function renderTabs(){
     adminTabs.push({id:"pending", label:t("Ogolaansho La Sugayo","Pending Approvals")+(db.pendingActions.filter(p=>p.status==="pending").length ? ` (${db.pendingActions.filter(p=>p.status==="pending").length})` : ""), icon:"ti-clock-check"});
     adminTabs.push({id:"activity", label:t("Diiwaanka Dhaqdhaqaaqa","Activity Log"), icon:"ti-history"});
   }
+  return { tabs, entryTabs, reportTabs, adminTabs };
+}
 
+// Wires the same data-tab/data-action buttons used by both the sidebar and
+// the mobile "More" menu to their real handlers (switchTab for plain view
+// tabs, specific openXModal functions for one-off actions). `afterClick` is
+// called after every click — the sidebar has nothing extra to do, the
+// mobile menu closes itself.
+function wireNavButtons(container, afterClick){
+  // afterClick (closing the mobile "More" overlay) must run BEFORE fn(),
+  // not after: action buttons like Give Loan/Bad Debt Report call
+  // openModal() themselves, reusing the same #modalRoot the "More" menu is
+  // shown in — closing afterward would wipe out the modal that action just
+  // opened instead of just dismissing the menu underneath it.
+  const run = (fn) => (...args) => { if(afterClick) afterClick(); fn(...args); };
+  container.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
+    btn.addEventListener("click", run(()=>switchTab(btn.dataset.tab)));
+  });
+  const wire = (action, fn) => {
+    const btn = container.querySelector(`[data-action='${action}']`);
+    if(btn) btn.addEventListener("click", run(fn));
+  };
+  wire("invoice", openInvoiceEntryModal);
+  wire("receipt", openQuickReceiptModal);
+  wire("payment", ()=>openNewJournalEntryModal("expense"));
+  wire("baddebt", ()=>openNewJournalEntryModal("writeoff"));
+  wire("giveloan", openGiveLoanModal);
+  wire("chargemember", openAddReceivableModal);
+  wire("loanreceipt", openLoanReceiptModal);
+  wire("membersreport", openReportsModal);
+  wire("acctreport", openAccountBalanceReportModal);
+  wire("balancesheet", openBalanceSheetReportModal);
+  wire("baddebtreport", openBadDebtReport);
+  wire("batchinvoice", openBatchInvoicingModal);
+  wire("forecast", ()=>openForecastModal());
+  wire("users", openManageUsersModal);
+}
+
+// Full-screen "everything else" menu for mobile, where the sidebar itself
+// is hidden and the bottom nav only has room for a handful of buttons.
+// Lists the exact same items as the sidebar (via buildNavGroups()) so
+// nothing in the sidebar is ever unreachable on a phone.
+function openMobileMoreMenu(){
+  const { tabs, entryTabs, reportTabs, adminTabs } = buildNavGroups();
+  const navBtn = tab => `<button data-tab="${tab.action?'':tab.id}" ${tab.action?`data-action="${tab.action}"`:''} class="${!tab.action && currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
+  const section = (label, items) => items.length ? `<div class="sidebar-group-label" style="cursor:default;"><span>${label}</span></div>${items.map(navBtn).join("")}` : "";
+  openModal(`
+    <h3>${t("Dheeraad","More")}</h3>
+    <div class="sidebar-nav" style="gap:4px;">
+      ${tabs.slice(2).map(navBtn).join("")}
+      ${section(t("GALINTA","ENTRY"), entryTabs)}
+      ${section(t("WARBIXINNO","REPORT"), reportTabs)}
+      ${adminTabs.length ? `<div class="sidebar-divider"></div>${adminTabs.map(navBtn).join("")}` : ""}
+      ${isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : ""}
+      ${isAdmin() ? `<button id="mobMoreSettings"><i class="ti ti-settings"></i><span>${t("Settings","Settings")}</span></button>` : ""}
+    </div>
+    <div class="actions"><button id="mCancel">${t("Xir","Close")}</button></div>
+  `);
+  document.getElementById("mCancel").addEventListener("click", closeModal);
+  const settingsBtn = document.getElementById("mobMoreSettings");
+  if(settingsBtn) settingsBtn.addEventListener("click", ()=>{ closeModal(); openAppSettingsModal(); });
+  wireNavButtons(document.getElementById("modalRoot"), closeModal);
+}
+
+function renderTabs(){
+  const { tabs, entryTabs, reportTabs, adminTabs } = buildNavGroups();
   const navBtn = tab => `<button data-tab="${tab.action?'':tab.id}" ${tab.action?`data-action="${tab.action}"`:''} class="${!tab.action && currentTab===tab.id?'on':''}"><i class="ti ${tab.icon}"></i><span>${tab.label}</span></button>`;
   // Group headers are clickable toggles — click to expand/collapse the
   // items under them, collapsed by default so Entry/Report don't crowd
@@ -4107,43 +4175,13 @@ function renderTabs(){
     + tabs.slice(2).map(navBtn).join("")
     + (adminTabs.length ? `<div class="sidebar-divider"></div>` + adminTabs.map(navBtn).join("") : "")
     + (isAdmin() ? `<button data-action="users"><i class="ti ti-user"></i><span>${t("Isticmaalayaasha","Users")}</span></button>` : "");
-  navList.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
-    btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
-  });
   navList.querySelectorAll("[data-group]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       sidebarGroupsExpanded[btn.dataset.group] = !sidebarGroupsExpanded[btn.dataset.group];
       renderTabs();
     });
   });
-  const usersBtn = navList.querySelector("[data-action='users']");
-  if(usersBtn) usersBtn.addEventListener("click", openManageUsersModal);
-  const invoiceBtn = navList.querySelector("[data-action='invoice']");
-  if(invoiceBtn) invoiceBtn.addEventListener("click", openInvoiceEntryModal);
-  const receiptBtn = navList.querySelector("[data-action='receipt']");
-  if(receiptBtn) receiptBtn.addEventListener("click", openQuickReceiptModal);
-  const paymentBtn = navList.querySelector("[data-action='payment']");
-  if(paymentBtn) paymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
-  const badDebtBtn = navList.querySelector("[data-action='baddebt']");
-  if(badDebtBtn) badDebtBtn.addEventListener("click", ()=>openNewJournalEntryModal("writeoff"));
-  const giveLoanBtn = navList.querySelector("[data-action='giveloan']");
-  if(giveLoanBtn) giveLoanBtn.addEventListener("click", openGiveLoanModal);
-  const chargeMemberBtn = navList.querySelector("[data-action='chargemember']");
-  if(chargeMemberBtn) chargeMemberBtn.addEventListener("click", openAddReceivableModal);
-  const loanReceiptBtn = navList.querySelector("[data-action='loanreceipt']");
-  if(loanReceiptBtn) loanReceiptBtn.addEventListener("click", openLoanReceiptModal);
-  const membersReportBtn = navList.querySelector("[data-action='membersreport']");
-  if(membersReportBtn) membersReportBtn.addEventListener("click", openReportsModal);
-  const acctReportBtn = navList.querySelector("[data-action='acctreport']");
-  if(acctReportBtn) acctReportBtn.addEventListener("click", openAccountBalanceReportModal);
-  const balanceSheetBtn = navList.querySelector("[data-action='balancesheet']");
-  if(balanceSheetBtn) balanceSheetBtn.addEventListener("click", openBalanceSheetReportModal);
-  const badDebtReportBtn = navList.querySelector("[data-action='baddebtreport']");
-  if(badDebtReportBtn) badDebtReportBtn.addEventListener("click", openBadDebtReport);
-  const batchInvoiceBtn = navList.querySelector("[data-action='batchinvoice']");
-  if(batchInvoiceBtn) batchInvoiceBtn.addEventListener("click", openBatchInvoicingModal);
-  const forecastBtn = navList.querySelector("[data-action='forecast']");
-  if(forecastBtn) forecastBtn.addEventListener("click", ()=>openForecastModal());
+  wireNavButtons(navList);
 
   const footer = document.getElementById("sidebarFooter");
   const roleLabel = currentUserObj.role === "admin" ? t("Maamule","Admin") : t("Shaqaale","Staff");
@@ -4163,21 +4201,17 @@ function renderTabs(){
   // Dashboard/Members + the Entry quick-actions (Invoice/Receipt/Payment) —
   // the transactions staff need on the go — take priority in the limited
   // mobile bottom-nav space; falls back to the next tabs if entryTabs is
-  // empty (no collectPayment permission).
-  const mobileTabs = tabs.slice(0,2).concat(entryTabs.length ? entryTabs : tabs.slice(2)).slice(0,5);
+  // empty (no collectPayment permission). The last slot is always "More",
+  // which opens everything else in the sidebar (Reports, Financials,
+  // Accounts, Give Loan, Bad Debt Report, Pending Approvals, Users, ...) —
+  // none of that was reachable at all on mobile before, since the sidebar
+  // itself is hidden below 768px and the bottom nav only has room for 5.
+  const mobileTabs = tabs.slice(0,2).concat(entryTabs.length ? entryTabs : tabs.slice(2)).slice(0,4);
   const nav = document.getElementById("mobileBottomNav");
-  nav.innerHTML = mobileTabs.map(mt=>`<button data-tab="${mt.action?'':mt.id}" ${mt.action?`data-action="${mt.action}"`:''} class="${!mt.action && currentTab===mt.id?'on':''}"><i class="ti ${mt.icon}"></i><span>${mt.label.split(' ')[0]}</span></button>`).join("");
-  nav.querySelectorAll("[data-tab]:not([data-tab=''])").forEach(btn=>{
-    btn.addEventListener("click", ()=>switchTab(btn.dataset.tab));
-  });
-  const mobInvoiceBtn = nav.querySelector("[data-action='invoice']");
-  if(mobInvoiceBtn) mobInvoiceBtn.addEventListener("click", openInvoiceEntryModal);
-  const mobReceiptBtn = nav.querySelector("[data-action='receipt']");
-  if(mobReceiptBtn) mobReceiptBtn.addEventListener("click", openQuickReceiptModal);
-  const mobPaymentBtn = nav.querySelector("[data-action='payment']");
-  if(mobPaymentBtn) mobPaymentBtn.addEventListener("click", ()=>openNewJournalEntryModal("expense"));
-  const mobForecastBtn = nav.querySelector("[data-action='forecast']");
-  if(mobForecastBtn) mobForecastBtn.addEventListener("click", ()=>openForecastModal());
+  nav.innerHTML = mobileTabs.map(mt=>`<button data-tab="${mt.action?'':mt.id}" ${mt.action?`data-action="${mt.action}"`:''} class="${!mt.action && currentTab===mt.id?'on':''}"><i class="ti ${mt.icon}"></i><span>${mt.label.split(' ')[0]}</span></button>`).join("")
+    + `<button id="mobMoreBtn"><i class="ti ti-dots"></i><span>${t("Dheeraad","More")}</span></button>`;
+  wireNavButtons(nav);
+  document.getElementById("mobMoreBtn").addEventListener("click", openMobileMoreMenu);
 }
 
 function updateMobileLayoutClass(){

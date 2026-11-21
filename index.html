@@ -4898,9 +4898,9 @@ function openBadDebtReport(){
   const rows = badDebtReportRows();
   const grand = rows.reduce((s,r)=>s+r.total,0);
   const rowsHtml = rows.map((r,i)=>`
-    <tr class="bdr-row" data-bdr="${i}" style="cursor:${r.items.length>1?'pointer':'default'};">
+    <tr class="bdr-row" data-bdr="${i}" style="cursor:pointer;">
       <td>${i+1}</td>
-      <td>${r.name}${r.items.length>1?` <span class="muted">(${r.items.length} ${t('cafinaad','write-offs')})</span>`:''}</td>
+      <td>${r.name} <span class="muted">(${r.items.length} ${t('cafinaad','write-off')}${r.items.length===1?'':'s'}) <i class="ti ti-chevron-down"></i></span></td>
       <td class="amt">${money(r.live)}</td>
       <td class="amt">${money(r.hist)}</td>
       <td class="amt">${money(r.total)}</td>
